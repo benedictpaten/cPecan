@@ -7,6 +7,7 @@ from sonLib.bioio import logger
 from sonLib.bioio import TestStatus
 from sonLib.bioio import getTempFile
 from sonLib.bioio import system
+from sonLib.bioio import parseSuiteTestOptions, getLogLevelString
 
 class TestCase(unittest.TestCase):
     
@@ -114,5 +115,10 @@ def seqFilePairGenerator():
                 seqFile2 = os.path.join(regionPath, "%s.%s.fa" % (species2, encodeRegion))
                 yield seqFile1, seqFile2
         
-if __name__ == '__main__':
+def main():
+    parseSuiteTestOptions()
     unittest.main()
+        
+if __name__ == '__main__':
+    main()
+

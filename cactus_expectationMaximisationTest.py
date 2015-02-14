@@ -1,14 +1,15 @@
 import unittest
 import os, sys
-from cactus.shared.test import parseCactusSuiteTestOptions
+import xml.etree.cElementTree as ET
+
 from sonLib.bioio import TestStatus
 from sonLib.bioio import logger
 from sonLib.bioio import getTempFile, getTempDirectory, system
-from cactus.bar.cactus_realignTest import seqFilePairGenerator
-from cactus.shared.common import runCactusExpectationMaximisation
-from cactus.bar.cactus_expectationMaximisation import Hmm, writeLastzScoringMatrix, makeBlastScoringMatrix
-from sonLib.bioio import getLogLevelString
-import xml.etree.cElementTree as ET
+from sonLib.bioio import parseSuiteTestOptions, getLogLevelString
+
+from cPecan.cactus_realignTest import seqFilePairGenerator
+from cPecan.common import runCactusExpectationMaximisation
+from cPecan.cactus_expectationMaximisation import Hmm, writeLastzScoringMatrix, makeBlastScoringMatrix
 
 class TestCase(unittest.TestCase):
     def setUp(self):
@@ -115,9 +116,9 @@ def computeAlignments(seqFile1, seqFile2, alignmentsFile, lastzArguments="--ambi
     system("cactus_lastz --format=cigar %s %s[multiple][nameparse=darkspace] %s[nameparse=darkspace] > %s" % (lastzArguments, seqFile1, seqFile2, alignmentsFile))
 
 def main():
-    parseCactusSuiteTestOptions()
-    sys.argv = sys.argv[:1]
+    parseSuiteTestOptions()
     unittest.main()
         
 if __name__ == '__main__':
     main()
+
