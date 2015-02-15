@@ -6,14 +6,13 @@
 import unittest
 
 from cPecan.cPecanLibTest import TestCase as cPecanLibTest
-from cPecan.cactus_realignTest import TestCase as realignTest
-from cPecan.cactus_expectationMaximisationTest import TestCase as expectationMaximisationTest
+from cPecan.cPecanRealignTest import TestCase as realignTest
+from cPecan.cPecanEmTest import TestCase as eMTest
 
 def allSuites(): 
     allTests = unittest.TestSuite((unittest.makeSuite(cPecanLibTest, 'test'),
                                    unittest.makeSuite(realignTest, 'test'),
-                                   unittest.makeSuite(expectationMaximisationTest, 'test'),                          
-                                   progressiveSuite()))
+                                   unittest.makeSuite(eMTest, 'test')))
     return allTests
         
 def main():

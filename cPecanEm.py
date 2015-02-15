@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Script to train pair-HMM of Cactus.
+"""Script to train pair-HMMs of cPecan.
 """
 
 import math
@@ -105,7 +105,7 @@ class Hmm:
         assert len(self.emissions) == self.stateNumber * SYMBOL_NUMBER**2
 
 def expectationMaximisation(target, sequences, alignments, outputModel, options):
-    #Iteratively run cactus realign to get expectations and load model.
+    #Iteratively run cPecanRealign to get expectations and load model.
     if options.inputModel != None: #Read in the model
         target.logToMaster("Loading the model from the input file %s" % options.inputModel)
         hmm = Hmm.loadHmm(options.inputModel)
@@ -176,8 +176,8 @@ def expectationMaximisation2(target, sequences, splitAlignments, modelsFile, exp
         fH.close()
 
 def calculateExpectations(target, sequences, alignments, modelsFile, expectationsFile, options):
-    #Run cactus_realign
-    system("cat %s | cactus_realign --logLevel DEBUG %s %s --outputExpectations=%s %s" % (alignments, sequences, nameValue("loadHmm", modelsFile, str), expectationsFile, options.optionsToRealign))
+    #Run cPecanRealign
+    system("cat %s | cPecanRealign --logLevel DEBUG %s %s --outputExpectations=%s %s" % (alignments, sequences, nameValue("loadHmm", modelsFile, str), expectationsFile, options.optionsToRealign))
 
 def calculateMaximisation(target, sequences, splitAlignments, modelsFile, expectationsFiles, iteration, runningLikelihoods, options):
     #Load and merge the models files
@@ -211,7 +211,7 @@ def calculateMaximisation(target, sequences, splitAlignments, modelsFile, expect
 
 def calculateAlignments(target, sequences, alignments, modelsFile, options):
     temporaryAlignmentFile=os.path.join(target.getLocalTempDir(), "realign.cigar")
-    system("cat %s | cactus_realign --logLevel DEBUG %s --loadHmm=%s %s > %s" % (alignments, sequences, modelsFile, options.optionsToRealign, temporaryAlignmentFile))
+    system("cat %s | cPecanRealign --logLevel DEBUG %s --loadHmm=%s %s > %s" % (alignments, sequences, modelsFile, options.optionsToRealign, temporaryAlignmentFile))
     system("mv %s %s" % (temporaryAlignmentFile, alignments))
 
 def expectationMaximisationTrials(target, sequences, alignments, outputModel, options):
@@ -390,7 +390,7 @@ def addExpectationMaximisationOptions(parser, options):
     group.add_option("--trials", default=options.trials, help="Number of independent EM trials. The model with the highest likelihood will be reported. Will only work if randomStart=True", type=int)
     group.add_option("--outputTrialHmms", default=options.outputTrialHmms, help="Writes out the final trained hmm for each trial, as outputModel + _i", action="store_true")
     group.add_option("--randomStart", default=options.randomStart, help="Iterate start model with small random values, else all values are equal", action="store_true")
-    group.add_option("--optionsToRealign", default=options.optionsToRealign, help="Further options to pass to cactus_realign when computing expectation values, should be passed as a quoted string")
+    group.add_option("--optionsToRealign", default=options.optionsToRealign, help="Further options to pass to cPecanRalign when computing expectation values, should be passed as a quoted string")
     group.add_option("--updateTheBand", default=options.updateTheBand, help="After each iteration of EM update the set of alignments by realigning them, so allowing stochastic updating of the constraints. This does not alter the input alignments file", action="store_true")
     group.add_option("--maxAlignmentLengthPerJob", default=options.maxAlignmentLengthPerJob, help="Maximum total alignment length of alignments to include in one job during EM..", type=int)
     group.add_option("--maxAlignmentLengthToSample", default=options.maxAlignmentLengthToSample, help="Maximum total alignment length of alignments to include in doing EM. Alignments are randomly sampled without replacement to achieve maximum. \
@@ -426,5 +426,5 @@ def main():
         raise RuntimeError("Got failed jobs")
 
 if __name__ == '__main__':
-    from cactus.bar.cactus_expectationMaximisation import *
+    from cPecan.cPecanEm import *
     main()

@@ -17,8 +17,8 @@ class TestCase(unittest.TestCase):
     def tearDown(self):
         unittest.TestCase.tearDown(self)
         
-    def testCactusRealignDummy(self):
-        """Runs cactus realign using the "rescoreOriginalAlignment" mode
+    def testCPecanRealignDummy(self):
+        """Runs cPecanRealign using the "rescoreOriginalAlignment" mode
         and checks the output is equivalent to what you'd get by just running lastz.
         """
         for seqFile1, seqFile2 in seqFilePairGenerator():
@@ -30,8 +30,8 @@ class TestCase(unittest.TestCase):
                 self.assertTrue(realignCigar != None)
                 self.assertTrue(realignCigar == lastzCigar)
     
-    def testCactusRealign(self):
-        """Runs cactus realign using the default parameters and checks that the realigned output cigars align
+    def testCPecanRealign(self):
+        """Runs cPecanRealign using the default parameters and checks that the realigned output cigars align
         the same subsequences.
         """
         for seqFile1, seqFile2 in seqFilePairGenerator():
@@ -42,8 +42,8 @@ class TestCase(unittest.TestCase):
                 lastzCigar = cigarReadFromString(lastzLine)
                 self.assertTrue(realignCigar.sameCoordinates(lastzCigar))
     
-    def testCactusRealignSplitSequences(self):
-        """Runs cactus realign, splitting indels longer than 100bp, and check
+    def testCPecanRealignSplitSequences(self):
+        """Runs cPecanRealign, splitting indels longer than 100bp, and check
         that the coverage from the results is the same as the coverage from
         realigning with no arguments.."""
         for seqFile1, seqFile2 in seqFilePairGenerator():
@@ -69,7 +69,7 @@ class TestCase(unittest.TestCase):
             os.remove(realignOutput)
             os.remove(splitRealignOutput)
 
-    def testCactusRealignRescoreByIdentityAndProb(self):
+    def testCPecanRealignRescoreByIdentityAndProb(self):
         """Runs cactus realign using the default parameters and checks that the realigned output cigars align 
         the same subsequences.
         """
@@ -96,8 +96,8 @@ class TestCase(unittest.TestCase):
                 #print "Scores", "Rescore by identity", realignCigarByIdentity.score, "Rescore by posterior prob", realignCigarByPosteriorProb.score, "Rescore by identity ignoring gaps", realignCigarByIdentityIgnoringGaps.score, "Lastz score", lastzCigar.score
 
 def getCommands(seqFile1, seqFile2, realignArguments="", lastzArguments="--ambiguous=iupac"):  
-    lastzCommand = "cactus_lastz --format=cigar %s %s[multiple][nameparse=darkspace] %s[nameparse=darkspace]" % (lastzArguments, seqFile1, seqFile2)
-    realignCommand = "%s | cactus_realign %s %s %s" % (lastzCommand, realignArguments, seqFile1, seqFile2)
+    lastzCommand = "cPecanLastz --format=cigar %s %s[multiple][nameparse=darkspace] %s[nameparse=darkspace]" % (lastzArguments, seqFile1, seqFile2)
+    realignCommand = "%s | cPecanRealign %s %s %s" % (lastzCommand, realignArguments, seqFile1, seqFile2)
     return realignCommand, lastzCommand
                             
 def seqFilePairGenerator():

@@ -21,24 +21,24 @@ def getLogLevelString2(logLevelString):
         return getLogLevelString()
     return logLevelString
 
-def runCactusExpectationMaximisation(sequenceFiles, alignmentsFile, outputModelFile,
-                                     inputModelFile=None, 
-                                     modelType=None,
-                                     jobTreeDir=None,
-                                     iterations=None, randomStart=None, 
-                                     trials=None,
-                                     optionsToRealign=None,
-                                     logLevel=None, 
-                                     updateTheBand=None,
-                                     maxAlignmentLengthPerJob=None,
-                                     maxAlignmentLengthToSample=None,
-                                     useDefaultModelAsStart=None, 
-                                     setJukesCantorStartingEmissions=None,
-                                     trainEmissions=None,
-                                     tieEmissions=None,
-                                     outputTrialHmms = None,
-                                     outputXMLModelFile = None,
-                                     blastScoringMatrixFile=None):
+def runCPecanEm(sequenceFiles, alignmentsFile, outputModelFile,
+                 inputModelFile=None, 
+                 modelType=None,
+                 jobTreeDir=None,
+                 iterations=None, randomStart=None, 
+                 trials=None,
+                 optionsToRealign=None,
+                 logLevel=None, 
+                 updateTheBand=None,
+                 maxAlignmentLengthPerJob=None,
+                 maxAlignmentLengthToSample=None,
+                 useDefaultModelAsStart=None, 
+                 setJukesCantorStartingEmissions=None,
+                 trainEmissions=None,
+                 tieEmissions=None,
+                 outputTrialHmms = None,
+                 outputXMLModelFile = None,
+                 blastScoringMatrixFile=None):
     logLevel = getLogLevelString2(logLevel)
     jobTreeDir= nameValue("jobTree", jobTreeDir, str)
     inputModelFile= nameValue("inputModel", inputModelFile, str)
@@ -58,7 +58,7 @@ def runCactusExpectationMaximisation(sequenceFiles, alignmentsFile, outputModelF
     outputXMLModelFile = nameValue("outputXMLModelFile", outputXMLModelFile, str)
     blastScoringMatrixFile = nameValue("blastScoringMatrixFile", blastScoringMatrixFile, str)
     
-    system("cactus_expectationMaximisation --sequences '%s' --alignments %s --outputModel %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s" % \
+    system("cPecanEm --sequences '%s' --alignments %s --outputModel %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s" % \
            (" ".join(sequenceFiles), alignmentsFile, outputModelFile, iterations, trials, randomStart, 
             jobTreeDir, inputModelFile, optionsToRealign, modelType,
             maxAlignmentLengthPerJob, maxAlignmentLengthToSample, updateTheBand, useDefaultModelAsStart, 

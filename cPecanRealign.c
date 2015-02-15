@@ -15,7 +15,7 @@
 #include "commonC.h"
 
 void usage() {
-    fprintf(stderr, "cactus_relign [options] seq1[fasta] seq2[fasta], version 0.2\n");
+    fprintf(stderr, "cPecanRelign [options] seq1[fasta] seq2[fasta], version 0.2\n");
     fprintf(stderr,
             "Realigns a set of pairwise alignments, as cigars, read from the command line and written back to the command line\n");
     fprintf(stderr, "-a --logLevel : Set the log level\n");
