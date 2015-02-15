@@ -59,6 +59,9 @@ class TestCase(unittest.TestCase):
             system(realignCommand)
             system(splitRealignCommand)
             # Check coverage on seqFile1
+            
+            #The following will fail until we refactor.
+            
             splitRealignCoverage = popenCatch("cactus_coverage %s %s" % (seqFile1, splitRealignOutput))
             realignCoverage = popenCatch("cactus_coverage %s %s" % (seqFile1, realignOutput))
             self.assertTrue(splitRealignCoverage == realignCoverage)
