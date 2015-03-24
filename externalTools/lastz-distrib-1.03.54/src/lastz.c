@@ -442,7 +442,7 @@ static const control defaultParams =
 	NULL,								// statsFilename
 	spt_dont,							// showPosTable
 	-1,								// randomSeed
-	0								// sampleHsps
+	0								// sampleSeedThreshold
 	};
 
 static const char* defaultSeedString = seed_12of19;
@@ -1548,6 +1548,7 @@ next_target:
 		abortQuery = !start_one_strand (target, targPositions, query,
 		                                /* empty anchors */ emptyAnchors,
 		                                /* prev anchor count */ 0,
+                                                currParams->sampleSeedThreshold,
 		                                hitProc, voidHitProcInfo);
 		emptyAnchors = false;
 		if (abortQuery) goto cleanup_query;
@@ -1559,11 +1560,6 @@ next_target:
 
 		if (!collectHspsFromBoth)
 			{
-			if (currParams->sampleHsps > 0)
-				{
-				originalNumAnchors = anchors->len;
-				choose_random_anchors (currParams->sampleHsps);
-				}
 			if (currParams->numBestHsps > 0)
 				{
 				originalNumAnchors = anchors->len;
@@ -1620,6 +1616,7 @@ next_target:
 			abortQuery = !start_one_strand (target, targPositions, query,
 			                                /* empty anchors */ emptyAnchors || (!collectHspsFromBoth),
 			                                prevAnchorCount,
+                                                        currParams->sampleSeedThreshold,
 			                                hitProc, voidHitProcInfo);
 			if (abortQuery) goto cleanup_query;
 
@@ -1632,12 +1629,6 @@ next_target:
 				{
 				originalNumAnchors = anchors->len;
 				choose_best_anchors (currParams->numBestHsps);
-				dbg_show_hsp_counts_2;
-				}
-			if (currParams->sampleHsps > 0)
-				{
-				originalNumAnchors = anchors->len;
-				choose_random_anchors (currParams->sampleHsps);
 				dbg_show_hsp_counts_2;
 				}
 
@@ -2932,6 +2923,7 @@ int start_one_strand
 	seq*			query,
 	int				emptyAnchors,
 	u32				prevAnchorCount,
+        u32                     sampleSeedThreshold,
 	hitprocessor	hitProc,
 	void*			hitProcInfo)
 	{
@@ -3013,6 +3005,7 @@ int start_one_strand
 		                 currParams->upperCharToBits, currParams->hitSeed,
 		                 searchLimit,
 		                 (currParams->searchLimitWarn)? currParams->searchLimit : 0,
+                                 sampleSeedThreshold,
 		                 hitProc, hitProcInfo);
 #else                    // === density filtering ENabled
 		basesHit = seed_hit_search (target, targPositions,
@@ -3021,6 +3014,7 @@ int start_one_strand
 		                            searchLimit,
 		                            (currParams->searchLimitWarn)? currParams->searchLimit : 0,
 		                            currParams->maxDensity,
+                                            sampleSeedThreshold,
 		                            hitProc, hitProcInfo);
 		if (basesHit == u64max) // maxDensity has been exceeded (u64max is used
 			goto abort;			// .. as a special value indicating this)
@@ -6750,14 +6744,14 @@ static void parse_options_loop
 		if (strcmp (arg, "--nomirror") == 0)
 			{ lzParams->mirrorHSP = false;  goto next_arg; }
 
-		if (strcmp_prefix (arg, "--sampleHsps=") == 0)
+		if (strcmp_prefix (arg, "--sampleSeedThreshold=") == 0)
 			{
 			tempInt = string_to_unitized_int (strchr(arg,'=')+1, true /*units of 1,000*/);
 			if (tempInt <= 0)
-				suicidef ("--sampleHsps must be positive");
-			lzParams->sampleHsps = tempInt;
+				suicidef ("--sampleSeedThreshold must be positive");
+			lzParams->sampleSeedThreshold = tempInt;
 			if (lzParams->searchLimit != 0)
-				chastise ("can't use %s with --sampleHsps\n", arg);
+				chastise ("can't use %s with --sampleSeedThreshold\n", arg);
 			goto next_arg;
 			}
 

@@ -153,6 +153,7 @@ static s32			searchToGo;
 #ifdef densityFiltering
 static u64			maxBasesAllowed;
 #endif // densityFiltering
+static u32              sampleSeedThreshold;
 static hitprocessor	processor;
 static void*		processorInfo;
 
@@ -326,6 +327,7 @@ u64 seed_hit_search
 #ifdef densityFiltering
 	double			_maxDensity,
 #endif // densityFiltering
+        u32                     _sampleSeedThreshold,
 	hitprocessor	_processor,
 	void*			_processorInfo)
 	{
@@ -369,6 +371,7 @@ u64 seed_hit_search
 #ifdef densityFiltering
 	maxBasesAllowed   = _maxDensity * seq2->len;
 #endif // densityFiltering
+        sampleSeedThreshold = _sampleSeedThreshold;
 	processor	      = _processor;
 	processorInfo     = _processorInfo;
 
@@ -815,9 +818,30 @@ static u64 find_table_matches
 #endif
 		return 0;
 		}
-
+        double sampleSeedProportion = 1.0;
+        if (sampleSeedThreshold > 1)
+                {
+                    u64 numSeedHits = 0;
+                    for (pos=pt->last[packed2] ; pos!=noPreviousPos ; pos=pt->prev[pos])
+                    {
+                        numSeedHits++;
+                    }
+                    if (numSeedHits > sampleSeedThreshold)
+                    {
+                        sampleSeedProportion = ((double)sampleSeedThreshold)/numSeedHits;
+                        fprintf(stderr, "found sampleSeedProportion %lf\n", sampleSeedProportion);
+                    }
+                }
 	for (pos=pt->last[packed2] ; pos!=noPreviousPos ; pos=pt->prev[pos])
 		{
+                if (sampleSeedProportion != 1.0)
+                    {
+                        if (drand48() > sampleSeedProportion)
+                        {
+                            fprintf(stderr, "skipping\n");
+                            continue;
+                        }
+                    }
 		pos1 = adjStart + step*pos;
 
 #ifdef debugSearchPos2

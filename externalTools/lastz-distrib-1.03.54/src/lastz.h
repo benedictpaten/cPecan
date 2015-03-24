@@ -440,6 +440,8 @@ typedef struct control
 	char*		statsFilename;	//     name of stats file (can be NULL)
 	int			showPosTable;	//     whether or not to show target positions
 								//     .. table (one of spt_xxx values)
+        int                     randomSeed;   // seed for random number generator
+        int                     sampleSeedThreshold; // sample seed hits so that about X hits will be randomly sampled
 	} control;
 
 // values for control parameters
@@ -473,6 +475,7 @@ void set_up_hit_processor (control* params, int collectingCensus,
 
 int  start_one_strand     (seq* target, postable* targPositions, seq* query,
                            int emptyAnchors, u32 prevAnchorsCount,
+                           u32 sampleSeedThreshold,
                            hitprocessor hitProc, void* hitProcInfo);
 void finish_one_strand    (seq* target, u8* targetRev,
                            postable* targPositions,

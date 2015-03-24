@@ -847,6 +847,7 @@ static void align_for_stats
 		abortQuery = !start_one_strand (target, targPositions, query,
 		                                /* empty anchors */ true,
 		                                /* prev anchor count */ 0,
+                                                0,
 		                                hitProc, hitProcInfo);
 		if (abortQuery) continue;
 		if (!collectHspsFromBoth)
@@ -859,6 +860,7 @@ static void align_for_stats
 			abortQuery = !start_one_strand (target, targPositions, query,
 			                                /* empty anchors */ !collectHspsFromBoth,
 			                                /* prev anchor count */ 0,
+                                                        0,
 			                                hitProc, hitProcInfo);
 			if (!abortQuery)
 				{
