@@ -440,7 +440,9 @@ static const control defaultParams =
 	false,								// showStats
 	NULL,								// statsFile
 	NULL,								// statsFilename
-	spt_dont							// showPosTable
+	spt_dont,							// showPosTable
+	-1,								// randomSeed
+	0								// sampleHsps
 	};
 
 static const char* defaultSeedString = seed_12of19;
@@ -575,6 +577,7 @@ static postable* capsule_position_table  (capinfo* cap, seq* seq,
 static interval  resolve_chore_target    (chore* chore, seq* target);
 static interval  resolve_chore_query     (seq* query, char strand);
 static void      choose_best_anchors     (u32 numAnchors);
+static void      choose_random_anchors   (u32 numAnchors);
 static score     chain_connect_penalty   (segment* seg1, segment* seg2, int scale);
 static void      remove_interval_seeds   (unspos b, unspos e, void* info);
 static u32       report_hsps             (void* info,
@@ -736,6 +739,12 @@ int main
 		currParams->anchorsFile  = fopen_or_die (currParams->anchorsFilename, "rt");
 		currParams->mergeAnchors = true;
 		}
+
+	// initialize prng
+	if (currParams->randomSeed == -1)
+		srand(time(NULL));
+	else
+		srand(currParams->randomSeed);
 
 	//////////
 	// open the sequence files
@@ -1550,6 +1559,11 @@ next_target:
 
 		if (!collectHspsFromBoth)
 			{
+			if (currParams->sampleHsps > 0)
+				{
+				originalNumAnchors = anchors->len;
+				choose_random_anchors (currParams->sampleHsps);
+				}
 			if (currParams->numBestHsps > 0)
 				{
 				originalNumAnchors = anchors->len;
@@ -1618,6 +1632,12 @@ next_target:
 				{
 				originalNumAnchors = anchors->len;
 				choose_best_anchors (currParams->numBestHsps);
+				dbg_show_hsp_counts_2;
+				}
+			if (currParams->sampleHsps > 0)
+				{
+				originalNumAnchors = anchors->len;
+				choose_random_anchors (currParams->sampleHsps);
 				dbg_show_hsp_counts_2;
 				}
 
@@ -3465,6 +3485,27 @@ static void choose_best_anchors
 	if (cutoffIx > 0)
 		anchors->len = cutoffIx;
 	}
+
+static void choose_random_anchors
+   (u32			numAnchors)
+	{
+	// check for special case where no limit is to be performed
+
+	if (numAnchors == 0) return;
+
+	// if we don't have more than N anchors, there's nothing to do
+
+	if (anchors->len <= numAnchors) return;
+
+	// randomly rearrange segments in-place
+
+	shuffle_segments(anchors);
+
+	// truncate the list
+
+	anchors->len = numAnchors;
+	}
+
 
 //----------
 //
@@ -6708,6 +6749,24 @@ static void parse_options_loop
 
 		if (strcmp (arg, "--nomirror") == 0)
 			{ lzParams->mirrorHSP = false;  goto next_arg; }
+
+		if (strcmp_prefix (arg, "--sampleHsps=") == 0)
+			{
+			tempInt = string_to_unitized_int (strchr(arg,'=')+1, true /*units of 1,000*/);
+			if (tempInt <= 0)
+				suicidef ("--sampleHsps must be positive");
+			lzParams->sampleHsps = tempInt;
+			if (lzParams->searchLimit != 0)
+				chastise ("can't use %s with --sampleHsps\n", arg);
+			goto next_arg;
+			}
+
+		if (strcmp_prefix (arg, "--randomSeed=") == 0)
+			{
+			tempInt = string_to_unitized_int (strchr(arg,'=')+1, true /*units of 1,000*/);
+			lzParams->randomSeed = tempInt;
+			goto next_arg;
+			}
 
 		// --out[put]=<file>
 
