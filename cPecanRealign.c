@@ -326,14 +326,29 @@ double scoreByPosteriorProbabilityIgnoringGaps(stList *alignedPairs) {
     return 100.0 * totalScore(alignedPairs) / ((double) stList_length(alignedPairs) * PAIR_ALIGNMENT_PROB_1);
 }
 
-void writePosteriorProbs(char *posteriorProbsFile, stList *alignedPairs) {
+int64_t transformCoordinate(int64_t coordinate, int64_t coordinateShift, bool flipStrand, int64_t seqLength) {
+    assert(seqLength > 0);
+    assert(coordinateShift >= 0);
+    int64_t i = coordinateShift + (flipStrand ? seqLength-1-coordinate : coordinate);
+    assert(i >= 0);
+    return i;
+}
+
+void writePosteriorProbs(char *posteriorProbsFile, stList *alignedPairs,
+        int64_t coordinateShift1, bool flipStrand1, int64_t seq1Length,
+        int64_t coordinateShift2, bool flipStrand2, int64_t seq2Length) {
     /*
      * Writes the posterior match probabibilities to a tab separated file, each line being X coordinate, Y coordinate, Match probability
      */
     FILE *fH = fopen(posteriorProbsFile, "w");
     for(int64_t i=0;i<stList_length(alignedPairs); i++) {
         stIntTuple *aPair = stList_get(alignedPairs, i);
-        fprintf(fH, "%" PRIi64 "\t%" PRIi64 "\t%f\n", stIntTuple_get(aPair, 1), stIntTuple_get(aPair, 2), ((double)stIntTuple_get(aPair, 0))/PAIR_ALIGNMENT_PROB_1);
+        fprintf(fH, "%" PRIi64 "\t%" PRIi64 "\t%f\n",
+                transformCoordinate(stIntTuple_get(aPair, 1),
+                        coordinateShift1, flipStrand1, seq1Length),
+                transformCoordinate(stIntTuple_get(aPair, 2),
+                        coordinateShift2, flipStrand2, seq2Length),
+                ((double)stIntTuple_get(aPair, 0))/PAIR_ALIGNMENT_PROB_1);
     }
     fclose(fH);
 }
@@ -561,7 +576,9 @@ int main(int argc, char *argv[]) {
                     pairwiseAlignmentBandingParameters, 1, 1);
             //Output all the posterior match probs, if needed
             if(allPosteriorProbsFile != NULL) {
-                writePosteriorProbs(allPosteriorProbsFile, alignedPairs);
+                writePosteriorProbs(allPosteriorProbsFile, alignedPairs,
+                                    coordinateShift1, flipStrand1, pA->end1-pA->start1,
+                                    coordinateShift2, flipStrand2, pA->end2-pA->start2);
             }
             //Convert to partial ordered set of pairs
             if (rescoreOriginalAlignment) {
@@ -585,7 +602,9 @@ int main(int argc, char *argv[]) {
             }
             //Output the posterior match probs, if needed
             if(posteriorProbsFile != NULL) {
-                writePosteriorProbs(posteriorProbsFile, alignedPairs);
+                writePosteriorProbs(posteriorProbsFile, alignedPairs,
+                                    coordinateShift1, flipStrand1, pA->end1-pA->start1,
+                                    coordinateShift2, flipStrand2, pA->end2-pA->start2);
             }
             //Convert to ordered list of sequence coordinate pairs
             stList_mapReplace(alignedPairs, convertToAnchorPair, NULL);
