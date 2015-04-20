@@ -37,7 +37,7 @@ def main():
                       help="The probability per base of a difference between \
                       the sequenced reference and the reference the reads are aligned to. \
                       Value must be between 0 and 1.", 
-                      default=0.05, type=float)
+                      default=0.00, type=float)
     
     parser.add_option("--gcContent", dest="gcContent", 
                       help="The desired GC content of the model. \
