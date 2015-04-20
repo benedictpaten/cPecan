@@ -98,6 +98,11 @@ class TestCase(unittest.TestCase):
             #Now use the blast file to compute a new matrix
             computeAlignments(seqFile1, seqFile2, alignmentsFile, lastzArguments=("--ambiguous=iupac --scores=%s" % outputBlastFile))
             
+            #Run modifyHmm to check it works
+            system("cPecanModifyHmm %s %s --gcContent=0.5 --substitutionRate=0.05 --setFlatIndelEmissions" % (outputModelFile, outputModelFile))
+            hmm = Hmm.loadHmm(outputModelFile)
+            node = ET.parse(outputModelXMLFile).getroot()
+            
             system("rm -rf %s" % tempDir)
     
     def testHMMToBlast(self):

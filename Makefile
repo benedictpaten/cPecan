@@ -8,7 +8,7 @@ libTests = tests/*.c
 cPecanDependencies =  ${basicLibsDependencies}
 cPecanLibs = ${basicLibs}
 
-all : ${libPath}/cPecanLib.a ${binPath}/cPecanLibTests ${binPath}/cPecanRealign ${binPath}/cPecanEm 
+all : ${libPath}/cPecanLib.a ${binPath}/cPecanLibTests ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/cPecanModifyHmm 
 	cd externalTools && make all
 	
 clean : 
@@ -24,6 +24,10 @@ ${binPath}/cPecanRealign : cPecanRealign.c ${libPath}/cPecanLib.a ${cPecanDepend
 ${binPath}/cPecanEm : cPecanEm.py
 	cp cPecanEm.py ${binPath}/cPecanEm
 	chmod +x ${binPath}/cPecanEm
+	
+${binPath}/cPecanModifyHmm : cPecanModifyHmm.py
+	cp cPecanModifyHmm.py ${binPath}/cPecanModifyHmm
+	chmod +x ${binPath}/cPecanModifyHmm
 
 ${binPath}/cPecanLibTests : ${libTests} tests/*.h ${libPath}/cPecanLib.a ${cPecanDependencies}
 	${cxx} ${cflags} -I inc -I${libPath} -Wno-error -o ${binPath}/cPecanLibTests ${libTests} ${libPath}/cPecanLib.a ${cPecanLibs}
