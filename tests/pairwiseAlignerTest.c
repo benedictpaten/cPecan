@@ -833,11 +833,13 @@ static void test_em_3State(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
+    
     SUITE_ADD_TEST(suite, test_diagonal);
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_logAdd);
     SUITE_ADD_TEST(suite, test_symbol);
     SUITE_ADD_TEST(suite, test_cell);
+    /*
     SUITE_ADD_TEST(suite, test_dpDiagonal);
     SUITE_ADD_TEST(suite, test_dpMatrix);
     SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
@@ -855,6 +857,7 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_em_3State);
     SUITE_ADD_TEST(suite, test_em_3StateAsymmetric);
     SUITE_ADD_TEST(suite, test_em_5State);
+    */
 
     return suite;
 }
