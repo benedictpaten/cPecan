@@ -13,6 +13,7 @@
 CuSuite* pairwiseAlignmentTestSuite(void);
 CuSuite* multipleAlignerTestSuite(void);
 CuSuite* pairwiseAlignmentLongTestSuite(void);
+CuSuite* shimTestSuite(void);
 
 int stBaseAlignerRunAllTests(void) {
 	CuString *output = CuStringNew();
@@ -20,6 +21,7 @@ int stBaseAlignerRunAllTests(void) {
 	CuSuiteAddSuite(suite, pairwiseAlignmentTestSuite());
 	CuSuiteAddSuite(suite, multipleAlignerTestSuite());
 	CuSuiteAddSuite(suite, pairwiseAlignmentLongTestSuite());
+    CuSuiteAddSuite(suite, shimTestSuite());
 	CuSuiteRun(suite);
 	CuSuiteSummary(suite, output);
 	CuSuiteDetails(suite, output);

@@ -16,6 +16,9 @@
 #include "sonLib.h"
 #include "pairwiseAligner.h"
 #include "pairwiseAlignment.h"
+#include "../inc/stateMachine.h"
+#include "../inc/shim.h"
+#include "../inc/pairwiseAligner.h"
 
 ///////////////////////////////////
 ///////////////////////////////////
@@ -57,7 +60,7 @@ inline int64_t diagonal_getMaxXmy(Diagonal diagonal) {
 inline int64_t diagonal_getWidth(Diagonal diagonal) {
     return (diagonal.xmyR - diagonal.xmyL) / 2 + 1;
 }
-
+// TODO should probably make a new version of this functions
 inline int64_t diagonal_getXCoordinate(int64_t xay, int64_t xmy) {
     assert((xay + xmy) % 2 == 0);
     return (xay + xmy) / 2;
@@ -66,7 +69,7 @@ inline int64_t diagonal_getXCoordinate(int64_t xay, int64_t xmy) {
 inline int64_t diagonal_equals(Diagonal diagonal1, Diagonal diagonal2) {
     return diagonal1.xay == diagonal2.xay && diagonal1.xmyL == diagonal2.xmyL && diagonal1.xmyR == diagonal2.xmyR;
 }
-
+// TODO should probably make a new version of this functions
 inline int64_t diagonal_getYCoordinate(int64_t xay, int64_t xmy) {
     assert((xay - xmy) % 2 == 0);
     return (xay - xmy) / 2;
@@ -314,8 +317,7 @@ static inline void doTransitionForward(double *fromCells, double *toCells, int64
     toCells[to] = logAdd(toCells[to], fromCells[from] + (eP + tP));
 }
 
-void cell_calculateForward(StateMachine *sM, double *current, double *lower, double *middle, double *upper, Symbol cX, Symbol cY,
-        void *extraArgs) {
+void cell_calculateForward(StateMachine *sM, double *current, double *lower, double *middle, double *upper, void* cX, void* cY, void *extraArgs) {
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, doTransitionForward, extraArgs);
 }
 
@@ -324,8 +326,7 @@ static inline void doTransitionBackward(double *fromCells, double *toCells, int6
     fromCells[from] = logAdd(fromCells[from], toCells[to] + (eP + tP));
 }
 
-void cell_calculateBackward(StateMachine *sM, double *current, double *lower, double *middle, double *upper, Symbol cX, Symbol cY,
-        void *extraArgs) {
+void cell_calculateBackward(StateMachine *sM, double *current, double *lower, double *middle, double *upper, void* cX, void* cY, void *extraArgs) {
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, doTransitionBackward, extraArgs);
 }
 
@@ -361,7 +362,7 @@ static inline void updateExpectations(double *fromCells, double *toCells, int64_
     }
 }
 
-static void cell_calculateExpectation(StateMachine *sM, double *current, double *lower, double *middle, double *upper, Symbol cX, Symbol cY,
+static void cell_calculateExpectation(StateMachine *sM, double *current, double *lower, double *middle, double *upper, void* cX, void* cY,
         void *extraArgs) {
     void *extraArgs2[4] = { ((void **)extraArgs)[0], ((void **)extraArgs)[1], &cX, &cY };
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, updateExpectations, extraArgs2);
@@ -537,13 +538,16 @@ static Symbol getYCharacter(const SymbolString sY, int64_t xay, int64_t xmy) {
 }
 
 static void diagonalCalculation(StateMachine *sM, DpDiagonal *dpDiagonal, DpDiagonal *dpDiagonalM1, DpDiagonal *dpDiagonalM2,
-        const SymbolString sX, const SymbolString sY,
-        void (*cellCalculation)(StateMachine *, double *, double *, double *, double *, Symbol, Symbol, void *), void *extraArgs) {
+        const Sequence* sX, const Sequence* sY,
+        void (*cellCalculation)(StateMachine *, double *, double *, double *, double *, void*, void*, void *), void *extraArgs) {
     Diagonal diagonal = dpDiagonal->diagonal;
     int64_t xmy = diagonal_getMinXmy(diagonal);
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
-        Symbol x = getXCharacter(sX, diagonal_getXay(diagonal), xmy);
-        Symbol y = getYCharacter(sY, diagonal_getXay(diagonal), xmy);
+//        Symbol x = getXCharacter(sX, diagonal_getXay(diagonal), xmy);
+//        Symbol y = getYCharacter(sY, diagonal_getXay(diagonal), xmy);
+        char* x = sX->get(sX->elements, (diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy)));
+        char* y = sY->get(sY->elements, (diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy)));
+        
         double *current = dpDiagonal_getCell(dpDiagonal, xmy);
         double *lower = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy - 1);
         double *middle = dpDiagonalM2 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM2, xmy);
@@ -553,18 +557,18 @@ static void diagonalCalculation(StateMachine *sM, DpDiagonal *dpDiagonal, DpDiag
     }
 }
 
-void diagonalCalculationForward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix, const SymbolString sX, const SymbolString sY) {
+void diagonalCalculationForward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix, const Sequence* sX, const Sequence* sY) {
     diagonalCalculation(sM, dpMatrix_getDiagonal(dpMatrix, xay), dpMatrix_getDiagonal(dpMatrix, xay - 1),
             dpMatrix_getDiagonal(dpMatrix, xay - 2), sX, sY, cell_calculateForward, NULL);
 }
 
-void diagonalCalculationBackward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix, const SymbolString sX, const SymbolString sY) {
+void diagonalCalculationBackward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix, const Sequence* sX, const Sequence* sY) {
     diagonalCalculation(sM, dpMatrix_getDiagonal(dpMatrix, xay), dpMatrix_getDiagonal(dpMatrix, xay - 1),
             dpMatrix_getDiagonal(dpMatrix, xay - 2), sX, sY, cell_calculateBackward, NULL);
 }
 
 double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
-        const SymbolString sX, const SymbolString sY) {
+        const Sequence* sX, const Sequence* sY) {
     //Get the forward and backward diagonals
     DpDiagonal *forwardDiagonal = dpMatrix_getDiagonal(forwardDpMatrix, xay);
     DpDiagonal *backDiagonal = dpMatrix_getDiagonal(backwardDpMatrix, xay);
@@ -583,7 +587,7 @@ double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatr
 }
 
 void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
-        const SymbolString sX, const SymbolString sY, double totalProbability, PairwiseAlignmentParameters *p,
+        const Sequence* sX, const Sequence* sY, double totalProbability, PairwiseAlignmentParameters *p,
         void *extraArgs) {
     assert(p->threshold >= 0.0);
     assert(p->threshold <= 1.0);
@@ -615,14 +619,17 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
 }
 
 static void diagonalCalculationExpectations(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
-        const SymbolString sX, const SymbolString sY, double totalProbability, PairwiseAlignmentParameters *p,
+        const Sequence* sX, const Sequence* sY, double totalProbability, PairwiseAlignmentParameters *p,
         void *extraArgs) {
     /*
      * Updates the expectations of the transitions/emissions for the given diagonal.
      */
     Hmm *hmmExpectations = extraArgs;
     void *extraArgs2[2] = { &totalProbability, hmmExpectations };
-    hmmExpectations->likelihood += totalProbability; //We do this once per diagonal, which is a hack, rather than for the whole matrix. The correction factor is approximately 1/number of diagonals.
+    hmmExpectations->likelihood += totalProbability; 
+    // We do this once per diagonal, which is a hack, rather than for the 
+    // whole matrix. The correction factor is approximately 1/number of 
+    // diagonals.
     diagonalCalculation(sM, dpMatrix_getDiagonal(backwardDpMatrix, xay), dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
             dpMatrix_getDiagonal(forwardDpMatrix, xay - 2), sX, sY, cell_calculateExpectation, extraArgs2);
 }
@@ -635,9 +642,9 @@ static void diagonalCalculationExpectations(StateMachine *sM, int64_t xay, DpMat
 ///////////////////////////////////
 ///////////////////////////////////
 
-void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const SymbolString sX, const SymbolString sY,
+void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const Sequence* sX, const Sequence* sY,
         PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
-        void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *, DpMatrix *, const SymbolString, const SymbolString, double,
+        void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *, DpMatrix *, const Sequence*, const Sequence*, double,
                 PairwiseAlignmentParameters *, void *), void *extraArgs) {
     //Prerequisites
     assert(p->traceBackDiagonals >= 1);
@@ -646,13 +653,13 @@ void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const S
     assert(p->minDiagsBetweenTraceBack >= 2);
     assert(p->traceBackDiagonals + 1 < p->minDiagsBetweenTraceBack);
 
-    int64_t diagonalNumber = sX.length + sY.length;
+    int64_t diagonalNumber = sX->length + sY->length;
     if (diagonalNumber == 0) { //Deal with trivial case
         return;
     }
 
     //Primitives for the forward matrix recursion
-    Band *band = band_construct(anchorPairs, sX.length, sY.length, p->diagonalExpansion);
+    Band *band = band_construct(anchorPairs, sX->length, sY->length, p->diagonalExpansion);
     BandIterator *forwardBandIterator = bandIterator_construct(band);
     DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
     dpDiagonal_initialiseValues(dpMatrix_createDiagonal(forwardDpMatrix, bandIterator_getNext(forwardBandIterator)), sM,

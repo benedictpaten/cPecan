@@ -12,6 +12,7 @@
 #include <string.h>
 #include <math.h>
 #include "randomSequences.h"
+#include "shim.h"
 
 static void test_diagonal(CuTest *testCase) {
     //Construct an example diagonal.
@@ -150,7 +151,7 @@ static void test_symbol(CuTest *testCase) {
     }
     free(cA2);
 }
-
+// so far looks ok
 static void test_cell(CuTest *testCase) {
     StateMachine *sM = stateMachine5_construct(fiveState);
     double lowerF[sM->stateNumber], middleF[sM->stateNumber], upperF[sM->stateNumber], currentF[sM->stateNumber];
@@ -165,15 +166,21 @@ static void test_cell(CuTest *testCase) {
         currentF[i] = LOG_ZERO;
         currentB[i] = sM->endStateProb(sM, i);
     }
-    Symbol cX = a, cY = t;
+    char* testXseq = "a";
+    char* testYseq = "t";
+    Sequence* xSeq = sequenceConstruct(1, testXseq, getBase);
+    Sequence* ySeq = sequenceConstruct(1, testYseq, getBase);
+    char* cX = xSeq->get(xSeq->elements, 0);
+    char* cY = ySeq->get(ySeq->elements, 0);
+//    Symbol cX = a, cY = t;
     //Do forward
-    cell_calculateForward(sM, lowerF, NULL, NULL, middleF, cX, cY, NULL);
-    cell_calculateForward(sM, upperF, middleF, NULL, NULL, cX, cY, NULL);
-    cell_calculateForward(sM, currentF, lowerF, middleF, upperF, cX, cY, NULL);
+    cell_calculateForward(sM, lowerF, NULL, NULL, middleF, *cX, *cY, NULL);
+    cell_calculateForward(sM, upperF, middleF, NULL, NULL, *cX, *cY, NULL);
+    cell_calculateForward(sM, currentF, lowerF, middleF, upperF, *cX, *cY, NULL);
     //Do backward
-    cell_calculateBackward(sM, currentB, lowerB, middleB, upperB, cX, cY, NULL);
-    cell_calculateBackward(sM, upperB, middleB, NULL, NULL, cX, cY, NULL);
-    cell_calculateBackward(sM, lowerB, NULL, NULL, middleB, cX, cY, NULL);
+    cell_calculateBackward(sM, currentB, lowerB, middleB, upperB, *cX, *cY, NULL);
+    cell_calculateBackward(sM, upperB, middleB, NULL, NULL, *cX, *cY, NULL);
+    cell_calculateBackward(sM, lowerB, NULL, NULL, middleB, *cX, *cY, NULL);
     double totalProbForward = cell_dotProduct2(currentF, sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(middleB, sM, sM->startStateProb);
     st_logInfo("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
@@ -239,15 +246,27 @@ static void test_dpMatrix(CuTest *testCase) {
 }
 
 static void test_diagonalDPCalculations(CuTest *testCase) {
-    //Sets up a complete matrix for the following example and checks the total marginal
-    //probability and the posterior probabilities of the matches
+    // Sets up a complete matrix for the following example and checks the total
+    // marginal probability and the posterior probabilities of the matches
 
-    const char *sX = "AGCG";
-    const char *sY = "AGTTCG";
-    int64_t lX = strlen(sX);
-    int64_t lY = strlen(sY);
-    SymbolString sX2 = symbolString_construct(sX, lX);
-    SymbolString sY2 = symbolString_construct(sY, lY);
+
+    
+//    const char *sX = "AGCG";
+//    const char *sY = "AGTTCG";
+    const char *seqX = "AGCG";
+    const char *seqY = "AGTTCG";
+    
+//    int64_t lX = strlen(sX);
+//    int64_t lY = strlen(sY);
+    int64_t lX = strlen(seqX);
+    int64_t lY = strlen(seqY);
+    
+//    SymbolString sX2 = symbolString_construct(sX, lX);
+//    SymbolString sY2 = symbolString_construct(sY, lY);
+    Sequence* sX2 = sequenceConstruct(lX, seqX, getBase);
+    Sequence* sY2 = sequenceConstruct(lY, seqY, getBase);
+    
+    
     StateMachine *sM = stateMachine5_construct(fiveState);
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
@@ -283,15 +302,18 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     double totalProbBackward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM,
             sM->startStateProb);
     st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
-
-    CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001); //Check the forward and back probabilities are about equal
-
-    //Test calculating the posterior probabilities along the diagonals of the matrix.
+    
+    CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);  
+    //Check the forward and back probabilities are about equal
+    
+    // Test calculating the posterior probabilities along the diagonals of the
+    // matrix.
     for (int64_t i = 0; i <= lX + lY; i++) {
         //Calculate the total probs
         double totalDiagonalProb = diagonalCalculationTotalProbability(sM, i, dpMatrixForward, dpMatrixBackward, sX2,
                 sY2);
-        CuAssertDblEquals(testCase, totalProbForward, totalDiagonalProb, 0.01); //Check the forward and back probabilities are about equal
+        CuAssertDblEquals(testCase, totalProbForward, totalDiagonalProb, 0.01); 
+        //Check the forward and back probabilities are about equal
     }
 
     //Now do the posterior probabilities
@@ -839,10 +861,10 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_logAdd);
     SUITE_ADD_TEST(suite, test_symbol);
     SUITE_ADD_TEST(suite, test_cell);
-    /*
     SUITE_ADD_TEST(suite, test_dpDiagonal);
     SUITE_ADD_TEST(suite, test_dpMatrix);
     SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+    /*
     SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_getBlastPairs);
     SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
@@ -858,6 +880,6 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_em_3StateAsymmetric);
     SUITE_ADD_TEST(suite, test_em_5State);
     */
-
+    
     return suite;
 }

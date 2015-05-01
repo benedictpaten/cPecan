@@ -18,6 +18,7 @@
 #include "sonLib.h"
 #include "pairwiseAlignment.h"
 #include "stateMachine.h"
+#include "shim.h"
 
 //The exception string
 extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
@@ -134,9 +135,9 @@ SymbolString symbolString_construct(const char *sequence, int64_t length);
 
 //Cell calculations
 
-void cell_calculateForward(StateMachine *sM, double *current, double *lower, double *middle, double *upper, Symbol cX, Symbol cY, void *extraArgs);
+void cell_calculateForward(StateMachine *sM, double *current, double *lower, double *middle, double *upper, void* cX, void* cY, void *extraArgs);
 
-void cell_calculateBackward(StateMachine *sM, double *current, double *lower, double *middle, double *upper, Symbol cX, Symbol cY, void *extraArgs);
+void cell_calculateBackward(StateMachine *sM, double *current, double *lower, double *middle, double *upper, void* cX, void* cY, void *extraArgs);
 
 double cell_dotProduct(double *cell1, double *cell2, int64_t stateNumber);
 
@@ -180,22 +181,22 @@ void dpMatrix_deleteDiagonal(DpMatrix *dpMatrix, int64_t xay);
 
 //Diagonal calculations
 
-void diagonalCalculationForward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix, const SymbolString sX, const SymbolString sY);
+void diagonalCalculationForward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix, const Sequence* sX, const Sequence* sY);
 
-void diagonalCalculationBackward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix, const SymbolString sX, const SymbolString sY);
+void diagonalCalculationBackward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix, const Sequence* sX, const Sequence* sY);
 
 double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
-        const SymbolString sX, const SymbolString sY);
+        const Sequence* sX, const Sequence* sY);
 
 void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
-        const SymbolString sX, const SymbolString sY,
+        const Sequence* sX, const Sequence* sY,
         double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs);
 
 //Banded matrix calculation of posterior probs
 
-void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const SymbolString sX, const SymbolString sY,
+void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const Sequence* sX, const Sequence* sY,
         PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
-        void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *, DpMatrix *, const SymbolString, const SymbolString,
+        void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *, DpMatrix *, const Sequence*, const Sequence*,
               double, PairwiseAlignmentParameters *, void *), void *extraArgs);
 
 //Blast pairs

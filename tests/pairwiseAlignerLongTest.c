@@ -135,8 +135,10 @@ static void test_pairwiseAligner_LongHumanDog(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentLongTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
+    /*
     SUITE_ADD_TEST(suite, test_pairwiseAligner_LongHumanDog);
     SUITE_ADD_TEST(suite, test_pairwiseAligner_LongHumanChimp);
     SUITE_ADD_TEST(suite, test_pairwiseAligner_LongHumanMouse);
+    */
     return suite;
 }

@@ -233,7 +233,7 @@ static void test_multipleAlignerRandom(CuTest *testCase) {
 
 CuSuite* multipleAlignerTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, test_getDistanceMatrix);
+/*    SUITE_ADD_TEST(suite, test_getDistanceMatrix);
     SUITE_ADD_TEST(suite, test_getReferencePairwiseAlignments);
     SUITE_ADD_TEST(suite, test_pairwiseAlignColumns);
     SUITE_ADD_TEST(suite, test_getMultipleSequenceAlignmentProgressive);
@@ -241,6 +241,6 @@ CuSuite* multipleAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_makeAlignmentUsingAllPairs);
     SUITE_ADD_TEST(suite, test_multipleAlignerAllPairsRandom);
     SUITE_ADD_TEST(suite, test_multipleAlignerRandom);
-
+*/
     return suite;
 }
