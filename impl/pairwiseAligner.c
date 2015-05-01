@@ -1090,7 +1090,7 @@ static void convertAlignedPairs(stList *alignedPairs2, int64_t offsetX, int64_t 
 void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(StateMachine *sM, stList *anchorPairs, const char *sX, const char *sY,
         int64_t lX, int64_t lY, PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd,
         bool alignmentHasRaggedRightEnd,
-        void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *, DpMatrix *, const SymbolString, const SymbolString, double,
+        void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *, DpMatrix *, const Sequence*, const Sequence*, double,
                 PairwiseAlignmentParameters *, void *), void (*coordinateCorrectionFn)(), void *extraArgs) {
     stList *splitPoints = getSplitPoints(anchorPairs, lX, lY, p->splitMatrixBiggerThanThis, alignmentHasRaggedLeftEnd, alignmentHasRaggedRightEnd);
     int64_t j = 0;
@@ -1103,10 +1103,13 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(StateMachine *sM
         int64_t y2 = stIntTuple_get(subRegion, 3);
 
         //Sub sequences
+        // may need new functions here?
         char *sX2 = stString_getSubString(sX, x1, x2 - x1);
         char *sY2 = stString_getSubString(sY, y1, y2 - y1);
-        SymbolString sX3 = symbolString_construct(sX2, x2 - x1);
-        SymbolString sY3 = symbolString_construct(sY2, y2 - y1);
+//        SymbolString sX3 = symbolString_construct(sX2, x2 - x1);
+//        SymbolString sY3 = symbolString_construct(sY2, y2 - y1);
+        Sequence* sX3 = sequenceConstruct(x2 - x1, sX2, getBase);
+        Sequence* sY3 = sequenceConstruct(y2 - y1, sY2, getBase);
 
         //List of anchor pairs
         stList *subListOfAnchorPoints = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
@@ -1135,8 +1138,8 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(StateMachine *sM
         stList_destruct(subListOfAnchorPoints);
         free(sX2);
         free(sY2);
-        symbolString_destruct(sX3);
-        symbolString_destruct(sY3);
+//        symbolString_destruct(sX3);
+//        symbolString_destruct(sY3);
     }
     assert(j == stList_length(anchorPairs));
     stList_destruct(splitPoints);

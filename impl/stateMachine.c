@@ -240,6 +240,7 @@ static void emissions_setGapProbsToDefaults(double *emissionGapProbs) {
     memcpy(emissionGapProbs, i, sizeof(double)*SYMBOL_NUMBER_NO_N);
 }
 
+// TODO make a new function like this
 static void symbol_check(Symbol c) {
     assert(c >= 0 && c < SYMBOL_NUMBER);
 }
@@ -397,7 +398,7 @@ static double stateMachine5_raggedEndStateProb(StateMachine *sM, int64_t state) 
 }
 
 static void stateMachine5_cellCalculate(StateMachine *sM, double *current, double *lower, double *middle, double *upper,
-        Symbol cX, Symbol cY, void (*doTransition)(double *, double *, int64_t, int64_t, double, double, void *),
+        void* cX, void* cY, void (*doTransition)(double *, double *, int64_t, int64_t, double, double, void *),
         void *extraArgs) {
     StateMachine5 *sM5 = (StateMachine5 *) sM;
     if (lower != NULL) {

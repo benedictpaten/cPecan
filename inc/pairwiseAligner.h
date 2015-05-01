@@ -215,7 +215,7 @@ stList *getSplitPoints(stList *anchorPairs, int64_t lX, int64_t lY,
 
 void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(StateMachine *sM, stList *anchorPairs, const char *sX, const char *sY, int64_t lX, int64_t lY,
         PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
-        void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *, DpMatrix *, const SymbolString, const SymbolString,
+        void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *, DpMatrix *, const Sequence*, const Sequence*,
                 double, PairwiseAlignmentParameters *, void *),
         void (*coordinateCorrectionFn)(), void *extraArgs);
 
