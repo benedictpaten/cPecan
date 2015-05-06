@@ -13,6 +13,7 @@
 #include "bioioC.h"
 #include "sonLib.h"
 #include "pairwiseAligner.h"
+#include "../inc/stateMachine.h"
 
 ///////////////////////////////////
 ///////////////////////////////////

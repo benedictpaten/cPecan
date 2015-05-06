@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <math.h>
 #include <ctype.h>
+#include <assert.h>
+#include <stdbool.h>
 
 #include "bioioC.h"
 #include "sonLib.h"
@@ -537,42 +539,58 @@ static Symbol getYCharacter(const SymbolString sY, int64_t xay, int64_t xmy) {
     return y > 0 ? sY.sequence[y - 1] : n;
 }
 
-static void diagonalCalculation(StateMachine *sM, DpDiagonal *dpDiagonal, DpDiagonal *dpDiagonalM1, DpDiagonal *dpDiagonalM2,
-        const Sequence* sX, const Sequence* sY,
-        void (*cellCalculation)(StateMachine *, double *, double *, double *, double *, void*, void*, void *), void *extraArgs) {
+static void diagonalCalculation(StateMachine *sM,
+                                DpDiagonal *dpDiagonal, DpDiagonal *dpDiagonalM1, DpDiagonal *dpDiagonalM2,
+                                Sequence* sX, Sequence* sY,
+                                void (*cellCalculation)(StateMachine *,
+                                                        double *, double *, double *, double *, void*, void*, void *),
+                                void *extraArgs) {
     Diagonal diagonal = dpDiagonal->diagonal;
     int64_t xmy = diagonal_getMinXmy(diagonal);
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
 //        Symbol x = getXCharacter(sX, diagonal_getXay(diagonal), xmy);
 //        Symbol y = getYCharacter(sY, diagonal_getXay(diagonal), xmy);
-        char* x = sX->get(sX->elements, (diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy)));
-        char* y = sY->get(sY->elements, (diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy)));
+        char* x = sX->get(sX->elements, diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy));
+        char* y = sY->get(sY->elements, diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy));
         
         double *current = dpDiagonal_getCell(dpDiagonal, xmy);
         double *lower = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy - 1);
         double *middle = dpDiagonalM2 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM2, xmy);
         double *upper = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy + 1);
-        cellCalculation(sM, current, lower, middle, upper, x, y, extraArgs);
+        cellCalculation(sM, current, lower, middle, upper, *x, *y, extraArgs);
         xmy += 2;
     }
 }
 
-void diagonalCalculationForward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix, const Sequence* sX, const Sequence* sY) {
-    diagonalCalculation(sM, dpMatrix_getDiagonal(dpMatrix, xay), dpMatrix_getDiagonal(dpMatrix, xay - 1),
-            dpMatrix_getDiagonal(dpMatrix, xay - 2), sX, sY, cell_calculateForward, NULL);
+void diagonalCalculationForward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix,
+                                const Sequence* sX, const Sequence* sY) {
+    diagonalCalculation(sM,
+                        dpMatrix_getDiagonal(dpMatrix, xay),
+                        dpMatrix_getDiagonal(dpMatrix, xay - 1),
+                        dpMatrix_getDiagonal(dpMatrix, xay - 2),
+                        sX, sY,
+                        cell_calculateForward,
+                        NULL);
 }
 
-void diagonalCalculationBackward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix, const Sequence* sX, const Sequence* sY) {
-    diagonalCalculation(sM, dpMatrix_getDiagonal(dpMatrix, xay), dpMatrix_getDiagonal(dpMatrix, xay - 1),
-            dpMatrix_getDiagonal(dpMatrix, xay - 2), sX, sY, cell_calculateBackward, NULL);
+void diagonalCalculationBackward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix,
+                                 const Sequence* sX, const Sequence* sY) {
+    diagonalCalculation(sM,
+                        dpMatrix_getDiagonal(dpMatrix, xay),
+                        dpMatrix_getDiagonal(dpMatrix, xay - 1),
+                        dpMatrix_getDiagonal(dpMatrix, xay - 2),
+                        sX, sY,
+                        cell_calculateBackward,
+                        NULL);
 }
 
-double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
-        const Sequence* sX, const Sequence* sY) {
+double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
+                                           DpMatrix *backwardDpMatrix, const Sequence* sX, const Sequence* sY) {
     //Get the forward and backward diagonals
     DpDiagonal *forwardDiagonal = dpMatrix_getDiagonal(forwardDpMatrix, xay);
     DpDiagonal *backDiagonal = dpMatrix_getDiagonal(backwardDpMatrix, xay);
     double totalProbability = dpDiagonal_dotProduct(forwardDiagonal, backDiagonal);
+
     //Now calculate the contribution of matches through xay.
     forwardDiagonal = dpMatrix_getDiagonal(forwardDpMatrix, xay - 1);
     backDiagonal = dpMatrix_getDiagonal(backwardDpMatrix, xay + 1);
@@ -585,10 +603,10 @@ double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatr
     }
     return totalProbability;
 }
-
-void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
-        const Sequence* sX, const Sequence* sY, double totalProbability, PairwiseAlignmentParameters *p,
-        void *extraArgs) {
+// How are sX and sY being used by this function?
+void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
+                                            DpMatrix *backwardDpMatrix, const Sequence* sX, const Sequence* sY,
+                                            double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs) {
     assert(p->threshold >= 0.0);
     assert(p->threshold <= 1.0);
     stList *alignedPairs = ((void **) extraArgs)[0];
@@ -596,6 +614,7 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
     DpDiagonal *backDiagonal = dpMatrix_getDiagonal(backwardDpMatrix, xay);
     Diagonal diagonal = forwardDiagonal->diagonal;
     int64_t xmy = diagonal_getMinXmy(diagonal);
+
     //Walk over the cells computing the posteriors
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
         int64_t x = diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy);
@@ -618,9 +637,9 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
     }
 }
 
-static void diagonalCalculationExpectations(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
-        const Sequence* sX, const Sequence* sY, double totalProbability, PairwiseAlignmentParameters *p,
-        void *extraArgs) {
+static void diagonalCalculationExpectations(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
+                                            DpMatrix *backwardDpMatrix, const Sequence* sX, const Sequence* sY,
+                                            double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs) {
     /*
      * Updates the expectations of the transitions/emissions for the given diagonal.
      */

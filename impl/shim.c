@@ -1,6 +1,7 @@
 // AR
 
 #include "shim.h"
+#include "../inc/shim.h"
 #include <assert.h>
 
 
@@ -46,7 +47,7 @@ void* getKmer(void *elements, int64_t index) {
 
 // getEvent function, returns a pointer to a event in a sequence
 void* getEvent(void* elements, int64_t index) {
-    return ((Event*)elements+index);
+    return (Event *) elements + index;
 }
 
 

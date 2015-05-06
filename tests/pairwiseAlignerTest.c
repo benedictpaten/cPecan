@@ -11,8 +11,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <inttypes.h>
+#include <stdbool.h>
 #include "randomSequences.h"
 #include "shim.h"
+#include "../inc/pairwiseAligner.h"
 
 static void test_diagonal(CuTest *testCase) {
     //Construct an example diagonal.
@@ -248,9 +251,6 @@ static void test_dpMatrix(CuTest *testCase) {
 static void test_diagonalDPCalculations(CuTest *testCase) {
     // Sets up a complete matrix for the following example and checks the total
     // marginal probability and the posterior probabilities of the matches
-
-
-    
 //    const char *sX = "AGCG";
 //    const char *sY = "AGTTCG";
     const char *seqX = "AGCG";
@@ -302,9 +302,10 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     double totalProbBackward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM,
             sM->startStateProb);
     st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
-    
-    CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);  
+
     //Check the forward and back probabilities are about equal
+    CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);  
+
     
     // Test calculating the posterior probabilities along the diagonals of the
     // matrix.
@@ -397,8 +398,12 @@ static void test_getAlignedPairsWithBanding(CuTest *testCase) {
         int64_t lY = strlen(sY);
         st_logInfo("Sequence X to align: %s END\n", sX);
         st_logInfo("Sequence Y to align: %s END\n", sY);
-        SymbolString sX2 = symbolString_construct(sX, lX);
-        SymbolString sY2 = symbolString_construct(sY, lY);
+        //SymbolString sX2 = symbolString_construct(sX, lX);
+        //SymbolString sY2 = symbolString_construct(sY, lY);
+        Sequence* sX2 = sequenceConstruct(lX, sX, getBase);
+        Sequence* sY2 = sequenceConstruct(lY, sY, getBase);
+
+
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
         p->traceBackDiagonals = st_randomInt(1, 10);
@@ -419,8 +424,8 @@ static void test_getAlignedPairsWithBanding(CuTest *testCase) {
         stateMachine_destruct(sM);
         free(sX);
         free(sY);
-        free(sX2.sequence);
-        free(sY2.sequence);
+        free(sX2->elements);
+        free(sY2->elements);
         stList_destruct(alignedPairs);
     }
 }
