@@ -6,12 +6,15 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
+
 
 // Generalized sequence struct
 typedef struct sequence {
     int64_t length;
     void *elements;
     void *(*get)(void *elements, int64_t index);
+    char n;
 } Sequence;
 
 Sequence* sequenceConstruct(int length, void *elements, void (*getFcn));

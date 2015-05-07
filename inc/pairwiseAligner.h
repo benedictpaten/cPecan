@@ -229,4 +229,10 @@ stList *reweightAlignedPairs(stList *alignedPairs,
 
 stList *reweightAlignedPairs2(stList *alignedPairs, int64_t seqLengthX, int64_t seqLengthY, double gapGamma);
 
+// additions from Art
+int64_t getXindex(Sequence* sX, int64_t xay, int64_t xmy);
+
+int64_t getYindex(Sequence* sY, int64_t xay, int64_t xmy);
+
+
 #endif /* PAIRWISEALIGNER_H_ */

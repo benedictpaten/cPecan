@@ -13,7 +13,9 @@
 #include <ctype.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <inttypes.h>
 
+#include "shim.h"
 #include "bioioC.h"
 #include "sonLib.h"
 #include "pairwiseAligner.h"
@@ -538,6 +540,19 @@ static Symbol getYCharacter(const SymbolString sY, int64_t xay, int64_t xmy) {
     assert(y >= 0 && y <= sY.length);
     return y > 0 ? sY.sequence[y - 1] : n;
 }
+// Index functions for interacting with diagonals
+// TODO need unit tests for these functions
+int64_t getXindex(Sequence* sX, int64_t xay, int64_t xmy) {
+    int64_t x = diagonal_getXCoordinate(xay, xmy);
+    assert(x >= 0 && x <= sX->length);
+    return x;
+}
+
+int64_t getYindex(Sequence* sY, int64_t xay, int64_t xmy) {
+    int64_t y = diagonal_getYCoordinate(xay, xmy);
+    assert(y >= 0 && y <= sY->length);
+    return y;
+}
 
 static void diagonalCalculation(StateMachine *sM,
                                 DpDiagonal *dpDiagonal, DpDiagonal *dpDiagonalM1, DpDiagonal *dpDiagonalM2,
@@ -550,9 +565,17 @@ static void diagonalCalculation(StateMachine *sM,
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
 //        Symbol x = getXCharacter(sX, diagonal_getXay(diagonal), xmy);
 //        Symbol y = getYCharacter(sY, diagonal_getXay(diagonal), xmy);
-        char* x = sX->get(sX->elements, diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy));
-        char* y = sY->get(sY->elements, diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy));
-        
+
+        int64_t indexX = diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy) - 1;
+        int64_t indexY = diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy) - 1;
+
+//        char* x = sY->get(sY->elements, diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy));
+//        char* y = sX->get(sX->elements, diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy));
+
+        char* x = sX->get(sY->elements, indexX);
+        char* y = sY->get(sY->elements, indexY);
+        printf("base x at %lld: %c\n", xmy, *x);
+        printf("base y at %lld: %c\n", xmy, *y);
         double *current = dpDiagonal_getCell(dpDiagonal, xmy);
         double *lower = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy - 1);
         double *middle = dpDiagonalM2 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM2, xmy);

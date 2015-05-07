@@ -48,8 +48,10 @@ struct _stateMachine {
     double (*raggedStartStateProb)(StateMachine *sM, int64_t state);
 
     //Cells (states at a given coordinate(
-    void (*cellCalculate)(StateMachine *sM, double *current, double *lower, double *middle, double *upper, void* cX, void* cY,
-            void(*doTransition)(double *, double *, int64_t, int64_t, double, double, void *), void *extraArgs);
+    void (*cellCalculate)(StateMachine *sM, double *current, double *lower, double *middle, double *upper,
+                          void* cX, void* cY,
+                          void(*doTransition)(double *, double *, int64_t, int64_t, double, double, void *),
+                          void *extraArgs);
 };
 
 /*

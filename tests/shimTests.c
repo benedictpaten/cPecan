@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include "shim.h"
 #include "CuTest.h"
+#include "../inc/shim.h"
 
 // test chars (nucleotides)
 static void test_chars(CuTest* testCase) {
@@ -50,9 +51,11 @@ static void test_events(CuTest* testCase) {
 
 CuSuite* shimTestSuite() {
     CuSuite* suite = CuSuiteNew();
+
     SUITE_ADD_TEST(suite, test_chars);
     SUITE_ADD_TEST(suite, test_kmers);
     SUITE_ADD_TEST(suite, test_events);
+
     return suite;
 }
 

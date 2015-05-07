@@ -2,6 +2,7 @@
 
 #include "shim.h"
 #include "../inc/shim.h"
+#include "../inc/pairwiseAligner.h"
 #include <assert.h>
 
 
@@ -12,7 +13,7 @@ Sequence* sequenceConstruct(int length, void *elements, void (*getfPtr)) {
     self->length = length;
     self->elements = elements;
     self->get = getfPtr;
-    
+    self->n = "n"; // TODO decide on a generic empty/Null character?
     return self;
 }
 
