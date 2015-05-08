@@ -7,11 +7,12 @@
 #include "shim.h"
 #include "CuTest.h"
 #include "../inc/shim.h"
+#include "../../sonLib/lib/CuTest.h"
 
 // test chars (nucleotides)
 static void test_chars(CuTest* testCase) {
     char* testSequence = "GATACA";
-    int dnaLen = strlen(testSequence);
+    int dnaLen = (int) strlen(testSequence);
     Sequence* charSeq = sequenceConstruct(dnaLen, testSequence, getBase);
     for (int c = 0; c < dnaLen; c++) {
         char* b = charSeq->get(charSeq->elements, c);
@@ -21,7 +22,7 @@ static void test_chars(CuTest* testCase) {
 
 static void test_kmers(CuTest* testCase) {
     char* testSequence = "GATACAGATACAGATACA";
-    int len = strlen(testSequence);
+    int len = (int) strlen(testSequence);
     char testKmers[14][6] = {"GATAC", "ATACA", "TACAG", "ACAGA", "CAGAT", "AGATA",
                              "GATAC", "ATACA", "TACAG", "ACAGA", "CAGAT", "AGATA",
                              "GATAC", "ATACA"};

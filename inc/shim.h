@@ -23,6 +23,12 @@ void sequenceDestroy(Sequence* seq);
 
 typedef char base;
 
+typedef enum {
+    match=0;
+    transversion=1;
+    transition=2;
+} baseMatchTypes;
+
 void* getBase(void *elements, int64_t index);
 
 void* getKmer(void *elements, int64_t index);

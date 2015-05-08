@@ -17,7 +17,7 @@
 
 #include "shim.h"
 #include "bioioC.h"
-#include "sonLib.h"
+#include "../../sonLib/lib/sonLib.h"
 #include "pairwiseAligner.h"
 #include "pairwiseAlignment.h"
 #include "../inc/stateMachine.h"
@@ -64,7 +64,7 @@ inline int64_t diagonal_getMaxXmy(Diagonal diagonal) {
 inline int64_t diagonal_getWidth(Diagonal diagonal) {
     return (diagonal.xmyR - diagonal.xmyL) / 2 + 1;
 }
-// TODO should probably make a new version of this functions
+
 inline int64_t diagonal_getXCoordinate(int64_t xay, int64_t xmy) {
     assert((xay + xmy) % 2 == 0);
     return (xay + xmy) / 2;
@@ -318,19 +318,26 @@ void symbolString_destruct(SymbolString s) {
 
 static inline void doTransitionForward(double *fromCells, double *toCells, int64_t from, int64_t to, double eP,
         double tP, void *extraArgs) {
+    printf("Transition forward!!\n");
+    //printf("fromCells: %f, toCells: %f\n", fromCells, toCells);
+    printf("from: %lld, to: %lld, eP: %f, tP: %f\n", from, to, eP, tP);
     toCells[to] = logAdd(toCells[to], fromCells[from] + (eP + tP));
 }
 
 void cell_calculateForward(StateMachine *sM, double *current, double *lower, double *middle, double *upper, void* cX, void* cY, void *extraArgs) {
+    printf("Cell Calc forward: looking at bases cX: %c cY: %c\n", cX, cY);
+    //printf("current: %f, lower: %f, middle: %f, upper: %f\n", *current, *lower, *middle, *upper);
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, doTransitionForward, extraArgs);
 }
 
 static inline void doTransitionBackward(double *fromCells, double *toCells, int64_t from, int64_t to, double eP,
         double tP, void *extraArgs) {
+    //printf("Transition backward!!\nfrom: %lld, to: %lld, eP: %f, tP: %f\n", from, to, eP, tP);
     fromCells[from] = logAdd(fromCells[from], toCells[to] + (eP + tP));
 }
 
 void cell_calculateBackward(StateMachine *sM, double *current, double *lower, double *middle, double *upper, void* cX, void* cY, void *extraArgs) {
+    //printf("Cell Calc backward: looking at bases cX: %c cY: %c\n", cX, cY);
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, doTransitionBackward, extraArgs);
 }
 
@@ -557,30 +564,31 @@ int64_t getYindex(Sequence* sY, int64_t xay, int64_t xmy) {
 static void diagonalCalculation(StateMachine *sM,
                                 DpDiagonal *dpDiagonal, DpDiagonal *dpDiagonalM1, DpDiagonal *dpDiagonalM2,
                                 Sequence* sX, Sequence* sY,
-                                void (*cellCalculation)(StateMachine *,
-                                                        double *, double *, double *, double *, void*, void*, void *),
+                                void (*cellCalculation)(StateMachine *, double *, double *, double *, double *,
+                                                        void*, void*, void *),
                                 void *extraArgs) {
     Diagonal diagonal = dpDiagonal->diagonal;
-    int64_t xmy = diagonal_getMinXmy(diagonal);
+    int64_t xmy = diagonal_getMinXmy(diagonal); // get the smallest x - y coordinate
+    //printf("starting xmy: %lld\n", xmy);
+    // work from smallest to largest
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
 //        Symbol x = getXCharacter(sX, diagonal_getXay(diagonal), xmy);
 //        Symbol y = getYCharacter(sY, diagonal_getXay(diagonal), xmy);
 
-        int64_t indexX = diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy) - 1;
-        int64_t indexY = diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy) - 1;
-
-//        char* x = sY->get(sY->elements, diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy));
-//        char* y = sX->get(sX->elements, diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy));
+        int64_t indexX = getXindex(sX, diagonal_getXay(diagonal), xmy) - 1;
+        int64_t indexY = getYindex(sY, diagonal_getXay(diagonal), xmy) - 1;
 
         char* x = sX->get(sY->elements, indexX);
         char* y = sY->get(sY->elements, indexY);
-        printf("base x at %lld: %c\n", xmy, *x);
-        printf("base y at %lld: %c\n", xmy, *y);
+
+//        printf("x Index:%lld, xmy: %lld: base returned: %c\n", indexX, xmy, *x);
+//        printf("y Index:%lld, xmy: %lld: base returned: %c\n", indexY, xmy, *y);
+
         double *current = dpDiagonal_getCell(dpDiagonal, xmy);
         double *lower = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy - 1);
         double *middle = dpDiagonalM2 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM2, xmy);
         double *upper = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy + 1);
-        cellCalculation(sM, current, lower, middle, upper, *x, *y, extraArgs);
+        cellCalculation(sM, current, lower, middle, upper,(char*) *x, (char*) *y, extraArgs);
         xmy += 2;
     }
 }

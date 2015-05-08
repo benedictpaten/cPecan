@@ -13,7 +13,7 @@ Sequence* sequenceConstruct(int length, void *elements, void (*getfPtr)) {
     self->length = length;
     self->elements = elements;
     self->get = getfPtr;
-    self->n = "n"; // TODO decide on a generic empty/Null character?
+    //self->n = "n"; // TODO decide on a generic empty/Null character?
     return self;
 }
 
@@ -28,8 +28,13 @@ void sequenceDestroy(Sequence* seq) {
  
 // returns a pointer to base in a char array
 void* getBase(void *elements, int64_t index) {
-    return &(((char *)elements)[index]);
+    char* n;
+    n = "n";
+    return index >= 0 ? &(((char *)elements)[index]) : n;
 }
+
+// TODO make a function that compares bases.
+
 
 
 // returns a pointer to a kmer within a char array
@@ -45,6 +50,8 @@ void* getKmer(void *elements, int64_t index) {
     
     return k_i;
 }
+
+// TODO make a function that compares kmers
 
 // getEvent function, returns a pointer to a event in a sequence
 void* getEvent(void* elements, int64_t index) {

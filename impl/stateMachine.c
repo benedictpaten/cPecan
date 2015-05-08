@@ -14,6 +14,8 @@
 #include "sonLib.h"
 #include "pairwiseAligner.h"
 #include "../inc/stateMachine.h"
+#include "../../sonLib/lib/sonLibCommon.h"
+#include "../inc/pairwiseAligner.h"
 
 ///////////////////////////////////
 ///////////////////////////////////
@@ -298,7 +300,7 @@ static void emissions_loadGapProbs(double *emissionGapProbs, Hmm *hmm,
         emissionGapProbs[i] = log(emissionGapProbs[i]/total);
     }
 }
-
+// TODO these functions need to be refactored to work with sequence elements
 static inline double emission_getGapProb(const double *emissionGapProbs, Symbol i) {
     symbol_check(i);
     if(i == n) {
@@ -306,7 +308,7 @@ static inline double emission_getGapProb(const double *emissionGapProbs, Symbol 
     }
     return emissionGapProbs[i];
 }
-
+// TODO change Symbols to void*?
 static inline double emission_getMatchProb(const double *emissionMatchProbs, Symbol x, Symbol y) {
     symbol_check(x);
     symbol_check(y);

@@ -17,6 +17,11 @@
 #include "randomSequences.h"
 #include "shim.h"
 #include "../inc/pairwiseAligner.h"
+#include "../../sonLib/lib/sonLibCommon.h"
+#include "../../sonLib/lib/sonLibRandom.h"
+#include "../../sonLib/lib/CuTest.h"
+#include "../../sonLib/lib/sonLibExcept.h"
+#include "../../sonLib/lib/sonLibList.h"
 
 static void test_diagonal(CuTest *testCase) {
     //Construct an example diagonal.
@@ -255,7 +260,9 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     // marginal probability and the posterior probabilities of the matches
 //    const char *sX = "AGCG";
 //    const char *sY = "AGTTCG";
-    const char *sX = "AGCG";
+
+    //const char *sX = "AGCG";
+    const char *sX = "AGTTCG";
     const char *sY = "AGTTCG";
     
 //    int64_t lX = strlen(sX);
@@ -865,14 +872,14 @@ static void test_em_3State(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-//    SUITE_ADD_TEST(suite, test_diagonal);
-//    SUITE_ADD_TEST(suite, test_bands);
-//    SUITE_ADD_TEST(suite, test_logAdd);
-    SUITE_ADD_TEST(suite, test_symbol);
+    SUITE_ADD_TEST(suite, test_diagonal);
+    SUITE_ADD_TEST(suite, test_bands);
+    SUITE_ADD_TEST(suite, test_logAdd);
+    //SUITE_ADD_TEST(suite, test_symbol);
 //    SUITE_ADD_TEST(suite, test_cell);
-//    SUITE_ADD_TEST(suite, test_dpDiagonal);
-//    SUITE_ADD_TEST(suite, test_dpMatrix);
-//    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_dpMatrix);
+    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
 //    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
 
 /*

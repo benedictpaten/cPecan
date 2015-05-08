@@ -16,7 +16,7 @@
 
 #include "bioioC.h"
 #include "sonLib.h"
-#include "pairwiseAlignment.h"
+#include "../../sonLib/lib/pairwiseAlignment.h"
 #include "stateMachine.h"
 #include "shim.h"
 
