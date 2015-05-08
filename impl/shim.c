@@ -34,7 +34,23 @@ void* getBase(void *elements, int64_t index) {
 }
 
 // TODO make a function that compares bases.
-
+int64_t getBaseIndex(char base) {
+    printf("Running getBaseIndex\n");
+    //char b;
+    //b = *base;
+    switch (base) {
+        case 'A':
+            return 0;
+        case 'C':
+            return 1;
+        case 'G':
+            return 2;
+        case 'T':
+            return 3;
+        default:
+            return 4;
+    }
+}
 
 
 // returns a pointer to a kmer within a char array

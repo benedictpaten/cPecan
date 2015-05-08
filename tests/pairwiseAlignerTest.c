@@ -258,24 +258,23 @@ static void test_dpMatrix(CuTest *testCase) {
 static void test_diagonalDPCalculations(CuTest *testCase) {
     // Sets up a complete matrix for the following example and checks the total
     // marginal probability and the posterior probabilities of the matches
-//    const char *sX = "AGCG";
-//    const char *sY = "AGTTCG";
 
-    //const char *sX = "AGCG";
-    const char *sX = "AGTTCG";
+    // make sure simple DNA sequences
+    const char *sX = "AGCG";
     const char *sY = "AGTTCG";
-    
-//    int64_t lX = strlen(sX);
-//    int64_t lY = strlen(sY);
+
+    // set lX and lY to the lengths of those sequences
     int64_t lX = strlen(sX);
     int64_t lY = strlen(sY);
     
 //    SymbolString sX2 = symbolString_construct(sX, lX);
 //    SymbolString sY2 = symbolString_construct(sY, lY);
+    // construct a sequence struct from those sequences and assign the get function as get base
     Sequence* sX2 = sequenceConstruct(lX, sX, getBase);
     Sequence* sY2 = sequenceConstruct(lY, sY, getBase);
 
-
+    // construct a 5-state state machine, the forward and reverse DP Matrices, the band, the band
+    // iterators and the anchor pairs
     StateMachine *sM = stateMachine5_construct(fiveState);
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
@@ -294,12 +293,14 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixBackward, lX + lY), sM, sM->endStateProb);
 
     //Forward algorithm
+    printf("At forward algorithm\n");
     for (int64_t i = 1; i <= lX + lY; i++) {
         //Do the forward calculation
         diagonalCalculationForward(sM, i, dpMatrixForward, sX2, sY2);
     }
 
     //Backward algorithm
+    printf("At backward algorithm\n");
     for (int64_t i = lX + lY; i > 0; i--) {
         //Do the backward calculation
         diagonalCalculationBackward(sM, i, dpMatrixBackward, sX2, sY2);
@@ -351,6 +352,7 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
         stIntTuple *pair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
         st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
+        // TODO this is next
         CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2( x, y)) != NULL);
     }
     CuAssertIntEquals(testCase, 4, stList_length(alignedPairs));

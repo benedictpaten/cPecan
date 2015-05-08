@@ -16,6 +16,7 @@
 #include "../inc/stateMachine.h"
 #include "../../sonLib/lib/sonLibCommon.h"
 #include "../inc/pairwiseAligner.h"
+#include "../inc/shim.h"
 
 ///////////////////////////////////
 ///////////////////////////////////
@@ -301,18 +302,18 @@ static void emissions_loadGapProbs(double *emissionGapProbs, Hmm *hmm,
     }
 }
 // TODO these functions need to be refactored to work with sequence elements
-static inline double emission_getGapProb(const double *emissionGapProbs, Symbol i) {
-    symbol_check(i);
-    if(i == n) {
+static inline double emission_getGapProb(const double *emissionGapProbs, int64_t i) {
+    //symbol_check(i);
+    if(i == 4) {
         return -1.386294361; //log(0.25)
     }
     return emissionGapProbs[i];
 }
 // TODO change Symbols to void*?
-static inline double emission_getMatchProb(const double *emissionMatchProbs, Symbol x, Symbol y) {
-    symbol_check(x);
-    symbol_check(y);
-    if(x == n || y == n) {
+static inline double emission_getMatchProb(const double *emissionMatchProbs, int64_t x, int64_t y) {
+//    symbol_check(x);
+//    symbol_check(y);
+    if(x == 4 || y == 4) {
         return -2.772588722; //log(0.25**2)
     }
     return emissionMatchProbs[x * SYMBOL_NUMBER_NO_N + y];
@@ -405,7 +406,10 @@ static void stateMachine5_cellCalculate(StateMachine *sM, double *current, doubl
         void *extraArgs) {
     StateMachine5 *sM5 = (StateMachine5 *) sM;
     if (lower != NULL) {
-        double eP = emission_getGapProb(sM5->EMISSION_GAP_X_PROBS, cX);
+        printf("at LOWER\n");
+        int64_t cXindex = getBaseIndex(cX);
+        printf("base index returned %lld from base: %c\n", cXindex, cX);
+        double eP = emission_getGapProb(sM5->EMISSION_GAP_X_PROBS, cXindex);
         doTransition(lower, current, match, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_OPEN_X, extraArgs);
         doTransition(lower, current, shortGapX, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_X, extraArgs);
         //doTransition(lower, current, shortGapY, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X, extraArgs);
@@ -414,7 +418,12 @@ static void stateMachine5_cellCalculate(StateMachine *sM, double *current, doubl
         //doTransition(lower, current, longGapY, longGapX, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_X, extraArgs);
     }
     if (middle != NULL) {
-        double eP = emission_getMatchProb(sM5->EMISSION_MATCH_PROBS, cX, cY); //symbol_matchProb(cX, cY);
+        printf("at MIDDLE\n");
+        int64_t cXindex = getBaseIndex(cX);
+        int cYindex = getBaseIndex(cY);
+        printf("base index returned %lld from base: %c\n", cXindex, cX);
+        printf("base index returned %lld from base: %c\n", cYindex, cY);
+        double eP = emission_getMatchProb(sM5->EMISSION_MATCH_PROBS, cXindex, cYindex); //symbol_matchProb(cX, cY);
         doTransition(middle, current, match, match, eP, sM5->TRANSITION_MATCH_CONTINUE, extraArgs);
         doTransition(middle, current, shortGapX, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X, extraArgs);
         doTransition(middle, current, shortGapY, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y, extraArgs);
@@ -422,7 +431,10 @@ static void stateMachine5_cellCalculate(StateMachine *sM, double *current, doubl
         doTransition(middle, current, longGapY, match, eP, sM5->TRANSITION_MATCH_FROM_LONG_GAP_Y, extraArgs);
     }
     if (upper != NULL) {
-        double eP = emission_getGapProb(sM5->EMISSION_GAP_Y_PROBS, cY);
+        printf("at UPPER we have base: %c\n", cY);
+        int64_t cYindex = getBaseIndex((char)cY);
+        printf("base index returned %lld from base: %c\n", cYindex, cY);
+        double eP = emission_getGapProb(sM5->EMISSION_GAP_Y_PROBS, cYindex);
         doTransition(upper, current, match, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_OPEN_Y, extraArgs);
         doTransition(upper, current, shortGapY, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_Y, extraArgs);
         //doTransition(upper, current, shortGapX, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_SWITCH_TO_Y, extraArgs);

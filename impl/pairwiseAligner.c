@@ -318,14 +318,14 @@ void symbolString_destruct(SymbolString s) {
 
 static inline void doTransitionForward(double *fromCells, double *toCells, int64_t from, int64_t to, double eP,
         double tP, void *extraArgs) {
-    printf("Transition forward!!\n");
+    printf("Running doTransitionForward with: ");
     //printf("fromCells: %f, toCells: %f\n", fromCells, toCells);
     printf("from: %lld, to: %lld, eP: %f, tP: %f\n", from, to, eP, tP);
     toCells[to] = logAdd(toCells[to], fromCells[from] + (eP + tP));
 }
 
 void cell_calculateForward(StateMachine *sM, double *current, double *lower, double *middle, double *upper, void* cX, void* cY, void *extraArgs) {
-    printf("Cell Calc forward: looking at bases cX: %c cY: %c\n", cX, cY);
+    printf("Running cell_calculateForward, looking at bases cX: %c cY: %c\n", cX, cY);
     //printf("current: %f, lower: %f, middle: %f, upper: %f\n", *current, *lower, *middle, *upper);
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, doTransitionForward, extraArgs);
 }
