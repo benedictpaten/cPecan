@@ -160,7 +160,7 @@ static void test_symbol(CuTest *testCase) {
     }
     free(cA2);
 }
-// so far looks ok
+
 static void test_cell(CuTest *testCase) {
     StateMachine *sM = stateMachine5_construct(fiveState);
     double lowerF[sM->stateNumber], middleF[sM->stateNumber], upperF[sM->stateNumber], currentF[sM->stateNumber];
@@ -175,12 +175,12 @@ static void test_cell(CuTest *testCase) {
         currentF[i] = LOG_ZERO;
         currentB[i] = sM->endStateProb(sM, i);
     }
-    char* testXseq = "atta";
-    char* testYseq = "tgct";
-    Sequence* xSeq = sequenceConstruct(4, testXseq, (*getBase));
-    Sequence* ySeq = sequenceConstruct(4, testYseq, (*getBase));
-    char* cX = xSeq->get(xSeq->elements, 1);
-    char* cY = ySeq->get(ySeq->elements, 0);
+    char* testXseq = "ATTA";
+    char* testYseq = "TGCT";
+    Sequence* xSeq = sequenceConstruct(4, testXseq, getBase);
+    Sequence* ySeq = sequenceConstruct(4, testYseq, getBase);
+    char* cX = xSeq->get(xSeq->elements, 0);
+    char* cY = ySeq->get(ySeq->elements, 1);
 //    Symbol cX = a, cY = t;
     //Do forward
     cell_calculateForward(sM, lowerF, NULL, NULL, middleF, *cX, *cY, NULL);
@@ -263,6 +263,7 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     const char *sX = "AGCG";
     const char *sY = "AGTTCG";
 
+
     // set lX and lY to the lengths of those sequences
     int64_t lX = strlen(sX);
     int64_t lY = strlen(sY);
@@ -293,14 +294,14 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixBackward, lX + lY), sM, sM->endStateProb);
 
     //Forward algorithm
-    printf("At forward algorithm\n");
+    //printf("At forward algorithm\n");
     for (int64_t i = 1; i <= lX + lY; i++) {
         //Do the forward calculation
         diagonalCalculationForward(sM, i, dpMatrixForward, sX2, sY2);
     }
 
     //Backward algorithm
-    printf("At backward algorithm\n");
+    //printf("At backward algorithm\n");
     for (int64_t i = lX + lY; i > 0; i--) {
         //Do the backward calculation
         diagonalCalculationBackward(sM, i, dpMatrixBackward, sX2, sY2);
@@ -313,10 +314,9 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
             sM->startStateProb);
     st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
     //Check the forward and back probabilities are about equal
-    // TODO figure out why this test fails
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);
-    
-    
+
+
     // Test calculating the posterior probabilities along the diagonals of the
     // matrix.
     for (int64_t i = 0; i <= lX + lY; i++) {
@@ -326,36 +326,47 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
                                                                        sX2, sY2);
         
         //Check the forward and back probabilities are about equal
-        // TODO figure out why this test fails
         CuAssertDblEquals(testCase, totalProbForward, totalDiagonalProb, 0.01);
     }
     
     //Now do the posterior probabilities
     stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
+    // aligned pairs has length 0 here, just constructed
     void *extraArgs[1] = { alignedPairs };
     for (int64_t i = 1; i <= lX + lY; i++) {
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
         p->threshold = 0.2;
-        diagonalCalculationPosteriorMatchProbs(sM, i, dpMatrixForward, dpMatrixBackward, sX2, sY2, totalProbForward, p,
-                extraArgs);
+        diagonalCalculationPosteriorMatchProbs(sM, i, dpMatrixForward, dpMatrixBackward, sX2, sY2,
+                                               totalProbForward, p, extraArgs);
         pairwiseAlignmentBandingParameters_destruct(p);
     }
 
+    // Make a list of the correct anchor points
     stSortedSet *alignedPairsSet = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
-            (void (*)(void *)) stIntTuple_destruct);
+                                                          (void (*)(void *)) stIntTuple_destruct);
+
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(0, 0));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(1, 1));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 4));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 5));
 
+    //FIXME alignmentPairs is incorrect.
+    //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 2));
+    //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 3));
+    //printf("alignedPairs length %lld\n", stList_length(alignedPairs));
+
     for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
         stIntTuple *pair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
+        printf("for i = %lld: x = %lld, y = %lld\n", i, x, y);
         st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
-        // TODO this is next
-        CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2( x, y)) != NULL);
+        //printf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
+
+        // TODO this can work if you cheat and add the pairs above.  Why are the pairs incorrect?
+        CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
-    CuAssertIntEquals(testCase, 4, stList_length(alignedPairs));
+
+    CuAssertIntEquals(testCase, 4, (int) stList_length(alignedPairs));
 
 }
 
@@ -877,8 +888,8 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_diagonal);
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_logAdd);
-    //SUITE_ADD_TEST(suite, test_symbol);
-//    SUITE_ADD_TEST(suite, test_cell);
+    SUITE_ADD_TEST(suite, test_symbol);
+    SUITE_ADD_TEST(suite, test_cell);
     SUITE_ADD_TEST(suite, test_dpDiagonal);
     SUITE_ADD_TEST(suite, test_dpMatrix);
     SUITE_ADD_TEST(suite, test_diagonalDPCalculations);

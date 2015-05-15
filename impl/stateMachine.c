@@ -406,9 +406,9 @@ static void stateMachine5_cellCalculate(StateMachine *sM, double *current, doubl
         void *extraArgs) {
     StateMachine5 *sM5 = (StateMachine5 *) sM;
     if (lower != NULL) {
-        printf("at LOWER\n");
+        //printf("at LOWER we have base cX: %c\n", cX);
         int64_t cXindex = getBaseIndex(cX);
-        printf("base index returned %lld from base: %c\n", cXindex, cX);
+        //printf("base index returned %lld\n", cXindex);
         double eP = emission_getGapProb(sM5->EMISSION_GAP_X_PROBS, cXindex);
         doTransition(lower, current, match, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_OPEN_X, extraArgs);
         doTransition(lower, current, shortGapX, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_X, extraArgs);
@@ -418,11 +418,11 @@ static void stateMachine5_cellCalculate(StateMachine *sM, double *current, doubl
         //doTransition(lower, current, longGapY, longGapX, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_X, extraArgs);
     }
     if (middle != NULL) {
-        printf("at MIDDLE\n");
+        //printf("at MIDDLE we have bases cX: %c and cY: %c\n", cX, cY);
         int64_t cXindex = getBaseIndex(cX);
         int cYindex = getBaseIndex(cY);
-        printf("base index returned %lld from base: %c\n", cXindex, cX);
-        printf("base index returned %lld from base: %c\n", cYindex, cY);
+        //printf("base index returned %lld from base: %c\n", cXindex, cX);
+        //printf("base index returned %lld from base: %c\n", cYindex, cY);
         double eP = emission_getMatchProb(sM5->EMISSION_MATCH_PROBS, cXindex, cYindex); //symbol_matchProb(cX, cY);
         doTransition(middle, current, match, match, eP, sM5->TRANSITION_MATCH_CONTINUE, extraArgs);
         doTransition(middle, current, shortGapX, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X, extraArgs);
@@ -431,9 +431,9 @@ static void stateMachine5_cellCalculate(StateMachine *sM, double *current, doubl
         doTransition(middle, current, longGapY, match, eP, sM5->TRANSITION_MATCH_FROM_LONG_GAP_Y, extraArgs);
     }
     if (upper != NULL) {
-        printf("at UPPER we have base: %c\n", cY);
+        //printf("at UPPER we have base cY: %c\n", cY);
         int64_t cYindex = getBaseIndex((char)cY);
-        printf("base index returned %lld from base: %c\n", cYindex, cY);
+        //printf("base index returned %lld\n", cYindex);
         double eP = emission_getGapProb(sM5->EMISSION_GAP_Y_PROBS, cYindex);
         doTransition(upper, current, match, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_OPEN_Y, extraArgs);
         doTransition(upper, current, shortGapY, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_Y, extraArgs);

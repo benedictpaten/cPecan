@@ -33,9 +33,10 @@ void* getBase(void *elements, int64_t index) {
     return index >= 0 ? &(((char *)elements)[index]) : n;
 }
 
-// TODO make a function that compares bases.
+// hack that will exchange a char representing a base for an integer to make them
+// compatable with other functions that usually take enum datatype
 int64_t getBaseIndex(char base) {
-    printf("Running getBaseIndex\n");
+    //printf("Running getBaseIndex\n");
     //char b;
     //b = *base;
     switch (base) {
