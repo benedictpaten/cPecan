@@ -73,7 +73,7 @@ inline int64_t diagonal_getXCoordinate(int64_t xay, int64_t xmy) {
 inline int64_t diagonal_equals(Diagonal diagonal1, Diagonal diagonal2) {
     return diagonal1.xay == diagonal2.xay && diagonal1.xmyL == diagonal2.xmyL && diagonal1.xmyR == diagonal2.xmyR;
 }
-// TODO should probably make a new version of this functions
+// TODO should probably make a new version of this function
 inline int64_t diagonal_getYCoordinate(int64_t xay, int64_t xmy) {
     assert((xay - xmy) % 2 == 0);
     return (xay - xmy) / 2;
@@ -253,6 +253,7 @@ static inline double lookup(double x) {
 }
 
 double logAdd(double x, double y) {
+    //printf("Running logAdd! x=%f y=%f\n", x, y);
     if (x < y)
         return (x == LOG_ZERO || y - x >= logUnderflowThreshold) ? y : lookup(y - x) + x;
     return (y == LOG_ZERO || x - y >= logUnderflowThreshold) ? x : lookup(x - y) + y;
@@ -316,28 +317,35 @@ void symbolString_destruct(SymbolString s) {
 ///////////////////////////////////
 ///////////////////////////////////
 
-static inline void doTransitionForward(double *fromCells, double *toCells, int64_t from, int64_t to, double eP,
-        double tP, void *extraArgs) {
-    //printf("Running doTransitionForward with: ");
+static inline void doTransitionForward(double *fromCells, double *toCells, int64_t from, int64_t to,
+                                       double eP, double tP, void *extraArgs) {
+    //printf("Running doTransitionForward!\n");
+    //printf("toCells[to] at start %f\n", toCells[to]);
     //printf("from: %lld, to: %lld, eP: %f, tP: %f\n", from, to, eP, tP);
     toCells[to] = logAdd(toCells[to], fromCells[from] + (eP + tP));
+    //printf("toCells[to] at end %f\n", toCells[to]);
 }
 
-void cell_calculateForward(StateMachine *sM, double *current, double *lower, double *middle, double *upper, void* cX, void* cY, void *extraArgs) {
-    //printf("\nRunning cell_calculateForward, looking at bases cX: %c cY: %c\n", cX, cY);
+void cell_calculateForward(StateMachine *sM,
+                           double *current, double *lower, double *middle, double *upper,
+                           void* cX, void* cY, void *extraArgs) {
+    //printf("Running cell_calculateForward, looking at bases cX: %c cY: %c\n", cX, cY);
     //printf("current: %f, lower: %f, middle: %f, upper: %f\n", *current, *lower, *middle, *upper);
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, doTransitionForward, extraArgs);
 }
 
-static inline void doTransitionBackward(double *fromCells, double *toCells, int64_t from, int64_t to, double eP,
-        double tP, void *extraArgs) {
+static inline void doTransitionBackward(double *fromCells, double *toCells, int64_t from, int64_t to,
+                                        double eP, double tP, void *extraArgs) {
     //printf("Running doTransitionBackward with: ");
     //printf("from: %lld, to: %lld, eP: %f, tP: %f\n", from, to, eP, tP);
     fromCells[from] = logAdd(fromCells[from], toCells[to] + (eP + tP));
 }
 
-void cell_calculateBackward(StateMachine *sM, double *current, double *lower, double *middle, double *upper, void* cX, void* cY, void *extraArgs) {
-    //printf("\nRunning cell_calculateBackward, looking at bases cX: %c cY: %c\n", cX, cY);
+void cell_calculateBackward(StateMachine *sM,
+                            double *current, double *lower, double *middle, double *upper,
+                            void* cX, void* cY, void *extraArgs) {
+    //printf("Running cell_calculateBackward, looking at bases cX: %c cY: %c\n", cX, cY);
+    //printf("current: %f, lower: %f, middle: %f, upper: %f\n", *current, *lower, *middle, *upper);
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, doTransitionBackward, extraArgs);
 }
 
@@ -566,18 +574,25 @@ static void diagonalCalculation(StateMachine *sM,
                                 DpDiagonal *dpDiagonal, DpDiagonal *dpDiagonalM1, DpDiagonal *dpDiagonalM2,
                                 Sequence* sX, Sequence* sY,
                                 void (*cellCalculation)(StateMachine *, double *, double *, double *, double *,
-                                                        void*, void*, void *),
+                                                        void *, void *, void *),
                                 void *extraArgs) {
+    // what does dbDiagonalM1 and M2 mean?
+    //printf("Running diagonalCalculation!\n");
     Diagonal diagonal = dpDiagonal->diagonal;
     int64_t xmy = diagonal_getMinXmy(diagonal); // get the smallest x - y coordinate
-    //printf("starting xmy: %lld\n", xmy);
+    int64_t maxXmY = diagonal_getMaxXmy(diagonal);
+    //printf("starting xmy=%lld, MaxXmY=%lld\n", xmy, maxXmY);
     // work from smallest to largest
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
+
         int64_t indexX = getXindex(sX, diagonal_getXay(diagonal), xmy) - 1;
         int64_t indexY = getYindex(sY, diagonal_getXay(diagonal), xmy) - 1;
 
-        char* x = sX->get(sY->elements, indexX);
+        //printf("Got indexX=%lld, indexY=%lld ", indexX, indexY);
+
+        char* x = sX->get(sX->elements, indexX);
         char* y = sY->get(sY->elements, indexY);
+        //printf("for xmy=%lld, x=%c, y=%c\n", xmy, *x, *y);
 
         double *current = dpDiagonal_getCell(dpDiagonal, xmy);
         double *lower = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy - 1);
@@ -589,7 +604,7 @@ static void diagonalCalculation(StateMachine *sM,
 }
 
 void diagonalCalculationForward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix,
-                                const Sequence* sX, const Sequence* sY) {
+                                Sequence* sX, Sequence* sY) {
     diagonalCalculation(sM,
                         dpMatrix_getDiagonal(dpMatrix, xay),
                         dpMatrix_getDiagonal(dpMatrix, xay - 1),
@@ -600,7 +615,7 @@ void diagonalCalculationForward(StateMachine *sM, int64_t xay, DpMatrix *dpMatri
 }
 
 void diagonalCalculationBackward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix,
-                                 const Sequence* sX, const Sequence* sY) {
+                                 Sequence* sX, Sequence* sY) {
     diagonalCalculation(sM,
                         dpMatrix_getDiagonal(dpMatrix, xay),
                         dpMatrix_getDiagonal(dpMatrix, xay - 1),
@@ -611,7 +626,7 @@ void diagonalCalculationBackward(StateMachine *sM, int64_t xay, DpMatrix *dpMatr
 }
 
 double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
-                                           DpMatrix *backwardDpMatrix, const Sequence* sX, const Sequence* sY) {
+                                           DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY) {
     //Get the forward and backward diagonals
     DpDiagonal *forwardDiagonal = dpMatrix_getDiagonal(forwardDpMatrix, xay);
     DpDiagonal *backDiagonal = dpMatrix_getDiagonal(backwardDpMatrix, xay);
@@ -631,8 +646,10 @@ double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatr
 }
 // How are sX and sY being used by this function?
 void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
-                                            DpMatrix *backwardDpMatrix, const Sequence* sX, const Sequence* sY,
+                                            DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
                                             double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs) {
+    //printf("\nRunning diagonalCalculationPosteriorMatchProbs!\n");
+    //printf("going in, totalProbability=%f\n", totalProbability);
     assert(p->threshold >= 0.0);
     assert(p->threshold <= 1.0);
     stList *alignedPairs = ((void **) extraArgs)[0];
@@ -644,28 +661,35 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
     //printf("before loop alignedPairs has length: %lld\n", stList_length(alignedPairs));
 
     //Walk over the cells computing the posteriors
+    //printf("xmy will increase until < %lld\n", diagonal_getMaxXmy(diagonal));
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
+        //printf("At start xmy: %lld \n", xmy);
         int64_t x = diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy);
-        //printf("here X=%lld\n", x);
         int64_t y = diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy);
-        //printf("here Y=%lld\n", y);
-        //FIXME someh where in here the wrong x and y are being passed to alignedPairs
+        //printf("walking here x=%lld, y=%lld\n", x, y);
         if (x > 0 && y > 0) {
             double *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
+            //printf("cellForward: %f \n", cellForward[sM->matchState]);
             double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
+            //printf("cellBackward: %f \n", cellBackward[sM->matchState]);
+            // see if these should match
             double posteriorProbability = exp(
                     (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
-
+            //printf("posteriorProb: %f\n", posteriorProbability);
             if (posteriorProbability >= p->threshold) {
                 if (posteriorProbability > 1.0) {
                     posteriorProbability = 1.0;
                 }
                 posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
-                printf("Adding to alignedPairs: posteriorProb: %f, X: %lld, Y: %lld\n", posteriorProbability, x, y);
+                //printf("Adding to alignedPairs! posteriorProb: %lld, X: %lld, Y: %lld\n\n", (int64_t) posteriorProbability, x - 1, y - 1);
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
+            }
+            if (posteriorProbability <= p->threshold) {
+                //printf("NOT adding to aligned pairs! posteriorProb: %f, X: %lld, Y: %lld\n\n", posteriorProbability, x - 1, y - 1);
             }
         }
         xmy += 2;
+        //printf("at end xmy=%lld\n", xmy);
         //printf("After loop for xmy: %lld, alignedPairs has length %lld\n", xmy, stList_length(alignedPairs));
     }
     //printf("final length for alignedPairs: %lld\n", stList_length(alignedPairs));

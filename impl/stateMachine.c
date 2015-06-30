@@ -410,8 +410,10 @@ static void stateMachine5_cellCalculate(StateMachine *sM, double *current, doubl
         int64_t cXindex = getBaseIndex(cX);
         //printf("base index returned %lld\n", cXindex);
         double eP = emission_getGapProb(sM5->EMISSION_GAP_X_PROBS, cXindex);
+        //printf("emissionProb=%f\n", eP);
         doTransition(lower, current, match, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_OPEN_X, extraArgs);
         doTransition(lower, current, shortGapX, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_X, extraArgs);
+        // how come these are commented out?
         //doTransition(lower, current, shortGapY, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X, extraArgs);
         doTransition(lower, current, match, longGapX, eP, sM5->TRANSITION_GAP_LONG_OPEN_X, extraArgs);
         doTransition(lower, current, longGapX, longGapX, eP, sM5->TRANSITION_GAP_LONG_EXTEND_X, extraArgs);
@@ -420,10 +422,11 @@ static void stateMachine5_cellCalculate(StateMachine *sM, double *current, doubl
     if (middle != NULL) {
         //printf("at MIDDLE we have bases cX: %c and cY: %c\n", cX, cY);
         int64_t cXindex = getBaseIndex(cX);
-        int cYindex = getBaseIndex(cY);
+        int64_t cYindex = getBaseIndex(cY);
         //printf("base index returned %lld from base: %c\n", cXindex, cX);
         //printf("base index returned %lld from base: %c\n", cYindex, cY);
         double eP = emission_getMatchProb(sM5->EMISSION_MATCH_PROBS, cXindex, cYindex); //symbol_matchProb(cX, cY);
+        //printf("emissionProb=%f\n", eP);
         doTransition(middle, current, match, match, eP, sM5->TRANSITION_MATCH_CONTINUE, extraArgs);
         doTransition(middle, current, shortGapX, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X, extraArgs);
         doTransition(middle, current, shortGapY, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y, extraArgs);
@@ -435,6 +438,7 @@ static void stateMachine5_cellCalculate(StateMachine *sM, double *current, doubl
         int64_t cYindex = getBaseIndex((char)cY);
         //printf("base index returned %lld\n", cYindex);
         double eP = emission_getGapProb(sM5->EMISSION_GAP_Y_PROBS, cYindex);
+        //printf("emissionProb=%f\n", eP);
         doTransition(upper, current, match, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_OPEN_Y, extraArgs);
         doTransition(upper, current, shortGapY, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_Y, extraArgs);
         //doTransition(upper, current, shortGapX, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_SWITCH_TO_Y, extraArgs);

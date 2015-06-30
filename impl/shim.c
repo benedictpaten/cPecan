@@ -36,7 +36,6 @@ void* getBase(void *elements, int64_t index) {
 // hack that will exchange a char representing a base for an integer to make them
 // compatable with other functions that usually take enum datatype
 int64_t getBaseIndex(char base) {
-    //printf("Running getBaseIndex\n");
     //char b;
     //b = *base;
     switch (base) {

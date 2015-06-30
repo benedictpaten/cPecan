@@ -175,12 +175,14 @@ static void test_cell(CuTest *testCase) {
         currentF[i] = LOG_ZERO;
         currentB[i] = sM->endStateProb(sM, i);
     }
-    char* testXseq = "ATTA";
-    char* testYseq = "TGCT";
+    //char* testXseq = "ATTA";
+    //char* testYseq = "TGCT";
+    const char *testXseq = "AGCG";
+    const char *testYseq = "AGTTCG";
     Sequence* xSeq = sequenceConstruct(4, testXseq, getBase);
-    Sequence* ySeq = sequenceConstruct(4, testYseq, getBase);
-    char* cX = xSeq->get(xSeq->elements, 0);
-    char* cY = ySeq->get(ySeq->elements, 1);
+    Sequence* ySeq = sequenceConstruct(6, testYseq, getBase);
+    char* cX = xSeq->get(xSeq->elements, 2);
+    char* cY = ySeq->get(ySeq->elements, 2);
 //    Symbol cX = a, cY = t;
     //Do forward
     cell_calculateForward(sM, lowerF, NULL, NULL, middleF, *cX, *cY, NULL);
@@ -193,29 +195,40 @@ static void test_cell(CuTest *testCase) {
     double totalProbForward = cell_dotProduct2(currentF, sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(middleB, sM, sM->startStateProb);
     st_logInfo("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
+    //printf("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.00001); //Check the forward and back probabilities are about equal
 }
 
 static void test_dpDiagonal(CuTest *testCase) {
     StateMachine *sM = stateMachine5_construct(fiveState);
     Diagonal diagonal = diagonal_construct(3, -1, 1);
+
     DpDiagonal *dpDiagonal = dpDiagonal_construct(diagonal, sM->stateNumber);
 
     //Get cell
     double *c1 = dpDiagonal_getCell(dpDiagonal, -1);
+    //printf("c1 here %f\n", c1);
     CuAssertTrue(testCase, c1 != NULL);
+
     double *c2 = dpDiagonal_getCell(dpDiagonal, 1);
+    //printf("c2 here %f\n", c2);
     CuAssertTrue(testCase, c2 != NULL);
+
     CuAssertTrue(testCase, dpDiagonal_getCell(dpDiagonal, 3) == NULL);
     CuAssertTrue(testCase, dpDiagonal_getCell(dpDiagonal, -3) == NULL);
 
     dpDiagonal_initialiseValues(dpDiagonal, sM, sM->endStateProb); //Test initialise values
     double totalProb = LOG_ZERO;
     for (int64_t i = 0; i < sM->stateNumber; i++) {
+        //printf("c1 for i=%lld, %f\n", i, c1[i]);
+        //printf("c2 for i=%lld, %f\n", i, c2[i]);
+        //printf("endStateProb:%f\n", sM->endStateProb(sM, i));
         CuAssertDblEquals(testCase, c1[i], sM->endStateProb(sM, i), 0.0);
         CuAssertDblEquals(testCase, c2[i], sM->endStateProb(sM, i), 0.0);
         totalProb = logAdd(totalProb, 2 * c1[i]);
+        //printf("totalProb, c1:%f\n", totalProb);
         totalProb = logAdd(totalProb, 2 * c2[i]);
+        //printf("totalProb, c2:%f\n", totalProb);
     }
 
     DpDiagonal *dpDiagonal2 = dpDiagonal_clone(dpDiagonal);
@@ -232,24 +245,30 @@ static void test_dpMatrix(CuTest *testCase) {
     int64_t lX = 3, lY = 2;
     DpMatrix *dpMatrix = dpMatrix_construct(lX + lY, 5);
 
+    // check initialization
     CuAssertIntEquals(testCase, dpMatrix_getActiveDiagonalNumber(dpMatrix), 0);
 
+    // make sure there aren't any fantom diagonals
     for (int64_t i = -1; i <= lX + lY + 10; i++) {
         CuAssertTrue(testCase, dpMatrix_getDiagonal(dpMatrix, i) == NULL);
     }
 
+    // make some diagonals in the dpMatrix, and check them, then make sure that
+    // the number of active diagonals is correct.
     for (int64_t i = 0; i <= lX + lY; i++) {
         DpDiagonal *dpDiagonal = dpMatrix_createDiagonal(dpMatrix, diagonal_construct(i, -i, i));
         CuAssertTrue(testCase, dpDiagonal == dpMatrix_getDiagonal(dpMatrix, i));
         CuAssertIntEquals(testCase, dpMatrix_getActiveDiagonalNumber(dpMatrix), i + 1);
     }
 
+    // test for destroying diagonals
     for (int64_t i = lX + lY; i >= 0; i--) {
         dpMatrix_deleteDiagonal(dpMatrix, i);
         CuAssertTrue(testCase, dpMatrix_getDiagonal(dpMatrix, i) == NULL);
         CuAssertIntEquals(testCase, dpMatrix_getActiveDiagonalNumber(dpMatrix), i);
     }
 
+    // double check that they are gone
     CuAssertIntEquals(testCase, dpMatrix_getActiveDiagonalNumber(dpMatrix), 0);
 
     dpMatrix_destruct(dpMatrix);
@@ -259,17 +278,18 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     // Sets up a complete matrix for the following example and checks the total
     // marginal probability and the posterior probabilities of the matches
 
-    // make sure simple DNA sequences
+    // make some simple DNA sequences
     const char *sX = "AGCG";
+    //const char *sY = "AGCG";
     const char *sY = "AGTTCG";
-
 
     // set lX and lY to the lengths of those sequences
     int64_t lX = strlen(sX);
     int64_t lY = strlen(sY);
     
-//    SymbolString sX2 = symbolString_construct(sX, lX);
-//    SymbolString sY2 = symbolString_construct(sY, lY);
+    //SymbolString sX2 = symbolString_construct(sX, lX);
+    //SymbolString sY2 = symbolString_construct(sY, lY);
+
     // construct a sequence struct from those sequences and assign the get function as get base
     Sequence* sX2 = sequenceConstruct(lX, sX, getBase);
     Sequence* sY2 = sequenceConstruct(lY, sY, getBase);
@@ -294,25 +314,21 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixBackward, lX + lY), sM, sM->endStateProb);
 
     //Forward algorithm
-    //printf("At forward algorithm\n");
     for (int64_t i = 1; i <= lX + lY; i++) {
         //Do the forward calculation
         diagonalCalculationForward(sM, i, dpMatrixForward, sX2, sY2);
     }
-
     //Backward algorithm
-    //printf("At backward algorithm\n");
     for (int64_t i = lX + lY; i > 0; i--) {
         //Do the backward calculation
         diagonalCalculationBackward(sM, i, dpMatrixBackward, sX2, sY2);
     }
 
     //Calculate total probabilities
-    double totalProbForward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY),
-                                               sM, sM->endStateProb);
-    double totalProbBackward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM,
-            sM->startStateProb);
+    double totalProbForward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY), sM, sM->endStateProb);
+    double totalProbBackward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
     st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
+    //printf("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
     //Check the forward and back probabilities are about equal
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);
 
@@ -322,9 +338,9 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     for (int64_t i = 0; i <= lX + lY; i++) {
         //Calculate the total probs
         double totalDiagonalProb = diagonalCalculationTotalProbability(sM, i, 
-                                                                       dpMatrixForward, dpMatrixBackward, 
+                                                                       dpMatrixForward,
+                                                                       dpMatrixBackward,
                                                                        sX2, sY2);
-        
         //Check the forward and back probabilities are about equal
         CuAssertDblEquals(testCase, totalProbForward, totalDiagonalProb, 0.01);
     }
@@ -350,19 +366,15 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 4));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 5));
 
-    //FIXME alignmentPairs is incorrect.
     //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 2));
     //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 3));
-    //printf("alignedPairs length %lld\n", stList_length(alignedPairs));
 
     for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
         stIntTuple *pair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
-        printf("for i = %lld: x = %lld, y = %lld\n", i, x, y);
         st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
         //printf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
 
-        // TODO this can work if you cheat and add the pairs above.  Why are the pairs incorrect?
         CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
 
@@ -423,6 +435,8 @@ static void test_getAlignedPairsWithBanding(CuTest *testCase) {
         int64_t lY = strlen(sY);
         st_logInfo("Sequence X to align: %s END\n", sX);
         st_logInfo("Sequence Y to align: %s END\n", sY);
+        printf("Sequence X to align: %s END\n", sX);
+        printf("Sequence Y to align: %s END\n", sY);
         //SymbolString sX2 = symbolString_construct(sX, lX);
         //SymbolString sY2 = symbolString_construct(sY, lY);
         Sequence* sX2 = sequenceConstruct(lX, sX, getBase);
@@ -449,8 +463,8 @@ static void test_getAlignedPairsWithBanding(CuTest *testCase) {
         stateMachine_destruct(sM);
         free(sX);
         free(sY);
-        free(sX2->elements);
-        free(sY2->elements);
+        //free(sX2->elements);
+        //free(sY2->elements);
         stList_destruct(alignedPairs);
     }
 }
@@ -894,22 +908,20 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_dpMatrix);
     SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
 //    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
+//    SUITE_ADD_TEST(suite, test_getBlastPairs);
+//    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
+//    SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
+//    SUITE_ADD_TEST(suite, test_getSplitPoints);
+//    SUITE_ADD_TEST(suite, test_getAlignedPairs);
+//    SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
+//    SUITE_ADD_TEST(suite, test_hmm_5State);
+//    SUITE_ADD_TEST(suite, test_hmm_5StateAsymmetric);
+//    SUITE_ADD_TEST(suite, test_hmm_3State);
+//    SUITE_ADD_TEST(suite, test_hmm_3StateAsymmetric);
+//    SUITE_ADD_TEST(suite, test_em_3State);
+//    SUITE_ADD_TEST(suite, test_em_3StateAsymmetric);
+//    SUITE_ADD_TEST(suite, test_em_5State);
 
-/*
-    SUITE_ADD_TEST(suite, test_getBlastPairs);
-    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
-    SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
-    SUITE_ADD_TEST(suite, test_getSplitPoints);
-    SUITE_ADD_TEST(suite, test_getAlignedPairs);
-    SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
-    SUITE_ADD_TEST(suite, test_hmm_5State);
-    SUITE_ADD_TEST(suite, test_hmm_5StateAsymmetric);
-    SUITE_ADD_TEST(suite, test_hmm_3State);
-    SUITE_ADD_TEST(suite, test_hmm_3StateAsymmetric);
-    SUITE_ADD_TEST(suite, test_em_3State);
-    SUITE_ADD_TEST(suite, test_em_3StateAsymmetric);
-    SUITE_ADD_TEST(suite, test_em_5State);
-*/
 
     return suite;
 }

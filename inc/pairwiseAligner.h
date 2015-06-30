@@ -161,7 +161,8 @@ double dpDiagonal_dotProduct(DpDiagonal *diagonal1, DpDiagonal *diagonal2);
 
 void dpDiagonal_zeroValues(DpDiagonal *diagonal);
 
-void dpDiagonal_initialiseValues(DpDiagonal *diagonal, StateMachine *sM, double (*getStateValue)(StateMachine *, int64_t));
+void dpDiagonal_initialiseValues(DpDiagonal *diagonal, StateMachine *sM,
+                                 double (*getStateValue)(StateMachine *, int64_t));
 
 //DpMatrix
 
@@ -181,16 +182,17 @@ void dpMatrix_deleteDiagonal(DpMatrix *dpMatrix, int64_t xay);
 
 //Diagonal calculations
 
-void diagonalCalculationForward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix, const Sequence* sX, const Sequence* sY);
+void diagonalCalculationForward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix, Sequence* sX, Sequence* sY);
 
-void diagonalCalculationBackward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix, const Sequence* sX, const Sequence* sY);
+void diagonalCalculationBackward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix, Sequence* sX, Sequence* sY);
 
-double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
-        const Sequence* sX, const Sequence* sY);
+double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
+                                           DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY);
 
-void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
-        const Sequence* sX, const Sequence* sY,
-        double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs);
+void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
+                                            DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
+                                            double totalProbability, PairwiseAlignmentParameters *p,
+                                            void *extraArgs);
 
 //Banded matrix calculation of posterior probs
 
