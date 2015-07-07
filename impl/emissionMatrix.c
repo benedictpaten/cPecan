@@ -14,7 +14,6 @@ void emissions_setMatchProbsToDefaults(double *emissionMatchProbs) {
     const double S=-3.9833860032220842; //log(0.01862247669752685);
     const double N=-2.772588722;        //log(0.25**2)
 
-    //const int64_t MATRIX_SIZE = 256; //(4**2)**2
     //Symmetric matrix of emission probabilities.
 
     const double i[MATRIX_SIZE] = {
