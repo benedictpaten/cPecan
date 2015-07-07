@@ -9,6 +9,7 @@
 #include <assert.h>
 
 
+
 // Generalized sequence struct
 typedef struct sequence {
     int64_t length;

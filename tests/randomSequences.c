@@ -9,9 +9,13 @@
 #include <string.h>
 #include <math.h>
 #include "sonLib.h"
+#include "../../sonLib/lib/sonLibRandom.h"
+#include "../../sonLib/lib/sonLibCommon.h"
+#include "../../sonLib/lib/sonLibString.h"
 
 char getRandomChar() {
-    char *positions = "AaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtN";
+    //char *positions = "AaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtAaCcGgTtN";
+    char *positions = "AACCGGTTAACCGGTTAACCGGTTAACCGGTTAACCGGTTAACCGGTTAACCGGTTAACCGGTTAACCGGTTAACCGGTTAACCGGTTN";
     return positions[st_randomInt(0, strlen(positions))];
 }
 

@@ -226,7 +226,9 @@ static void emissions_setMatchProbsToDefaults(double *emissionMatchProbs) {
     const double EMISSION_MATCH=-2.1149196655034745; //log(0.12064298095701059);
     const double EMISSION_TRANSVERSION=-4.5691014376830479; //log(0.010367271172731285);
     const double EMISSION_TRANSITION=-3.9833860032220842; //log(0.01862247669752685);
-    //Symmetric matrix of transition probabilities.
+
+    //Symmetric matrix of transition probabilities. TODO do you mean emission probs here?
+
     const double i[SYMBOL_NUMBER_NO_N*SYMBOL_NUMBER_NO_N] = {
             EMISSION_MATCH, EMISSION_TRANSVERSION, EMISSION_TRANSITION, EMISSION_TRANSVERSION,
             EMISSION_TRANSVERSION, EMISSION_MATCH, EMISSION_TRANSVERSION, EMISSION_TRANSITION,
@@ -301,7 +303,7 @@ static void emissions_loadGapProbs(double *emissionGapProbs, Hmm *hmm,
         emissionGapProbs[i] = log(emissionGapProbs[i]/total);
     }
 }
-// TODO these functions need to be refactored to work with sequence elements
+
 static inline double emission_getGapProb(const double *emissionGapProbs, int64_t i) {
     //symbol_check(i);
     if(i == 4) {

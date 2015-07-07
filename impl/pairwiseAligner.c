@@ -719,10 +719,17 @@ static void diagonalCalculationExpectations(StateMachine *sM, int64_t xay, DpMat
 ///////////////////////////////////
 ///////////////////////////////////
 
-void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const Sequence* sX, const Sequence* sY,
-        PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
-        void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *, DpMatrix *, const Sequence*, const Sequence*, double,
-                PairwiseAlignmentParameters *, void *), void *extraArgs) {
+void getPosteriorProbsWithBanding(StateMachine *sM,
+                                  stList *anchorPairs,
+                                  const Sequence* sX, const Sequence* sY,
+                                  PairwiseAlignmentParameters *p,
+                                  bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
+                                  void (*diagonalPosteriorProbFn)(StateMachine *,
+                                                                  int64_t,
+                                                                  DpMatrix *, DpMatrix *,
+                                                                  const Sequence*, const Sequence*, double,
+                                                                  PairwiseAlignmentParameters *, void *),
+                                  void *extraArgs) {
     //Prerequisites
     assert(p->traceBackDiagonals >= 1);
     assert(p->diagonalExpansion >= 0);
