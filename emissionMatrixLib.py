@@ -55,7 +55,10 @@ class emissionMatrix(object):
                 lastY = kmerY[-1]
 
                 if lastX == lastY:
-                    prob += 'M'
+                    if lastX == 'N':
+                        prob += 'N'
+                    else:
+                        prob += 'M'
 
                 if (kmerX[:-1] == kmerY[:-1]) and (lastX != lastY):
                     prob = self.matchNucleotide(lastX, lastY)

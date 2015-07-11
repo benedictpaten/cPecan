@@ -30,8 +30,8 @@ header = """#include "{}.h"
 #include <string.h>
 #include <inttypes.h>"""
 
-Cfunction_start = """
-void emissions_setMatchProbsToDefaults(double *emissionMatchProbs) {
+emissionsMatchfunction_start = """
+void emissionsKmers_setMatchProbsToDefaults(double *emissionMatchProbs) {
     /*
      * This sets the match probabilities to default values for matching kmers
      */
@@ -45,42 +45,75 @@ void emissions_setMatchProbsToDefaults(double *emissionMatchProbs) {
 
     const double i[MATRIX_SIZE] = {
         """
-Cfunction_end = """};
+emissionsMatchfunction_end = """};
 
     memcpy(emissionMatchProbs, i, sizeof(double)*MATRIX_SIZE);
 }
 \n"""
 
+emissionsGapFunction_start = """
+void emissionsKmers_setGapProbsToDefaults(double *emissionGapProbs) {
+    /*
+     * This is used to set the emissions to reasonable values.
+     */
+    const double G = -1.6094379124341003; //log(0.2)
+    const double i[%d] = {
+        """
+emissionsGapFunction_end = """};
+
+    memcpy(emissionGapProbs, i, sizeof(double)*%d);
+}
+\n"""
+
+
+
+def writeLines(generator, numOfCols, outFile):
+    outFile = outFile
+    lineBreak = 0
+    for entry in generator:
+        if len(entry) == 1:
+            print(entry, end=', ', file=outFile)
+        if len(entry) > 1:
+            entry = '*'.join(list(entry))
+            print(entry, end=', ', file=outFile)
+
+        lineBreak += 1
+        if lineBreak == numOfCols:
+            print('', file=outFile)
+            print('        ', end='', file=outFile)
+            lineBreak = 0
+
 
 def main():
+
+    # Do the set up
     args = parse_args()
+    eMatrix = eMLib.emissionMatrix(args.alpha, args.kLength)
+    num_of_kmers = len(eMatrix.Xkmers)
 
-    matrix = eMLib.emissionMatrix(args.alpha, args.kLength)
-
+    # hande output
     if args.outFile != sys.stdout:
         outFile = open(args.outFile+'.c', 'a')
     if args.outFile == sys.stdout:
         outFile = sys.stdout
 
-    print(header.format(args.outFile), file=outFile)
-    print(Cfunction_start, end='', file=outFile)
-    lineBreak = 0
+    # write out header and emission match default function
+    print(header.format(args.outFile), file=outFile) # header
+    print(emissionsMatchfunction_start, end='', file=outFile) # everything up
+                                                              # to the matrix
+    writeLines(eMatrix.generateMatrix(), 5, outFile) # the matrix
+    print(emissionsMatchfunction_end, file=outFile) # the end of the function
+    print('\n', file=outFile) # to seperate functions
 
-    for prob in matrix.generateMatrix():
-        if len(prob) == 1:
-            print(prob, end=', ', file=outFile)
-        if len(prob) > 1:
-            prob = '*'.join(list(prob))
-            print(prob, end=', ', file=outFile)
+    print(emissionsGapFunction_start % num_of_kmers, end='',
+         file=outFile) # start of gap emissions function
 
-        lineBreak += 1
-        if lineBreak == 10:
-            print('', file=outFile)
-            print('        ', end='', file=outFile)
-            lineBreak = 0
+    # print out the gap emissions
+    writeLines(['G' for k in eMatrix.Xkmers], 5, outFile)
 
-    print(Cfunction_end, file=outFile)
-    #print('\n', file=outFile)
+    print(emissionsGapFunction_end % num_of_kmers,
+          file=outFile) # end of the function
+
 
 if __name__ == '__main__':
     main()

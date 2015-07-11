@@ -8,6 +8,8 @@
 #include "CuTest.h"
 #include "../inc/shim.h"
 #include "../../sonLib/lib/CuTest.h"
+#include "../inc/stateMachine.h"
+#include "../inc/pairwiseAligner.h"
 
 // test chars (nucleotides)
 static void test_chars(CuTest* testCase) {
@@ -38,10 +40,10 @@ static void test_events(CuTest* testCase) {
                               "GATAC", "ATACA", "TACAG", "ACAGA", "CAGAT", "AGATA" };
     double testMeans[] = { 12.12, 23.23, 34.34, 45.45, 56.56, 67.67,
                            12.12, 23.23, 34.34, 45.45, 56.56, 67.67 };
-    
+
     void* eventSequence = eventSequenceConstruct(12, testMeans, *testKmers);
     Sequence* eventSeq = sequenceConstruct(12, eventSequence, getEvent);
-    
+
     for (int x = 0; x < 12; x++) {
         Event *ev = eventSeq->get(eventSeq->elements, x);
         // test for kmer
@@ -49,6 +51,7 @@ static void test_events(CuTest* testCase) {
         CuAssertDblEquals(testCase, testMeans[x], ev->mean, 0.0);
     }
 }
+
 
 CuSuite* shimTestSuite() {
     CuSuite* suite = CuSuiteNew();
@@ -66,7 +69,7 @@ CuSuite* shimTestSuite() {
     char testKmers[3][6] = {"ATGAC", "TGACA", "GACAT"};
     double testMeans[] = {45.45, 65.65, 101.101};
     char testDNA[] = "GATACAGATACA";
-    
+
     // Test chars
     int dnaLen = strlen(testDNA);
     Sequence* charSeq = sequenceConstruct(dnaLen, testDNA, getBase);
@@ -77,28 +80,28 @@ CuSuite* shimTestSuite() {
     printf("\n");
     // Test kmers
     Sequence* kmerSeq = sequenceConstruct(dnaLen, testDNA, getKmer);
-    
+
     for (int k = 0; k < (dnaLen - 4); k++) {
         char* kmer = kmerSeq->get(kmerSeq->elements, k);
         printf("%s is the kmer at position %d\n", kmer, k);
-        
+
     }
     printf("\n");
-    
-    
+
+
     // Test Events
     void* eventSequence = eventSequenceConstruct(3, testMeans, *testKmers);
     Sequence* eventSeq = sequenceConstruct(3, eventSequence, getEvent);
     for (int x = 0; x < 3; x++) {
 //        Event *ev;
         Event *ev = eventSeq->get(eventSeq->elements, x);
-        printf("Event %d retrieved: kmer: %s mean: %f base: %c \n", x, 
-                                                                    ev->kmer, 
-                                                                    ev->mean, 
+        printf("Event %d retrieved: kmer: %s mean: %f base: %c \n", x,
+                                                                    ev->kmer,
+                                                                    ev->mean,
                                                                     ev->base);
-        
+
     }
-        
+
     return 0;
 }
 */

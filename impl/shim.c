@@ -8,6 +8,7 @@
 
 // Sequence constructor function
 Sequence* sequenceConstruct(int length, void *elements, void (*getfPtr)) {
+
     Sequence* self = malloc(sizeof(Sequence));
     
     self->length = length;
