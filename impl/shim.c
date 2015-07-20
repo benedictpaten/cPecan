@@ -53,6 +53,25 @@ int64_t getBaseIndex(char base) {
     }
 }
 
+int64_t getKmerIndex(char* kmer) {
+    int64_t axisLength = 25; // for 2-mers
+    int64_t l = axisLength/5;
+    int64_t i = 0;
+    int64_t x = 0; //instead of index
+    while(l > 1) {
+        printf("at start x:%lld, l:%lld\n", x, l);
+        x += l*getBaseIndex(kmer[i]);
+        printf("after math, x:%lld, gBI:%lld\n", x, getBaseIndex(kmer[i]));
+        i += 1;
+        l = l/5;
+    }
+
+    int64_t last = strlen(kmer)-1;
+    printf("last:%lld\n", last);
+    x += getBaseIndex(kmer[last]);
+
+    return x;
+}
 
 // returns a pointer to a kmer within a char array
 void* getKmer(void *elements, int64_t index) {

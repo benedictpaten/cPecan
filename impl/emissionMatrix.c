@@ -164,4 +164,3 @@ void emissionsKmers_setGapProbsToDefaults(double *emissionGapProbs) {
     memcpy(emissionGapProbs, i, sizeof(double)*25);
 }
 
-

@@ -34,6 +34,8 @@ void* getBase(void *elements, int64_t index);
 
 int64_t getBaseIndex(char base);
 
+int64_t getKmerIndex(char* kmer);
+
 void* getKmer(void *elements, int64_t index);
 
 

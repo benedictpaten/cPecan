@@ -16,6 +16,7 @@
 #include "../inc/stateMachine.h"
 #include "../../sonLib/lib/sonLibCommon.h"
 #include "../inc/pairwiseAligner.h"
+#include "../inc/emissionMatrix.h"
 #include "../inc/shim.h"
 
 ///////////////////////////////////
@@ -311,13 +312,31 @@ static inline double emission_getGapProb(const double *emissionGapProbs, int64_t
     }
     return emissionGapProbs[i];
 }
-// TODO change Symbols to void*?
+
 static inline double emission_getMatchProb(const double *emissionMatchProbs, int64_t x, int64_t y) {
 //    symbol_check(x);
 //    symbol_check(y);
     if(x == 4 || y == 4) {
         return -2.772588722; //log(0.25**2)
     }
+    return emissionMatchProbs[x * SYMBOL_NUMBER_NO_N + y];
+}
+
+// Addition for kmer/kmer alignment
+static inline double emission_kmer_getGapProb(const double *emissionGapProbs, int64_t i) {
+    //symbol_check(i);
+    if(i == NUM_OF_KMERS) {
+        return -1.386294361; //log(0.25)
+    }
+    return emissionGapProbs[i];
+}
+
+static inline double emission_kmer_getMatchProb(const double *emissionMatchProbs, int64_t x, int64_t y) {
+
+    //if(x == 4 || y == 4) {
+    //    return -2.772588722; //log(0.25**2)
+    //}
+
     return emissionMatchProbs[x * SYMBOL_NUMBER_NO_N + y];
 }
 
@@ -329,6 +348,7 @@ static inline double emission_getMatchProb(const double *emissionMatchProbs, int
 
 //Transitions
 typedef struct _StateMachine5 StateMachine5;
+typedef struct _StateMachineKmer5 StateMachineKmer5;
 
 struct _StateMachine5 {
     StateMachine model;
@@ -352,6 +372,30 @@ struct _StateMachine5 {
     double EMISSION_MATCH_PROBS[SYMBOL_NUMBER_NO_N*SYMBOL_NUMBER_NO_N]; //Match emission probs
     double EMISSION_GAP_X_PROBS[SYMBOL_NUMBER_NO_N]; //Gap emission probs
     double EMISSION_GAP_Y_PROBS[SYMBOL_NUMBER_NO_N]; //Gap emission probs
+};
+
+struct _StateMachineKmer5 {
+    StateMachine model;
+    double TRANSITION_MATCH_CONTINUE; //0.9703833696510062f
+    double TRANSITION_MATCH_FROM_SHORT_GAP_X; //1.0 - gapExtend - gapSwitch = 0.280026392297485
+    double TRANSITION_MATCH_FROM_LONG_GAP_X; //1.0 - gapExtend = 0.00343657420938
+    double TRANSITION_GAP_SHORT_OPEN_X; //0.0129868352330243
+    double TRANSITION_GAP_SHORT_EXTEND_X; //0.7126062401851738f;
+    double TRANSITION_GAP_SHORT_SWITCH_TO_X; //0.0073673675173412815f;
+    double TRANSITION_GAP_LONG_OPEN_X; //(1.0 - match - 2*gapOpenShort)/2 = 0.001821479941473
+    double TRANSITION_GAP_LONG_EXTEND_X; //0.99656342579062f;
+    double TRANSITION_GAP_LONG_SWITCH_TO_X; //0.0073673675173412815f;
+    double TRANSITION_MATCH_FROM_SHORT_GAP_Y; //1.0 - gapExtend - gapSwitch = 0.280026392297485
+    double TRANSITION_MATCH_FROM_LONG_GAP_Y; //1.0 - gapExtend = 0.00343657420938
+    double TRANSITION_GAP_SHORT_OPEN_Y; //0.0129868352330243
+    double TRANSITION_GAP_SHORT_EXTEND_Y; //0.7126062401851738f;
+    double TRANSITION_GAP_SHORT_SWITCH_TO_Y; //0.0073673675173412815f;
+    double TRANSITION_GAP_LONG_OPEN_Y; //(1.0 - match - 2*gapOpenShort)/2 = 0.001821479941473
+    double TRANSITION_GAP_LONG_EXTEND_Y; //0.99656342579062f;
+    double TRANSITION_GAP_LONG_SWITCH_TO_Y; //0.0073673675173412815f;
+    double EMISSION_MATCH_PROBS[MATRIX_SIZE]; //Match emission probs
+    double EMISSION_GAP_X_PROBS[NUM_OF_KMERS]; //Gap emission probs
+    double EMISSION_GAP_Y_PROBS[NUM_OF_KMERS]; //Gap emission probs
 };
 
 static double stateMachine5_startStateProb(StateMachine *sM, int64_t state) {
@@ -450,6 +494,56 @@ static void stateMachine5_cellCalculate(StateMachine *sM, double *current, doubl
     }
 }
 
+
+void stateMachine5_kmer_cellCalculate(StateMachine *sM, double *current, double *lower, double *middle, double *upper,
+                                      void* cX, void* cY,
+                                      void (*doTransition)(double *, double *, int64_t, int64_t, double, double, void *),
+                                      void *extraArgs) {
+    StateMachineKmer5 *sM5 = (StateMachineKmer5 *) sM;
+    if (lower != NULL) {
+        printf("at LOWER we have kmer cX: %c\n", cX);
+        int64_t cXindex = getKmerIndex(cX);
+        printf("base index returned %lld\n", cXindex);
+        double eP = emission_kmer_getGapProb(sM5->EMISSION_GAP_X_PROBS, cXindex);
+        printf("emissionProb=%f\n", eP);
+        doTransition(lower, current, match, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_OPEN_X, extraArgs);
+        doTransition(lower, current, shortGapX, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_X, extraArgs);
+        // how come these are commented out?
+        //doTransition(lower, current, shortGapY, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X, extraArgs);
+        doTransition(lower, current, match, longGapX, eP, sM5->TRANSITION_GAP_LONG_OPEN_X, extraArgs);
+        doTransition(lower, current, longGapX, longGapX, eP, sM5->TRANSITION_GAP_LONG_EXTEND_X, extraArgs);
+        //doTransition(lower, current, longGapY, longGapX, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_X, extraArgs);
+    }
+    if (middle != NULL) {
+        printf("at MIDDLE we have kemrs cX: %c and cY: %c\n", cX, cY);
+        int64_t cXindex = getKmerIndex(cX);
+        int64_t cYindex = getKmerIndex(cY);
+        printf("kmer index returned %lld from base: %c\n", cXindex, cX);
+        printf("kmer index returned %lld from base: %c\n", cYindex, cY);
+        double eP = emission_kmer_getMatchProb(sM5->EMISSION_MATCH_PROBS, cXindex, cYindex); //symbol_matchProb(cX, cY);
+        printf("emissionProb=%f\n", eP);
+        doTransition(middle, current, match, match, eP, sM5->TRANSITION_MATCH_CONTINUE, extraArgs);
+        doTransition(middle, current, shortGapX, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X, extraArgs);
+        doTransition(middle, current, shortGapY, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y, extraArgs);
+        doTransition(middle, current, longGapX, match, eP, sM5->TRANSITION_MATCH_FROM_LONG_GAP_X, extraArgs);
+        doTransition(middle, current, longGapY, match, eP, sM5->TRANSITION_MATCH_FROM_LONG_GAP_Y, extraArgs);
+    }
+    if (upper != NULL) {
+        printf("at UPPER we have kmer cY: %c\n", cY);
+        int64_t cYindex = getKmerIndex(cY);
+        printf("kmer index returned %lld\n", cYindex);
+        double eP = emission_kmer_getGapProb(sM5->EMISSION_GAP_Y_PROBS, cYindex);
+        printf("emissionProb=%f\n", eP);
+        doTransition(upper, current, match, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_OPEN_Y, extraArgs);
+        doTransition(upper, current, shortGapY, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_Y, extraArgs);
+        //doTransition(upper, current, shortGapX, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_SWITCH_TO_Y, extraArgs);
+        doTransition(upper, current, match, longGapY, eP, sM5->TRANSITION_GAP_LONG_OPEN_Y, extraArgs);
+        doTransition(upper, current, longGapY, longGapY, eP, sM5->TRANSITION_GAP_LONG_EXTEND_Y, extraArgs);
+        //doTransition(upper, current, longGapX, longGapY, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_Y, extraArgs);
+    }
+}
+
+
 StateMachine *stateMachine5_construct(StateMachineType type) {
     StateMachine5 *sM5 = st_malloc(sizeof(StateMachine5));
     sM5->TRANSITION_MATCH_CONTINUE = -0.030064059121770816; //0.9703833696510062f
@@ -488,6 +582,46 @@ StateMachine *stateMachine5_construct(StateMachineType type) {
 
     return (StateMachine *) sM5;
 }
+
+StateMachine *stateMachine5_kmer_construct(StateMachineType type) {
+    StateMachineKmer5 *sM5 = st_malloc(sizeof(StateMachineKmer5));
+    sM5->TRANSITION_MATCH_CONTINUE = -0.030064059121770816; //0.9703833696510062f
+    sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X = -1.272871422049609; //1.0 - gapExtend - gapSwitch = 0.280026392297485
+    sM5->TRANSITION_MATCH_FROM_LONG_GAP_X = -5.673280173170473; //1.0 - gapExtend = 0.00343657420938
+    sM5->TRANSITION_GAP_SHORT_OPEN_X = -4.34381910900448; //0.0129868352330243
+    sM5->TRANSITION_GAP_SHORT_EXTEND_X = -0.3388262689231553; //0.7126062401851738f;
+    sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X = -4.910694825551255; //0.0073673675173412815f;
+    sM5->TRANSITION_GAP_LONG_OPEN_X = -6.30810595366929; //(1.0 - match - 2*gapOpenShort)/2 = 0.001821479941473
+    sM5->TRANSITION_GAP_LONG_EXTEND_X = -0.003442492794189331; //0.99656342579062f;
+    sM5->TRANSITION_GAP_LONG_SWITCH_TO_X = -6.30810595366929; //0.99656342579062f;
+
+    sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y = sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X;
+    sM5->TRANSITION_MATCH_FROM_LONG_GAP_Y = sM5->TRANSITION_MATCH_FROM_LONG_GAP_X;
+    sM5->TRANSITION_GAP_SHORT_OPEN_Y = sM5->TRANSITION_GAP_SHORT_OPEN_X;
+    sM5->TRANSITION_GAP_SHORT_EXTEND_Y = sM5->TRANSITION_GAP_SHORT_EXTEND_X;
+    sM5->TRANSITION_GAP_SHORT_SWITCH_TO_Y = sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X;
+    sM5->TRANSITION_GAP_LONG_OPEN_Y = sM5->TRANSITION_GAP_LONG_OPEN_X;
+    sM5->TRANSITION_GAP_LONG_EXTEND_Y = sM5->TRANSITION_GAP_LONG_EXTEND_X;
+    sM5->TRANSITION_GAP_LONG_SWITCH_TO_Y = sM5->TRANSITION_GAP_LONG_SWITCH_TO_X;
+
+    emissionsKmers_setMatchProbsToDefaults(sM5->EMISSION_MATCH_PROBS);
+    emissionsKmers_setGapProbsToDefaults(sM5->EMISSION_GAP_X_PROBS);
+    emissionsKmers_setGapProbsToDefaults(sM5->EMISSION_GAP_Y_PROBS);
+    if(type != fiveState && type != fiveStateAsymmetric) {
+        st_errAbort("Wrong type for five state %i", type);
+    }
+    sM5->model.type = type;
+    sM5->model.stateNumber = 5;
+    sM5->model.matchState = match;
+    sM5->model.startStateProb = stateMachine5_startStateProb;
+    sM5->model.endStateProb = stateMachine5_endStateProb;
+    sM5->model.raggedStartStateProb = stateMachine5_raggedStartStateProb;
+    sM5->model.raggedEndStateProb = stateMachine5_raggedEndStateProb;
+    sM5->model.cellCalculate = stateMachine5_kmer_cellCalculate;
+
+    return (StateMachine *) sM5;
+}
+
 
 static void switchDoubles(double *a, double *b) {
     double c = *a;
