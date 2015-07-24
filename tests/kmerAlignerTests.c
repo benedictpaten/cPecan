@@ -9,12 +9,17 @@
 #include "../../sonLib/lib/CuTest.h"
 #include "../inc/stateMachine.h"
 #include "../inc/pairwiseAligner.h"
+#include "../inc/emissionMatrix.h"
 
 static void test_Kmers_cell(CuTest *testCase) {
+    // construct the state machine
     StateMachine *sM = stateMachine5_kmer_construct(fiveState);
-    printf("constructed statemachine\n");
+
+    // make arrays
     double lowerF[sM->stateNumber], middleF[sM->stateNumber], upperF[sM->stateNumber], currentF[sM->stateNumber];
     double lowerB[sM->stateNumber], middleB[sM->stateNumber], upperB[sM->stateNumber], currentB[sM->stateNumber];
+
+    // set array values to start values
     for (int64_t i = 0; i < sM->stateNumber; i++) {
         middleF[i] = sM->startStateProb(sM, i);
         middleB[i] = LOG_ZERO;
@@ -25,29 +30,37 @@ static void test_Kmers_cell(CuTest *testCase) {
         currentF[i] = LOG_ZERO;
         currentB[i] = sM->endStateProb(sM, i);
     }
+
+    // These are the same sequences as in test_cell
+    const char *testXseq = "AGCG";
+    const char *testYseq = "AGTTCG";
+
+    // Alternate test sequences
     //char* testXseq = "ATTA";
     //char* testYseq = "TGCT";
-
-    //const char *testXseq = "AGCG";
-    //const char *testYseq = "AGTTCG";
-    const char *testXseq = "AATT";
-    const char *testYseq = "AATT";
+    //const char *testXseq = "AATT";
+    //const char *testYseq = "AATT";
 
     Sequence* xSeq = sequenceConstruct(4, testXseq, getKmer);
     Sequence* ySeq = sequenceConstruct(4, testYseq, getKmer);
 
-    char* cX = xSeq->get(xSeq->elements, 0);
-    char* cY = ySeq->get(ySeq->elements, 0);
+    //char* xkmer = xSeq->get(xSeq->elements, 0);
+    //char* ykmer = ySeq->get(ySeq->elements, 0);
+    //printf("%s is the kmer at position %d\n", xkmer, 0);
+    //printf("%s is the kmer at position %d\n", ykmer, 0);
+
+    char* cX = xSeq->get(xSeq->elements, 1);
+    char* cY = ySeq->get(ySeq->elements, 1);
 
 
     //Do forward
-    cell_calculateForward(sM, lowerF, NULL, NULL, middleF, *cX, *cY, NULL);
-    cell_calculateForward(sM, upperF, middleF, NULL, NULL, *cX, *cY, NULL);
-    cell_calculateForward(sM, currentF, lowerF, middleF, upperF, *cX, *cY, NULL);
+    cell_calculateForward(sM, lowerF, NULL, NULL, middleF, cX, cY, NULL);
+    cell_calculateForward(sM, upperF, middleF, NULL, NULL, cX, cY, NULL);
+    cell_calculateForward(sM, currentF, lowerF, middleF, upperF, cX, cY, NULL);
     //Do backward
-    cell_calculateBackward(sM, currentB, lowerB, middleB, upperB, *cX, *cY, NULL);
-    cell_calculateBackward(sM, upperB, middleB, NULL, NULL, *cX, *cY, NULL);
-    cell_calculateBackward(sM, lowerB, NULL, NULL, middleB, *cX, *cY, NULL);
+    cell_calculateBackward(sM, currentB, lowerB, middleB, upperB, cX, cY, NULL);
+    cell_calculateBackward(sM, upperB, middleB, NULL, NULL, cX, cY, NULL);
+    cell_calculateBackward(sM, lowerB, NULL, NULL, middleB, cX, cY, NULL);
     double totalProbForward = cell_dotProduct2(currentF, sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(middleB, sM, sM->startStateProb);
     st_logInfo("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
@@ -61,27 +74,30 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
 
     // make some simple DNA sequences
     const char *sX = "CAGGCT";
-    const char *sY = "CAGTTTGCT";
+    const char *sY = "CAGTTGCT";
 
     // set lX and lY to the lengths of those sequences
-    int64_t lX = strlen(sX);
-    int64_t lY = strlen(sY);
-
-    //SymbolString sX2 = symbolString_construct(sX, lX);
-    //SymbolString sY2 = symbolString_construct(sY, lY);
+    int64_t lX = strlen(sX)/KMER_LENGTH;
+    int64_t lY = strlen(sY)/KMER_LENGTH;
 
     // construct a sequence struct from those sequences and assign the get function as get base
-    Sequence* sX2 = sequenceConstruct(lX, sX, getBase);
-    Sequence* sY2 = sequenceConstruct(lY, sY, getBase);
+    Sequence* sX2 = sequenceConstruct(lX*KMER_LENGTH, sX, getKmer);
+    Sequence* sY2 = sequenceConstruct(lY*KMER_LENGTH, sY, getKmer);
 
     // construct a 5-state state machine, the forward and reverse DP Matrices, the band, the band
     // iterators and the anchor pairs
-    StateMachine *sM = stateMachine5_construct(fiveState);
+    StateMachine *sM = stateMachine5_kmer_construct(fiveState);
+    printf("just finished running stateMachine5 kmer construct, states: %lld\n", sM->stateNumber);
+
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
+    printf("just finished running dpMatrix_construct, twice\n");
+
     stList *anchorPairs = stList_construct();
     Band *band = band_construct(anchorPairs, lX, lY, 2);
+    printf("just finished running band_construct\n");
     BandIterator *bandIt = bandIterator_construct(band);
+    printf("just finished running bandIterator_construct\n");
 
     //Initialise matrices
     for (int64_t i = 0; i <= lX + lY; i++) {
@@ -90,15 +106,20 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
         dpDiagonal_zeroValues(dpMatrix_createDiagonal(dpMatrixBackward, d));
         dpDiagonal_zeroValues(dpMatrix_createDiagonal(dpMatrixForward, d));
     }
+    printf("just finished initializing matrices\n");
+
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixForward, 0), sM, sM->startStateProb);
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixBackward, lX + lY), sM, sM->endStateProb);
+    printf("just finished initializing values\n");
 
     //Forward algorithm
+    printf("-->At forward algorithm\n");
     for (int64_t i = 1; i <= lX + lY; i++) {
         //Do the forward calculation
         diagonalCalculationForward(sM, i, dpMatrixForward, sX2, sY2);
     }
     //Backward algorithm
+    printf("-->At Backward algorithm\n");
     for (int64_t i = lX + lY; i > 0; i--) {
         //Do the backward calculation
         diagonalCalculationBackward(sM, i, dpMatrixBackward, sX2, sY2);
@@ -165,7 +186,7 @@ CuSuite* kmerTestSuite() {
     CuSuite* suite = CuSuiteNew();
 
     SUITE_ADD_TEST(suite, test_Kmers_cell);
-//    SUITE_ADD_TEST(suite, test_Kmers_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_Kmers_diagonalDPCalculations);
 
 
 

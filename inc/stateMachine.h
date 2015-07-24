@@ -94,6 +94,8 @@ StateMachine *hmm_getStateMachine(Hmm *hmm);
 
 StateMachine *stateMachine5_construct(StateMachineType type);
 
+StateMachine *stateMachine5_kmer_construct(StateMachineType type);
+
 StateMachine *stateMachine3_construct(StateMachineType type); //the type is to specify symmetric/asymmetric
 
 void stateMachine_destruct(StateMachine *stateMachine);

@@ -57,7 +57,7 @@ CuSuite* shimTestSuite() {
     CuSuite* suite = CuSuiteNew();
 
     SUITE_ADD_TEST(suite, test_chars);
-    SUITE_ADD_TEST(suite, test_kmers);
+    //SUITE_ADD_TEST(suite, test_kmers);
     SUITE_ADD_TEST(suite, test_events);
 
     return suite;

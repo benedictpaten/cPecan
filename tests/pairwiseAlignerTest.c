@@ -286,7 +286,7 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     // set lX and lY to the lengths of those sequences
     int64_t lX = strlen(sX);
     int64_t lY = strlen(sY);
-    
+
     //SymbolString sX2 = symbolString_construct(sX, lX);
     //SymbolString sY2 = symbolString_construct(sY, lY);
 
@@ -337,14 +337,14 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     // matrix.
     for (int64_t i = 0; i <= lX + lY; i++) {
         //Calculate the total probs
-        double totalDiagonalProb = diagonalCalculationTotalProbability(sM, i, 
+        double totalDiagonalProb = diagonalCalculationTotalProbability(sM, i,
                                                                        dpMatrixForward,
                                                                        dpMatrixBackward,
                                                                        sX2, sY2);
         //Check the forward and back probabilities are about equal
         CuAssertDblEquals(testCase, totalProbForward, totalDiagonalProb, 0.01);
     }
-    
+
     //Now do the posterior probabilities
     stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
     // aligned pairs has length 0 here, just constructed
@@ -914,7 +914,7 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
 //    SUITE_ADD_TEST(suite, test_cell);
 //    SUITE_ADD_TEST(suite, test_dpDiagonal);
 //    SUITE_ADD_TEST(suite, test_dpMatrix);
-    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+//    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
 //    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
 //    SUITE_ADD_TEST(suite, test_getBlastPairs);
 //    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);

@@ -133,6 +133,7 @@ static int64_t band_boundCoordinate(int64_t z, int64_t lZ) {
 }
 
 Band *band_construct(stList *anchorPairs, int64_t lX, int64_t lY, int64_t expansion) {
+    printf("running band_construct\n");
     //Prerequisities
     assert(lX >= 0);
     assert(lY >= 0);
@@ -196,6 +197,7 @@ struct _bandIterator {
 };
 
 BandIterator *bandIterator_construct(Band *band) {
+    printf("running bandIterator_construct\n");
     BandIterator *bandIterator = st_malloc(sizeof(BandIterator));
     bandIterator->band = band;
     bandIterator->index = 0;
@@ -329,7 +331,7 @@ static inline void doTransitionForward(double *fromCells, double *toCells, int64
 void cell_calculateForward(StateMachine *sM,
                            double *current, double *lower, double *middle, double *upper,
                            void* cX, void* cY, void *extraArgs) {
-    //printf("Running cell_calculateForward, looking at bases cX: %c cY: %c\n", cX, cY);
+    //printf("Running cell_calculateForward, looking at kmers cX: %s cY: %s\n", (char*) cX, (char*) cY);
     //printf("current: %f, lower: %f, middle: %f, upper: %f\n", *current, *lower, *middle, *upper);
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, doTransitionForward, extraArgs);
 }
@@ -489,6 +491,7 @@ struct _dpMatrix {
 };
 
 DpMatrix *dpMatrix_construct(int64_t diagonalNumber, int64_t stateNumber) {
+    printf("running dpMatrix_construct\n");
     assert(diagonalNumber >= 0);
     DpMatrix *dpMatrix = st_malloc(sizeof(DpMatrix));
     dpMatrix->diagonalNumber = diagonalNumber;
@@ -577,28 +580,30 @@ static void diagonalCalculation(StateMachine *sM,
                                                         void *, void *, void *),
                                 void *extraArgs) {
     // what does dbDiagonalM1 and M2 mean?
-    //printf("Running diagonalCalculation!\n");
+    printf("Running diagonalCalculation!\n");
     Diagonal diagonal = dpDiagonal->diagonal;
     int64_t xmy = diagonal_getMinXmy(diagonal); // get the smallest x - y coordinate
     int64_t maxXmY = diagonal_getMaxXmy(diagonal);
-    //printf("starting xmy=%lld, MaxXmY=%lld\n", xmy, maxXmY);
+    printf("starting xmy=%lld, MaxXmY=%lld\n", xmy, maxXmY);
     // work from smallest to largest
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
 
         int64_t indexX = getXindex(sX, diagonal_getXay(diagonal), xmy) - 1;
         int64_t indexY = getYindex(sY, diagonal_getXay(diagonal), xmy) - 1;
 
-        //printf("Got indexX=%lld, indexY=%lld ", indexX, indexY);
+        printf("Got indexX=%lld, indexY=%lld ", indexX, indexY);
 
         char* x = sX->get(sX->elements, indexX);
         char* y = sY->get(sY->elements, indexY);
-        //printf("for xmy=%lld, x=%c, y=%c\n", xmy, *x, *y);
+        printf("for xmy=%lld, x=%s, y=%s\n", xmy, (char*) x, (char*) y);
 
         double *current = dpDiagonal_getCell(dpDiagonal, xmy);
         double *lower = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy - 1);
         double *middle = dpDiagonalM2 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM2, xmy);
         double *upper = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy + 1);
+        printf("just about to perform cellCalculation\n");
         cellCalculation(sM, current, lower, middle, upper,(char*) *x, (char*) *y, extraArgs);
+
         xmy += 2;
     }
 }
@@ -703,9 +708,9 @@ static void diagonalCalculationExpectations(StateMachine *sM, int64_t xay, DpMat
      */
     Hmm *hmmExpectations = extraArgs;
     void *extraArgs2[2] = { &totalProbability, hmmExpectations };
-    hmmExpectations->likelihood += totalProbability; 
-    // We do this once per diagonal, which is a hack, rather than for the 
-    // whole matrix. The correction factor is approximately 1/number of 
+    hmmExpectations->likelihood += totalProbability;
+    // We do this once per diagonal, which is a hack, rather than for the
+    // whole matrix. The correction factor is approximately 1/number of
     // diagonals.
     diagonalCalculation(sM, dpMatrix_getDiagonal(backwardDpMatrix, xay), dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
             dpMatrix_getDiagonal(forwardDpMatrix, xay - 2), sX, sY, cell_calculateExpectation, extraArgs2);
@@ -1353,4 +1358,3 @@ stList *reweightAlignedPairs2(stList *alignedPairs, int64_t seqLengthX, int64_t 
     free(indelProbsY);
     return alignedPairs;
 }
-

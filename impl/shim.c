@@ -3,6 +3,7 @@
 #include "shim.h"
 #include "../inc/shim.h"
 #include "../inc/pairwiseAligner.h"
+#include "../inc/emissionMatrix.h"
 #include <assert.h>
 
 
@@ -10,7 +11,7 @@
 Sequence* sequenceConstruct(int length, void *elements, void (*getfPtr)) {
 
     Sequence* self = malloc(sizeof(Sequence));
-    
+
     self->length = length;
     self->elements = elements;
     self->get = getfPtr;
@@ -24,9 +25,9 @@ void sequenceDestroy(Sequence* seq) {
     free(seq);
 }
 
-// Get functions: retrieve a single element (base, kmer, or event) from an 
+// Get functions: retrieve a single element (base, kmer, or event) from an
 // array of elements.
- 
+
 // returns a pointer to base in a char array
 void* getBase(void *elements, int64_t index) {
     char* n;
@@ -53,21 +54,22 @@ int64_t getBaseIndex(char base) {
     }
 }
 
+// TODO need a proper unit test function for this
 int64_t getKmerIndex(char* kmer) {
     int64_t axisLength = 25; // for 2-mers
     int64_t l = axisLength/5;
     int64_t i = 0;
     int64_t x = 0; //instead of index
     while(l > 1) {
-        printf("at start x:%lld, l:%lld\n", x, l);
+        //printf("at start x:%lld, l:%lld\n", x, l);
         x += l*getBaseIndex(kmer[i]);
-        printf("after math, x:%lld, gBI:%lld\n", x, getBaseIndex(kmer[i]));
+        //printf("after math, x:%lld, gBI:%lld\n", x, getBaseIndex(kmer[i]));
         i += 1;
         l = l/5;
     }
 
     int64_t last = strlen(kmer)-1;
-    printf("last:%lld\n", last);
+    //printf("last:%lld\n", last);
     x += getBaseIndex(kmer[last]);
 
     return x;
@@ -75,16 +77,22 @@ int64_t getKmerIndex(char* kmer) {
 
 // returns a pointer to a kmer within a char array
 void* getKmer(void *elements, int64_t index) {
+    char* n;
+    n = "NN"; // hardwirded null kmer
+
     int64_t i = index;
-    int kmerLength = 5;
-    
+
+    // change kmer length here, hardwired so far...
+    int kmerLength = KMER_LENGTH;
+
     char *k_i = malloc((kmerLength+1) * sizeof(char));
-    
+
     for (int x = 0; x < kmerLength; x++) {
         k_i[x] = *((char *)elements+(i+x));
     }
-    
-    return k_i;
+
+    return index >= 0 ? k_i : n;
+    //return k_i;
 }
 
 // TODO make a function that compares kmers
@@ -102,7 +110,7 @@ Event* event_construct(double mean, char kmer[6]) {
     event->mean = mean;
     event->kmer = kmer;
     event->base = kmer[0];
-    
+
     return event;
 }
 
@@ -113,7 +121,7 @@ void* eventSequenceConstruct(int length, double* means, char* kmers) {
     for (int i = 0; i < length; i++) {
         eventArray[i] = *(event_construct(means[i], kmers+(i*6)));
     }
-    
+
     return eventArray;
 }
 
