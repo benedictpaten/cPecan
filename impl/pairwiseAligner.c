@@ -580,28 +580,28 @@ static void diagonalCalculation(StateMachine *sM,
                                                         void *, void *, void *),
                                 void *extraArgs) {
     // what does dbDiagonalM1 and M2 mean?
-    printf("Running diagonalCalculation!\n");
+    //printf("Running diagonalCalculation!\n");
     Diagonal diagonal = dpDiagonal->diagonal;
     int64_t xmy = diagonal_getMinXmy(diagonal); // get the smallest x - y coordinate
     int64_t maxXmY = diagonal_getMaxXmy(diagonal);
-    printf("starting xmy=%lld, MaxXmY=%lld\n", xmy, maxXmY);
+    //printf("starting xmy=%lld, MaxXmY=%lld\n", xmy, maxXmY);
     // work from smallest to largest
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
 
         int64_t indexX = getXindex(sX, diagonal_getXay(diagonal), xmy) - 1;
         int64_t indexY = getYindex(sY, diagonal_getXay(diagonal), xmy) - 1;
 
-        printf("Got indexX=%lld, indexY=%lld ", indexX, indexY);
+        //printf("Got indexX=%lld, indexY=%lld ", indexX, indexY);
 
         char* x = sX->get(sX->elements, indexX);
         char* y = sY->get(sY->elements, indexY);
-        printf("for xmy=%lld, x=%s, y=%s\n", xmy, (char*) x, (char*) y);
+        //printf("for xmy=%lld, x=%s, y=%s\n", xmy, (char*) x, (char*) y);
 
         double *current = dpDiagonal_getCell(dpDiagonal, xmy);
         double *lower = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy - 1);
         double *middle = dpDiagonalM2 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM2, xmy);
         double *upper = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy + 1);
-        printf("Just about to perform cellCalculation\n");
+        //printf("Just about to perform cellCalculation\n");
         // This is the format that works for dpDiagonalCalculations, with individual nucleotides
         //cellCalculation(sM, current, lower, middle, upper, (char*) *x, (char*) *y, extraArgs);
         cellCalculation(sM, current, lower, middle, upper, x, y, extraArgs);
@@ -655,8 +655,8 @@ double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatr
 void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
                                             DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
                                             double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs) {
-    //printf("\nRunning diagonalCalculationPosteriorMatchProbs!\n");
-    //printf("going in, totalProbability=%f\n", totalProbability);
+    printf("\nRunning diagonalCalculationPosteriorMatchProbs!\n");
+    printf("going in, totalProbability=%f\n", totalProbability);
     assert(p->threshold >= 0.0);
     assert(p->threshold <= 1.0);
     stList *alignedPairs = ((void **) extraArgs)[0];
@@ -673,26 +673,26 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
         //printf("At start xmy: %lld \n", xmy);
         int64_t x = diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy);
         int64_t y = diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy);
-        //printf("walking here x=%lld, y=%lld\n", x, y);
+        printf("walking here x=%lld, y=%lld\n", x, y);
         if (x > 0 && y > 0) {
             double *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
-            //printf("cellForward: %f \n", cellForward[sM->matchState]);
+            printf("cellForward: %f \n", cellForward[sM->matchState]);
             double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
-            //printf("cellBackward: %f \n", cellBackward[sM->matchState]);
+            printf("cellBackward: %f \n", cellBackward[sM->matchState]);
             // see if these should match
             double posteriorProbability = exp(
                     (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
-            //printf("posteriorProb: %f\n", posteriorProbability);
+            printf("posteriorProb: %f\n", posteriorProbability);
             if (posteriorProbability >= p->threshold) {
                 if (posteriorProbability > 1.0) {
                     posteriorProbability = 1.0;
                 }
                 posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
-                //printf("Adding to alignedPairs! posteriorProb: %lld, X: %lld, Y: %lld\n\n", (int64_t) posteriorProbability, x - 1, y - 1);
+                printf("Adding to alignedPairs! posteriorProb: %lld, X: %lld, Y: %lld\n\n", (int64_t) posteriorProbability, x - 1, y - 1);
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
             }
             if (posteriorProbability <= p->threshold) {
-                //printf("NOT adding to aligned pairs! posteriorProb: %f, X: %lld, Y: %lld\n\n", posteriorProbability, x - 1, y - 1);
+                printf("NOT adding to aligned pairs! posteriorProb: %f, X: %lld, Y: %lld\n\n", posteriorProbability, x - 1, y - 1);
             }
         }
         xmy += 2;
