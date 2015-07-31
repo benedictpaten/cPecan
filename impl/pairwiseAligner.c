@@ -601,8 +601,10 @@ static void diagonalCalculation(StateMachine *sM,
         double *lower = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy - 1);
         double *middle = dpDiagonalM2 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM2, xmy);
         double *upper = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy + 1);
-        printf("just about to perform cellCalculation\n");
-        cellCalculation(sM, current, lower, middle, upper,(char*) *x, (char*) *y, extraArgs);
+        printf("Just about to perform cellCalculation\n");
+        // This is the format that works for dpDiagonalCalculations, with individual nucleotides
+        //cellCalculation(sM, current, lower, middle, upper, (char*) *x, (char*) *y, extraArgs);
+        cellCalculation(sM, current, lower, middle, upper, x, y, extraArgs);
 
         xmy += 2;
     }

@@ -185,8 +185,8 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
 CuSuite* kmerTestSuite() {
     CuSuite* suite = CuSuiteNew();
 
-    SUITE_ADD_TEST(suite, test_Kmers_cell);
-    //SUITE_ADD_TEST(suite, test_Kmers_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_Kmers_cell);
+    SUITE_ADD_TEST(suite, test_Kmers_diagonalDPCalculations);
 
 
 

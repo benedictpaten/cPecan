@@ -56,6 +56,7 @@ int64_t getBaseIndex(char base) {
 
 // TODO need a proper unit test function for this
 int64_t getKmerIndex(char* kmer) {
+    printf("Running getKmerIndex\n");
     int64_t axisLength = 25; // for 2-mers
     int64_t l = axisLength/5;
     int64_t i = 0;

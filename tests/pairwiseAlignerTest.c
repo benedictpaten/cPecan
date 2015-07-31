@@ -374,7 +374,6 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
         st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
         //printf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
-
         CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
 
@@ -914,7 +913,7 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
 //    SUITE_ADD_TEST(suite, test_cell);
 //    SUITE_ADD_TEST(suite, test_dpDiagonal);
 //    SUITE_ADD_TEST(suite, test_dpMatrix);
-//    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
 //    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
 //    SUITE_ADD_TEST(suite, test_getBlastPairs);
 //    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
