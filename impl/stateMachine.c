@@ -503,7 +503,7 @@ void stateMachine5_kmer_cellCalculate(StateMachine *sM, double *current, double 
                                       void (*doTransition)(double *, double *, int64_t, int64_t, double, double, void *),
                                       void *extraArgs) {
     StateMachineKmer5 *sM5 = (StateMachineKmer5 *) sM;
-    printf("running kmer cellCalculate\n");
+    //printf("running kmer cellCalculate\n");
     if (lower != NULL) {
         //printf("at LOWER we have kmer cX: %s\n", (char*) cX);
         int64_t cXindex = getKmerIndex(cX);
@@ -522,8 +522,8 @@ void stateMachine5_kmer_cellCalculate(StateMachine *sM, double *current, double 
         printf("at MIDDLE we have kemrs cX: %s and cY: %s\n", (char*) cX, (char*) cY);
         int64_t cXindex = getKmerIndex(cX);
         int64_t cYindex = getKmerIndex(cY);
-        printf("kmer index returned %lld from base: %s\n", cXindex, cX);
-        printf("kmer index returned %lld from base: %s\n", cYindex, cY);
+        printf("kmer index returned %lld from kmer: %s\n", cXindex, cX);
+        printf("kmer index returned %lld from kmer: %s\n", cYindex, cY);
         double eP = emission_kmer_getMatchProb(sM5->EMISSION_MATCH_PROBS, cXindex, cYindex); //symbol_matchProb(cX, cY);
         printf("emissionMatchProb=%f\n", eP);
         doTransition(middle, current, match, match, eP, sM5->TRANSITION_MATCH_CONTINUE, extraArgs);

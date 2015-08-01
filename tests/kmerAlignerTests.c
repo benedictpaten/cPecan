@@ -73,16 +73,19 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
     // marginal probability and the posterior probabilities of the matches
 
     // make some simple DNA sequences
-    const char *sX = "CAGGCT";
-    const char *sY = "CAGTTGCT";
+    // These are the originals:
+    //const char *sX = "CAGGCT";
+    //const char *sY = "CAGTTGCT";
     // TODO TODO TODO
     // Make some simpler sequences and walk thought the alignment process.
     // Right now I suspect that the problem is at the end of the alignment ie.
     // aligning the final kmers.
+    const char *sX = "ATCG";
+    const char *sY = "ATCG";
 
     // set lX and lY to the lengths of those sequences
-    int64_t lX = strlen(sX);
-    int64_t lY = strlen(sY);
+    int64_t lX = strlen(sX)-1;
+    int64_t lY = strlen(sY)-1;
 
     // construct a sequence struct from those sequences and assign the get function as get base
     Sequence* sX2 = sequenceConstruct(lX*KMER_LENGTH, sX, getKmer);
@@ -117,13 +120,13 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
     printf("just finished initializing values\n");
 
     //Forward algorithm
-    printf("-->At forward algorithm\n");
+    printf("\n-->At forward algorithm\n");
     for (int64_t i = 1; i <= lX + lY; i++) {
         //Do the forward calculation
         diagonalCalculationForward(sM, i, dpMatrixForward, sX2, sY2);
     }
     //Backward algorithm
-    printf("-->At Backward algorithm\n");
+    printf("\n-->At Backward algorithm\n");
     for (int64_t i = lX + lY; i > 0; i--) {
         //Do the backward calculation
         diagonalCalculationBackward(sM, i, dpMatrixBackward, sX2, sY2);
