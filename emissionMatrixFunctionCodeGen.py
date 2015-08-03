@@ -101,7 +101,8 @@ def main():
     print(header.format(args.outFile), file=outFile) # header
     print(emissionsMatchfunction_start, end='', file=outFile) # everything up
                                                               # to the matrix
-    writeLines(eMatrix.generateMatrix(), 5, outFile) # the matrix
+    #writeLines(eMatrix.generateMatrix(), 25, outFile) # the matrix
+    writeLines(eMatrix.generateMatrix2(), 25, outFile) # the matrix
     print(emissionsMatchfunction_end, file=outFile) # the end of the function
     print('\n', file=outFile) # to seperate functions
 

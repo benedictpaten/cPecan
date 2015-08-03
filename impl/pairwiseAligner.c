@@ -676,10 +676,10 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
         printf("walking here x=%lld, y=%lld\n", x, y);
         if (x > 0 && y > 0) {
             double *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
-            printf("cellForward: %f \n", cellForward[sM->matchState]);
+            printf("cellForward->MatchState: %f \n", cellForward[sM->matchState]);
             double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
-            printf("cellBackward: %f \n", cellBackward[sM->matchState]);
-            // see if these should match
+            printf("cellBackward->MatchState: %f \n", cellBackward[sM->matchState]);
+
             double posteriorProbability = exp(
                     (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
             printf("posteriorProb: %f\n", posteriorProbability);

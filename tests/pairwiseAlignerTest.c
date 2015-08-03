@@ -280,8 +280,10 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     // marginal probability and the posterior probabilities of the matches
 
     // make some simple DNA sequences
-    const char *sX = "AGCG";
-    const char *sY = "AGTTCG";
+    //const char *sX = "AGCG";
+    //const char *sY = "AGTTCG";
+    const char *sX = "ATC";
+    const char *sY = "ATC";
 
     // set lX and lY to the lengths of those sequences
     int64_t lX = strlen(sX);
@@ -314,11 +316,13 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixBackward, lX + lY), sM, sM->endStateProb);
 
     //Forward algorithm
+    printf("\n-->At forward algorithm\n");
     for (int64_t i = 1; i <= lX + lY; i++) {
         //Do the forward calculation
         diagonalCalculationForward(sM, i, dpMatrixForward, sX2, sY2);
     }
     //Backward algorithm
+    printf("\n-->At backward algorithm\n");
     for (int64_t i = lX + lY; i > 0; i--) {
         //Do the backward calculation
         diagonalCalculationBackward(sM, i, dpMatrixBackward, sX2, sY2);
@@ -328,13 +332,14 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     double totalProbForward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY), sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
     st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
-    //printf("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
+    printf("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
     //Check the forward and back probabilities are about equal
     // need to make this more lax for different sequences
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);
 
     // Test calculating the posterior probabilities along the diagonals of the
     // matrix.
+    printf("\n-->Calculating posterior probabilities\n");
     for (int64_t i = 0; i <= lX + lY; i++) {
         //Calculate the total probs
         double totalDiagonalProb = diagonalCalculationTotalProbability(sM, i,
@@ -363,11 +368,9 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
 
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(0, 0));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(1, 1));
-    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 4));
-    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 5));
-
-    //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 2));
-    //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 3));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 2));// for atc example
+    //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 4));
+    //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 5));
 
     for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
         stIntTuple *pair = stList_get(alignedPairs, i);
@@ -377,7 +380,7 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
         CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
 
-    CuAssertIntEquals(testCase, 4, (int) stList_length(alignedPairs));
+    CuAssertIntEquals(testCase, 3, (int) stList_length(alignedPairs));
 
 }
 

@@ -68,3 +68,15 @@ class emissionMatrix(object):
 
                 probs.append(prob)
                 yield prob
+
+    def generateMatrix2(self):
+        probs = []
+        Xkmers = self.Xkmers
+        Ykmers = self.Ykmers
+
+        for kmerX in Xkmers:
+            for kmerY in Ykmers:
+                prob = ''
+                for n in range(len(kmerX)):
+                    prob += self.matchNucleotide(kmerX[n], kmerY[n])
+                yield prob

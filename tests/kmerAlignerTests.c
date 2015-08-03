@@ -80,16 +80,16 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
     // Make some simpler sequences and walk thought the alignment process.
     // Right now I suspect that the problem is at the end of the alignment ie.
     // aligning the final kmers.
-    const char *sX = "ATCG";
-    const char *sY = "ATCG";
+    const char *sX = "ATC";
+    const char *sY = "ATC";
 
     // set lX and lY to the lengths of those sequences
     int64_t lX = strlen(sX)-1;
     int64_t lY = strlen(sY)-1;
 
     // construct a sequence struct from those sequences and assign the get function as get base
-    Sequence* sX2 = sequenceConstruct(lX*KMER_LENGTH, sX, getKmer);
-    Sequence* sY2 = sequenceConstruct(lY*KMER_LENGTH, sY, getKmer);
+    Sequence* sX2 = sequenceConstruct(lX+1, sX, getKmer);
+    Sequence* sY2 = sequenceConstruct(lY+1, sY, getKmer);
 
     // construct a 5-state state machine, the forward and reverse DP Matrices, the band, the band
     // iterators and the anchor pairs
@@ -143,6 +143,7 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
 
     // Test calculating the posterior probabilities along the diagonals of the
     // matrix.
+    printf("\n-->Calculating posterior probabilities\n");
     for (int64_t i = 0; i <= lX + lY; i++) {
         //Calculate the total probs
         double totalDiagonalProb = diagonalCalculationTotalProbability(sM, i,
@@ -172,20 +173,19 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(0, 0));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(1, 1));
     //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 2));
-    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 6));
-    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(4, 7));
-    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(5, 8));
+    //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 6));
+    //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(4, 7));
+    //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(5, 8));
 
     for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
         stIntTuple *pair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
         st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
         //printf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
-
         CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
 
-    CuAssertIntEquals(testCase, 5, (int) stList_length(alignedPairs));
+    CuAssertIntEquals(testCase, 2, (int) stList_length(alignedPairs));
 
 }
 
