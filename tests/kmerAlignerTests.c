@@ -161,7 +161,7 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
     void *extraArgs[1] = { alignedPairs };
     for (int64_t i = 1; i <= lX + lY; i++) {
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-        p->threshold = 0.2;
+        p->threshold = 0.4 // used to be 0.2 needs to be doubled for kmers;
         diagonalCalculationPosteriorMatchProbs(sM, i, dpMatrixForward, dpMatrixBackward, sX2, sY2,
                                                totalProbForward, p, extraArgs);
         pairwiseAlignmentBandingParameters_destruct(p);
