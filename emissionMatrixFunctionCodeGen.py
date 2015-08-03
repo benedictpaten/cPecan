@@ -74,7 +74,7 @@ def writeLines(generator, numOfCols, outFile):
         if len(entry) == 1:
             print(entry, end=', ', file=outFile)
         if len(entry) > 1:
-            entry = '*'.join(list(entry))
+            entry = '+'.join(list(entry))
             print(entry, end=', ', file=outFile)
 
         lineBreak += 1

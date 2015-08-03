@@ -74,14 +74,14 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
 
     // make some simple DNA sequences
     // These are the originals:
-    //const char *sX = "CAGGCT";
-    //const char *sY = "CAGTTGCT";
+    const char *sX = "AGCG";
+    const char *sY = "AGTTCG";
     // TODO TODO TODO
     // Make some simpler sequences and walk thought the alignment process.
     // Right now I suspect that the problem is at the end of the alignment ie.
     // aligning the final kmers.
-    const char *sX = "ATC";
-    const char *sY = "ATC";
+    //const char *sX = "AGTG";
+    //const char *sY = "AGTG";
 
     // set lX and lY to the lengths of those sequences
     int64_t lX = strlen(sX)-1;
@@ -133,12 +133,13 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
     }
 
     //Calculate total probabilities
+    // NOTE this is where the problem is
     double totalProbForward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY), sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
     st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
     printf("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
     //Check the forward and back probabilities are about equal
-    // need to make this more lax for different sequences
+
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);
 
     // Test calculating the posterior probabilities along the diagonals of the
@@ -172,10 +173,8 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
 
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(0, 0));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(1, 1));
-    //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 2));
-    //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 6));
-    //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(4, 7));
-    //stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(5, 8));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 4));
+
 
     for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
         stIntTuple *pair = stList_get(alignedPairs, i);
@@ -185,7 +184,7 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
         CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
 
-    CuAssertIntEquals(testCase, 2, (int) stList_length(alignedPairs));
+    CuAssertIntEquals(testCase, 3, (int) stList_length(alignedPairs));
 
 }
 
