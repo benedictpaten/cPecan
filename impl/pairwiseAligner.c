@@ -133,7 +133,7 @@ static int64_t band_boundCoordinate(int64_t z, int64_t lZ) {
 }
 
 Band *band_construct(stList *anchorPairs, int64_t lX, int64_t lY, int64_t expansion) {
-    printf("running band_construct\n");
+    //printf("running band_construct\n");
     //Prerequisities
     assert(lX >= 0);
     assert(lY >= 0);
@@ -197,7 +197,7 @@ struct _bandIterator {
 };
 
 BandIterator *bandIterator_construct(Band *band) {
-    printf("running bandIterator_construct\n");
+    //printf("running bandIterator_construct\n");
     BandIterator *bandIterator = st_malloc(sizeof(BandIterator));
     bandIterator->band = band;
     bandIterator->index = 0;
@@ -491,7 +491,7 @@ struct _dpMatrix {
 };
 
 DpMatrix *dpMatrix_construct(int64_t diagonalNumber, int64_t stateNumber) {
-    printf("running dpMatrix_construct\n");
+    //printf("running dpMatrix_construct\n");
     assert(diagonalNumber >= 0);
     DpMatrix *dpMatrix = st_malloc(sizeof(DpMatrix));
     dpMatrix->diagonalNumber = diagonalNumber;
@@ -655,8 +655,8 @@ double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatr
 void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
                                             DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
                                             double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs) {
-    printf("\nRunning diagonalCalculationPosteriorMatchProbs!\n");
-    printf("going in, totalProbability=%f\n", totalProbability);
+    //printf("\nRunning diagonalCalculationPosteriorMatchProbs!\n");
+    //printf("going in, totalProbability=%f\n", totalProbability);
     assert(p->threshold >= 0.0);
     assert(p->threshold <= 1.0);
     stList *alignedPairs = ((void **) extraArgs)[0];
@@ -673,26 +673,26 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
         //printf("At start xmy: %lld \n", xmy);
         int64_t x = diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy);
         int64_t y = diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy);
-        printf("walking here x=%lld, y=%lld\n", x, y);
+        //printf("walking here x=%lld, y=%lld\n", x, y);
         if (x > 0 && y > 0) {
             double *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
-            printf("cellForward->MatchState: %f \n", cellForward[sM->matchState]);
+            //printf("cellForward->MatchState: %f \n", cellForward[sM->matchState]);
             double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
-            printf("cellBackward->MatchState: %f \n", cellBackward[sM->matchState]);
+            //printf("cellBackward->MatchState: %f \n", cellBackward[sM->matchState]);
 
             double posteriorProbability = exp(
                     (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
-            printf("posteriorProb: %f\n", posteriorProbability);
+            //printf("posteriorProb: %f\n", posteriorProbability);
             if (posteriorProbability >= p->threshold) {
                 if (posteriorProbability > 1.0) {
                     posteriorProbability = 1.0;
                 }
                 posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
-                printf("Adding to alignedPairs! posteriorProb: %lld, X: %lld, Y: %lld\n\n", (int64_t) posteriorProbability, x - 1, y - 1);
+                //printf("Adding to alignedPairs! posteriorProb: %lld, X: %lld, Y: %lld\n\n", (int64_t) posteriorProbability, x - 1, y - 1);
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
             }
             if (posteriorProbability <= p->threshold) {
-                printf("NOT adding to aligned pairs! posteriorProb: %f, X: %lld, Y: %lld\n\n", posteriorProbability, x - 1, y - 1);
+                //printf("NOT adding to aligned pairs! posteriorProb: %f, X: %lld, Y: %lld\n\n", posteriorProbability, x - 1, y - 1);
             }
         }
         xmy += 2;
@@ -1243,6 +1243,7 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(StateMachine *sM
 ///////////////////////////////////
 
 PairwiseAlignmentParameters *pairwiseAlignmentBandingParameters_construct() {
+    printf("4s. Running pairwiseAlignmentBandingParameters_construct\n");
     PairwiseAlignmentParameters *p = st_malloc(sizeof(PairwiseAlignmentParameters));
     p->threshold = 0.01;
     p->minDiagsBetweenTraceBack = 1000;

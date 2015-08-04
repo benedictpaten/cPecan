@@ -23,6 +23,7 @@ char getRandomChar() {
  * Creates a random DNA sequence of the given length.
  */
 char *getRandomSequence(int64_t length) {
+    printf("1s. Running getRandomSequence\n");
     char *seq = st_malloc((length + 1) * sizeof(char));
     for (int64_t i = 0; i < length; i++) {
         seq[i] = getRandomChar();
@@ -35,6 +36,7 @@ char *getRandomSequence(int64_t length) {
  * Transfroms the given sequence into a different sequence.
  */
 char *evolveSequence(const char *startSequence) {
+    printf("2s. Running evolveSequence\n");
     //Copy sequence
     char *seq = stString_copy(startSequence);
 

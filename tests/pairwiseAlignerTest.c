@@ -315,13 +315,13 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixBackward, lX + lY), sM, sM->endStateProb);
 
     //Forward algorithm
-    printf("\n-->At forward algorithm\n");
+    //printf("\n-->At forward algorithm\n");
     for (int64_t i = 1; i <= lX + lY; i++) {
         //Do the forward calculation
         diagonalCalculationForward(sM, i, dpMatrixForward, sX2, sY2);
     }
     //Backward algorithm
-    printf("\n-->At backward algorithm\n");
+    //printf("\n-->At backward algorithm\n");
     for (int64_t i = lX + lY; i > 0; i--) {
         //Do the backward calculation
         diagonalCalculationBackward(sM, i, dpMatrixBackward, sX2, sY2);
@@ -331,14 +331,14 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     double totalProbForward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY), sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
     st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
-    printf("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
+    //printf("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
     //Check the forward and back probabilities are about equal
     // need to make this more lax for different sequences
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);
 
     // Test calculating the posterior probabilities along the diagonals of the
     // matrix.
-    printf("\n-->Calculating posterior probabilities\n");
+    //printf("\n-->Calculating posterior probabilities\n");
     for (int64_t i = 0; i <= lX + lY; i++) {
         //Calculate the total probs
         double totalDiagonalProb = diagonalCalculationTotalProbability(sM, i,
@@ -437,10 +437,7 @@ static void test_getAlignedPairsWithBanding(CuTest *testCase) {
         int64_t lY = strlen(sY);
         st_logInfo("Sequence X to align: %s END\n", sX);
         st_logInfo("Sequence Y to align: %s END\n", sY);
-        printf("Sequence X to align: %s END\n", sX);
-        printf("Sequence Y to align: %s END\n", sY);
-        //SymbolString sX2 = symbolString_construct(sX, lX);
-        //SymbolString sY2 = symbolString_construct(sY, lY);
+
         Sequence* sX2 = sequenceConstruct(lX, sX, getBase);
         Sequence* sY2 = sequenceConstruct(lY, sY, getBase);
 

@@ -9,6 +9,7 @@
 
 // Sequence constructor function
 Sequence* sequenceConstruct(int length, void *elements, void (*getfPtr)) {
+    printf("3s. Running sequenceConstruct\n");
 
     Sequence* self = malloc(sizeof(Sequence));
 

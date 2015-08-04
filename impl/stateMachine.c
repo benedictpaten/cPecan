@@ -332,13 +332,13 @@ static inline double emission_kmer_getGapProb(const double *emissionGapProbs, in
 }
 
 static inline double emission_kmer_getMatchProb(const double *emissionMatchProbs, int64_t x, int64_t y) {
-    printf("gettingMatchProb for x=%lld, y=%lld\n", x, y);
+    //printf("gettingMatchProb for x=%lld, y=%lld\n", x, y);
     //if(x == 4 || y == 4) {
     //    return -2.772588722; //log(0.25**2)
     //}
     //int64_t tableIndex = x * SYMBOL_NUMBER + y;
     int64_t tableIndex = x * NUM_OF_KMERS + y;
-    printf("emissionMatchProbs[%lld] = %f\n", tableIndex, emissionMatchProbs[tableIndex]);
+    //printf("emissionMatchProbs[%lld] = %f\n", tableIndex, emissionMatchProbs[tableIndex]);
     return emissionMatchProbs[tableIndex];
 }
 
@@ -469,13 +469,13 @@ static void stateMachine5_cellCalculate(StateMachine *sM, double *current, doubl
         //doTransition(lower, current, longGapY, longGapX, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_X, extraArgs);
     }
     if (middle != NULL) {
-        printf("at MIDDLE we have bases cX: %c and cY: %c\n", *cX, *cY);
+        //printf("at MIDDLE we have bases cX: %c and cY: %c\n", *cX, *cY);
         int64_t cXindex = getBaseIndex(*cX);
         int64_t cYindex = getBaseIndex(*cY);
-        printf("base index returned %lld from base: %c\n", cXindex, *cX);
-        printf("base index returned %lld from base: %c\n", cYindex, *cY);
+        //printf("base index returned %lld from base: %c\n", cXindex, *cX);
+        //printf("base index returned %lld from base: %c\n", cYindex, *cY);
         double eP = emission_getMatchProb(sM5->EMISSION_MATCH_PROBS, cXindex, cYindex); //symbol_matchProb(cX, cY);
-        printf("emissionProb=%f\n", eP);
+        //printf("emissionProb=%f\n", eP);
         doTransition(middle, current, match, match, eP, sM5->TRANSITION_MATCH_CONTINUE, extraArgs);
         doTransition(middle, current, shortGapX, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X, extraArgs);
         doTransition(middle, current, shortGapY, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y, extraArgs);
@@ -519,13 +519,13 @@ void stateMachine5_kmer_cellCalculate(StateMachine *sM, double *current, double 
         //doTransition(lower, current, longGapY, longGapX, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_X, extraArgs);
     }
     if (middle != NULL) {
-        printf("at MIDDLE we have kemrs cX: %s and cY: %s\n", (char*) cX, (char*) cY);
+        //printf("at MIDDLE we have kemrs cX: %s and cY: %s\n", (char*) cX, (char*) cY);
         int64_t cXindex = getKmerIndex(cX);
         int64_t cYindex = getKmerIndex(cY);
-        printf("kmer index returned %lld from kmer: %s\n", cXindex, cX);
-        printf("kmer index returned %lld from kmer: %s\n", cYindex, cY);
+        //printf("kmer index returned %lld from kmer: %s\n", cXindex, cX);
+        //printf("kmer index returned %lld from kmer: %s\n", cYindex, cY);
         double eP = emission_kmer_getMatchProb(sM5->EMISSION_MATCH_PROBS, cXindex, cYindex); //symbol_matchProb(cX, cY);
-        printf("emissionMatchProb=%f\n", eP);
+        //printf("emissionMatchProb=%f\n", eP);
         doTransition(middle, current, match, match, eP, sM5->TRANSITION_MATCH_CONTINUE, extraArgs);
         doTransition(middle, current, shortGapX, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X, extraArgs);
         doTransition(middle, current, shortGapY, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y, extraArgs);
@@ -549,6 +549,7 @@ void stateMachine5_kmer_cellCalculate(StateMachine *sM, double *current, double 
 
 
 StateMachine *stateMachine5_construct(StateMachineType type) {
+    printf("6s. Running stateMachine5_construct\n");
     StateMachine5 *sM5 = st_malloc(sizeof(StateMachine5));
     sM5->TRANSITION_MATCH_CONTINUE = -0.030064059121770816; //0.9703833696510062f
     sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X = -1.272871422049609; //1.0 - gapExtend - gapSwitch = 0.280026392297485
@@ -588,7 +589,7 @@ StateMachine *stateMachine5_construct(StateMachineType type) {
 }
 
 StateMachine *stateMachine5_kmer_construct(StateMachineType type) {
-    printf("running stateMachine5 kmer construct\n");
+    //printf("running stateMachine5 kmer construct\n");
     StateMachineKmer5 *sM5 = st_malloc(sizeof(StateMachineKmer5));
     sM5->TRANSITION_MATCH_CONTINUE = -0.030064059121770816; //0.9703833696510062f
     sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X = -1.272871422049609; //1.0 - gapExtend - gapSwitch = 0.280026392297485
