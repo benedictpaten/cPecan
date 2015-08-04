@@ -133,7 +133,6 @@ static int64_t band_boundCoordinate(int64_t z, int64_t lZ) {
 }
 
 Band *band_construct(stList *anchorPairs, int64_t lX, int64_t lY, int64_t expansion) {
-    //printf("running band_construct\n");
     //Prerequisities
     assert(lX >= 0);
     assert(lY >= 0);
@@ -142,6 +141,7 @@ Band *band_construct(stList *anchorPairs, int64_t lX, int64_t lY, int64_t expans
     Band *band = st_malloc(sizeof(Band));
     band->diagonals = st_malloc(sizeof(Diagonal) * (lX + lY + 1));
     band->lXalY = lX + lY;
+
 
     //Now initialise the diagonals
     int64_t anchorPairIndex = 0;
@@ -197,7 +197,6 @@ struct _bandIterator {
 };
 
 BandIterator *bandIterator_construct(Band *band) {
-    //printf("running bandIterator_construct\n");
     BandIterator *bandIterator = st_malloc(sizeof(BandIterator));
     bandIterator->band = band;
     bandIterator->index = 0;
@@ -591,7 +590,7 @@ static void diagonalCalculation(StateMachine *sM,
         int64_t indexX = getXindex(sX, diagonal_getXay(diagonal), xmy) - 1;
         int64_t indexY = getYindex(sY, diagonal_getXay(diagonal), xmy) - 1;
 
-        //printf("Got indexX=%lld, indexY=%lld ", indexX, indexY);
+        //printf("Got indexX=%lld, indexY=%lld \n", indexX, indexY);
 
         char* x = sX->get(sX->elements, indexX);
         char* y = sY->get(sY->elements, indexY);
@@ -750,6 +749,7 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
     }
 
     //Primitives for the forward matrix recursion
+
     Band *band = band_construct(anchorPairs, sX->length, sY->length, p->diagonalExpansion);
     BandIterator *forwardBandIterator = bandIterator_construct(band);
     DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
@@ -1243,7 +1243,6 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(StateMachine *sM
 ///////////////////////////////////
 
 PairwiseAlignmentParameters *pairwiseAlignmentBandingParameters_construct() {
-    printf("4s. Running pairwiseAlignmentBandingParameters_construct\n");
     PairwiseAlignmentParameters *p = st_malloc(sizeof(PairwiseAlignmentParameters));
     p->threshold = 0.01;
     p->minDiagsBetweenTraceBack = 1000;

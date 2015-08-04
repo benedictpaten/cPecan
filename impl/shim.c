@@ -9,8 +9,6 @@
 
 // Sequence constructor function
 Sequence* sequenceConstruct(int length, void *elements, void (*getfPtr)) {
-    printf("3s. Running sequenceConstruct\n");
-
     Sequence* self = malloc(sizeof(Sequence));
 
     self->length = length;
@@ -57,6 +55,10 @@ int64_t getBaseIndex(char base) {
 
 // TODO need a proper unit test function for this
 int64_t getKmerIndex(char* kmer) {
+    //int64_t kmerLength = strlen(kmer);
+    //printf("kmer length: %lld\n", kmerLength);
+    int64_t kmerLen = strlen(kmer);
+    assert(kmerLen == KMER_LENGTH);
     int64_t axisLength = 25; // for 2-mers
     int64_t l = axisLength/5;
     int64_t i = 0;
@@ -73,13 +75,25 @@ int64_t getKmerIndex(char* kmer) {
     //printf("last:%lld\n", last);
     x += getBaseIndex(kmer[last]);
 
+
     return x;
 }
+
+int64_t getKmerSeqLength(int64_t stringLength) {
+    //int64_t l = stringLength;
+    if (stringLength == 0) {
+        return 0;
+    }
+    if (stringLength > 0) {
+        return stringLength - 1;
+    }
+}
+
 
 // returns a pointer to a kmer within a char array
 void* getKmer(void *elements, int64_t index) {
     char* n;
-    n = "NN"; // hardwirded null kmer
+    n = "NN"; // hardwired null kmer
 
     int64_t i = index;
 
