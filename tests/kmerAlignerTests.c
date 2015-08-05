@@ -53,8 +53,8 @@ static void test_Kmers_cell(CuTest *testCase) {
     //const char *testXseq = "AATT";
     //const char *testYseq = "AATT";
 
-    Sequence* xSeq = sequenceConstruct(4, testXseq, getKmer);
-    Sequence* ySeq = sequenceConstruct(4, testYseq, getKmer);
+    Sequence* xSeq = sequenceConstruct(4, testXseq, getKmer, kmer);
+    Sequence* ySeq = sequenceConstruct(6, testYseq, getKmer, kmer);
 
     //char* xkmer = xSeq->get(xSeq->elements, 0);
     //char* ykmer = ySeq->get(ySeq->elements, 0);
@@ -95,12 +95,12 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
 
     // set lX and lY to the lengths of those sequences
     // NOTE The length of kmers is the length of bases-1
-    int64_t lX = getKmerSeqLength(strlen(sX));
-    int64_t lY = getKmerSeqLength(strlen(sY));
+    int64_t lX = strlen(sX);
+    int64_t lY = strlen(sY);
 
     // construct a sequence struct from those sequences and assign the get function as get base
-    Sequence* sX2 = sequenceConstruct(lX, sX, getKmer);
-    Sequence* sY2 = sequenceConstruct(lY, sY, getKmer);
+    Sequence* sX2 = sequenceConstruct(lX, sX, getKmer, kmer);
+    Sequence* sY2 = sequenceConstruct(lY, sY, getKmer, kmer);
 
     // construct a 5-state state machine, the forward and reverse DP Matrices, the band, the band
     // iterators and the anchor pairs
@@ -251,13 +251,13 @@ static void test_Kmers_getAlignedPairsWithBanding(CuTest *testCase) {
         char *sY = evolveSequence(sX); //stString_copy(seqX);
 
 
-        int64_t lX = getKmerSeqLength(strlen(sX));
-        int64_t lY = getKmerSeqLength(strlen(sY));
+        int64_t lX = strlen(sX);
+        int64_t lY = strlen(sY);
 
         //st_logInfo("Sequence X to align: %s END\n", sX);
         //st_logInfo("Sequence Y to align: %s END\n", sY);
-        Sequence* sX2 = sequenceConstruct(lX, sX, getKmer);
-        Sequence* sY2 = sequenceConstruct(lY, sY, getKmer);
+        Sequence* sX2 = sequenceConstruct(lX, sX, getKmer, kmer);
+        Sequence* sY2 = sequenceConstruct(lY, sY, getKmer, kmer);
 
 
         //Now do alignment
@@ -290,17 +290,41 @@ static void test_Kmers_getAlignedPairsWithBanding(CuTest *testCase) {
     }
 }
 
+// TODO this is next!
+static void test_kmers_getAlignedPairs(CuTest *testCase) {
+    printf("Runnung getAlignedPairs_kmers");
+    for (int64_t test = 0; test < 100; test++) {
+        //Make a pair of sequences
+        char *sX = getRandomSequence(st_randomInt(0, 100));
+        char *sY = evolveSequence(sX); //stString_copy(seqX);
+        int64_t lX = strlen(sX);
+        int64_t lY = strlen(sY);
+        st_logInfo("Sequence X to align: %s END\n", sX);
+        st_logInfo("Sequence Y to align: %s END\n", sY);
 
+        //Now do alignment
+        PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+        StateMachine *sM = stateMachine5_construct(fiveState);
+
+        stList *alignedPairs = getAlignedPairs(sM, sX, sY, p, 0, 0);
+
+        //Check the aligned pairs.
+        checkAlignedPairs_kmers(testCase, alignedPairs, lX, lY);
+
+        //Cleanup
+        stateMachine_destruct(sM);
+        free(sX);
+        free(sY);
+        stList_destruct(alignedPairs);
+    }
+}
 
 
 CuSuite* kmerTestSuite() {
     CuSuite* suite = CuSuiteNew();
-
 //    SUITE_ADD_TEST(suite, test_Kmers_cell);
 //    SUITE_ADD_TEST(suite, test_Kmers_diagonalDPCalculations);
 //    SUITE_ADD_TEST(suite, test_Kmers_getAlignedPairsWithBanding);
-
-
-
+//    SUITE_ADD_TEST(suite, test_kmers_getAlignedPairs);
     return suite;
 }

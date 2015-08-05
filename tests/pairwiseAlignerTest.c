@@ -180,19 +180,19 @@ static void test_cell(CuTest *testCase) {
     //char* testYseq = "TGCT";
     const char *testXseq = "AGCG";
     const char *testYseq = "AGTTCG";
-    Sequence* xSeq = sequenceConstruct(4, testXseq, getBase);
-    Sequence* ySeq = sequenceConstruct(6, testYseq, getBase);
+    Sequence* xSeq = sequenceConstruct(4, testXseq, getBase, nucleotide);
+    Sequence* ySeq = sequenceConstruct(6, testYseq, getBase, nucleotide);
     char* cX = xSeq->get(xSeq->elements, 2);
     char* cY = ySeq->get(ySeq->elements, 2);
 //    Symbol cX = a, cY = t;
     //Do forward
-    cell_calculateForward(sM, lowerF, NULL, NULL, middleF, *cX, *cY, NULL);
-    cell_calculateForward(sM, upperF, middleF, NULL, NULL, *cX, *cY, NULL);
-    cell_calculateForward(sM, currentF, lowerF, middleF, upperF, *cX, *cY, NULL);
+    cell_calculateForward(sM, lowerF, NULL, NULL, middleF, cX, cY, NULL);
+    cell_calculateForward(sM, upperF, middleF, NULL, NULL, cX, cY, NULL);
+    cell_calculateForward(sM, currentF, lowerF, middleF, upperF, cX, cY, NULL);
     //Do backward
-    cell_calculateBackward(sM, currentB, lowerB, middleB, upperB, *cX, *cY, NULL);
-    cell_calculateBackward(sM, upperB, middleB, NULL, NULL, *cX, *cY, NULL);
-    cell_calculateBackward(sM, lowerB, NULL, NULL, middleB, *cX, *cY, NULL);
+    cell_calculateBackward(sM, currentB, lowerB, middleB, upperB, cX, cY, NULL);
+    cell_calculateBackward(sM, upperB, middleB, NULL, NULL, cX, cY, NULL);
+    cell_calculateBackward(sM, lowerB, NULL, NULL, middleB, cX, cY, NULL);
     double totalProbForward = cell_dotProduct2(currentF, sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(middleB, sM, sM->startStateProb);
     st_logInfo("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
@@ -292,8 +292,8 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     //SymbolString sY2 = symbolString_construct(sY, lY);
 
     // construct a sequence struct from those sequences and assign the get function as get base
-    Sequence* sX2 = sequenceConstruct(lX, sX, getBase);
-    Sequence* sY2 = sequenceConstruct(lY, sY, getBase);
+    Sequence* sX2 = sequenceConstruct(lX, sX, getBase, nucleotide);
+    Sequence* sY2 = sequenceConstruct(lY, sY, getBase, nucleotide);
 
     // construct a 5-state state machine, the forward and reverse DP Matrices, the band, the band
     // iterators and the anchor pairs
@@ -438,8 +438,8 @@ static void test_getAlignedPairsWithBanding(CuTest *testCase) {
         st_logInfo("Sequence X to align: %s END\n", sX);
         st_logInfo("Sequence Y to align: %s END\n", sY);
 
-        Sequence* sX2 = sequenceConstruct(lX, sX, getBase);
-        Sequence* sY2 = sequenceConstruct(lY, sY, getBase);
+        Sequence* sX2 = sequenceConstruct(lX, sX, getBase, nucleotide);
+        Sequence* sY2 = sequenceConstruct(lY, sY, getBase, nucleotide);
 
 
         //Now do alignment
@@ -908,14 +908,14 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
 //    SUITE_ADD_TEST(suite, test_bands);
 //    SUITE_ADD_TEST(suite, test_logAdd);
 //    SUITE_ADD_TEST(suite, test_symbol);
-//    SUITE_ADD_TEST(suite, test_cell);
-//    SUITE_ADD_TEST(suite, test_dpDiagonal);
-//    SUITE_ADD_TEST(suite, test_dpMatrix);
+    SUITE_ADD_TEST(suite, test_cell);
+    SUITE_ADD_TEST(suite, test_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_dpMatrix);
     SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
-    SUITE_ADD_TEST(suite, test_getBlastPairs);
+//    SUITE_ADD_TEST(suite, test_getBlastPairs);
 //    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
-//    SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
+    //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap); // TODO has failure
 //    SUITE_ADD_TEST(suite, test_getSplitPoints);
 //    SUITE_ADD_TEST(suite, test_getAlignedPairs);
 //    SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
@@ -923,8 +923,8 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
 //    SUITE_ADD_TEST(suite, test_hmm_5StateAsymmetric);
 //    SUITE_ADD_TEST(suite, test_hmm_3State);
 //    SUITE_ADD_TEST(suite, test_hmm_3StateAsymmetric);
-//    SUITE_ADD_TEST(suite, test_em_3State);
-//    SUITE_ADD_TEST(suite, test_em_3StateAsymmetric);
+    //SUITE_ADD_TEST(suite, test_em_3State); // TODO has segmentation fault
+    //SUITE_ADD_TEST(suite, test_em_3StateAsymmetric); //TODO has segmentation fault
 //    SUITE_ADD_TEST(suite, test_em_5State);
 
 

@@ -376,6 +376,7 @@ struct _StateMachine5 {
     double EMISSION_GAP_Y_PROBS[SYMBOL_NUMBER_NO_N]; //Gap emission probs
 };
 
+// DRY! Try to remove this.
 struct _StateMachineKmer5 {
     StateMachine model;
     double TRANSITION_MATCH_CONTINUE; //0.9703833696510062f

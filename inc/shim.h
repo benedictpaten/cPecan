@@ -14,11 +14,20 @@
 typedef struct sequence {
     int64_t length;
     void *elements;
-    void *(*get)(void *elements, int64_t index);
+    void* (*get)(void *elements, int64_t index);
     char n;
 } Sequence;
 
-Sequence* sequenceConstruct(int length, void *elements, void (*getFcn));
+// Types of sequences
+typedef enum {
+    nucleotide=0,
+    kmer=1,
+    event=2
+} sequenceType;
+
+int64_t correctSeqLength(sequenceType type, int64_t stringLength);
+
+Sequence* sequenceConstruct(int length, void *elements, void (*getFcn), sequenceType type);
 
 void sequenceDestroy(Sequence* seq);
 

@@ -15,7 +15,7 @@
 static void test_chars(CuTest* testCase) {
     char* testSequence = "GATACA";
     int dnaLen = (int) strlen(testSequence);
-    Sequence* charSeq = sequenceConstruct(dnaLen, testSequence, getBase);
+    Sequence* charSeq = sequenceConstruct(dnaLen, testSequence, getBase, nucleotide);
     for (int c = 0; c < dnaLen; c++) {
         char* b = charSeq->get(charSeq->elements, c);
         CuAssertStrEquals(testCase, &testSequence[c], b);
@@ -28,7 +28,7 @@ static void test_kmers(CuTest* testCase) {
     char testKmers[14][6] = {"GATAC", "ATACA", "TACAG", "ACAGA", "CAGAT", "AGATA",
                              "GATAC", "ATACA", "TACAG", "ACAGA", "CAGAT", "AGATA",
                              "GATAC", "ATACA"};
-    Sequence* kmerSeq = sequenceConstruct(len, testSequence, getKmer);
+    Sequence* kmerSeq = sequenceConstruct(len, testSequence, getKmer, kmer);
     for (int x = 0; x < 5; x++) {
         char* kmer = kmerSeq->get(kmerSeq->elements, x);
         CuAssertStrEquals(testCase, &testKmers[x], kmer);
@@ -42,7 +42,7 @@ static void test_events(CuTest* testCase) {
                            12.12, 23.23, 34.34, 45.45, 56.56, 67.67 };
 
     void* eventSequence = eventSequenceConstruct(12, testMeans, *testKmers);
-    Sequence* eventSeq = sequenceConstruct(12, eventSequence, getEvent);
+    Sequence* eventSeq = sequenceConstruct(12, eventSequence, getEvent, event);
 
     for (int x = 0; x < 12; x++) {
         Event *ev = eventSeq->get(eventSeq->elements, x);

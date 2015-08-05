@@ -8,10 +8,10 @@
 
 
 // Sequence constructor function
-Sequence* sequenceConstruct(int length, void *elements, void (*getfPtr)) {
+Sequence* sequenceConstruct(int stringLength, void *elements, void (*getfPtr), sequenceType type) {
     Sequence* self = malloc(sizeof(Sequence));
 
-    self->length = length;
+    self->length = correctSeqLength(stringLength, type);
     self->elements = elements;
     self->get = getfPtr;
     //self->n = "n"; // TODO decide on a generic empty/Null character?
@@ -79,6 +79,21 @@ int64_t getKmerIndex(char* kmer) {
     return x;
 }
 
+int64_t correctSeqLength(sequenceType type, int64_t stringLength) {
+    if (stringLength == 0) {
+        return 0;
+    }
+    if (stringLength > 0) {
+        switch (type) {
+            case 0: // nucleotide sequence
+                return stringLength;
+            case 1: // event and kmer sequence
+            case 2:
+                return stringLength - 1;
+        }
+    }
+}
+
 int64_t getKmerSeqLength(int64_t stringLength) {
     //int64_t l = stringLength;
     if (stringLength == 0) {
@@ -94,20 +109,16 @@ int64_t getKmerSeqLength(int64_t stringLength) {
 void* getKmer(void *elements, int64_t index) {
     char* n;
     n = "NN"; // hardwired null kmer
-
     int64_t i = index;
-
     // change kmer length here, hardwired so far...
     int kmerLength = KMER_LENGTH;
-
-    char *k_i = malloc((kmerLength+1) * sizeof(char));
-
+    char *k_i = malloc((kmerLength+1) * sizeof(char)); // TODO remove this malloc
     for (int x = 0; x < kmerLength; x++) {
         k_i[x] = *((char *)elements+(i+x));
     }
 
     return index >= 0 ? k_i : n;
-    //return k_i;
+
 }
 
 // TODO make a function that compares kmers
