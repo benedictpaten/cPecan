@@ -911,9 +911,9 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
 //    SUITE_ADD_TEST(suite, test_cell);
 //    SUITE_ADD_TEST(suite, test_dpDiagonal);
 //    SUITE_ADD_TEST(suite, test_dpMatrix);
-//    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
-//    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
-//    SUITE_ADD_TEST(suite, test_getBlastPairs);
+    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_getBlastPairs);
 //    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
 //    SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
 //    SUITE_ADD_TEST(suite, test_getSplitPoints);

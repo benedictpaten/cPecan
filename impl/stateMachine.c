@@ -549,7 +549,6 @@ void stateMachine5_kmer_cellCalculate(StateMachine *sM, double *current, double 
 
 
 StateMachine *stateMachine5_construct(StateMachineType type) {
-    printf("6s. Running stateMachine5_construct\n");
     StateMachine5 *sM5 = st_malloc(sizeof(StateMachine5));
     sM5->TRANSITION_MATCH_CONTINUE = -0.030064059121770816; //0.9703833696510062f
     sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X = -1.272871422049609; //1.0 - gapExtend - gapSwitch = 0.280026392297485
