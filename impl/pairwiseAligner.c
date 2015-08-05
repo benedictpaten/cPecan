@@ -1186,6 +1186,7 @@ static void convertAlignedPairs(stList *alignedPairs2, int64_t offsetX, int64_t 
 
 void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         StateMachine *sM, stList *anchorPairs, const char *sX, const char *sY,
+        sequenceType t, //void (*getfPtr),
         int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,
         bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
         void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *,
@@ -1193,7 +1194,7 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
                                         const Sequence*, double,
                                         PairwiseAlignmentParameters *, void *),
         void (*coordinateCorrectionFn)(), void *extraArgs) {
-    printf("getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps: running\n");
+    //printf("getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps: running\n");
 
     stList *splitPoints = getSplitPoints(anchorPairs, lX, lY,
                                          p->splitMatrixBiggerThanThis,
@@ -1215,8 +1216,8 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         char *sY2 = stString_getSubString(sY, y1, y2 - y1);
 //        SymbolString sX3 = symbolString_construct(sX2, x2 - x1);
 //        SymbolString sY3 = symbolString_construct(sY2, y2 - y1);
-        Sequence* sX3 = sequenceConstruct(x2 - x1, sX2, getBase, nucleotide);
-        Sequence* sY3 = sequenceConstruct(y2 - y1, sY2, getBase, nucleotide);
+        Sequence* sX3 = sequenceConstruct(x2 - x1, sX2, nucleotide);
+        Sequence* sY3 = sequenceConstruct(y2 - y1, sY2, nucleotide);
 
         //List of anchor pairs
         stList *subListOfAnchorPoints = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
@@ -1290,6 +1291,8 @@ static void alignedPairCoordinateCorrectionFn(int64_t offsetX, int64_t offsetY, 
 
 stList *getAlignedPairsUsingAnchors(StateMachine *sM,
                                     const char *sX, const char *sY,
+                                    sequenceType t,
+                                    //void (*getfPtr),
                                     stList *anchorPairs,
                                     PairwiseAlignmentParameters *p,
                                     bool alignmentHasRaggedLeftEnd,
@@ -1305,7 +1308,8 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM,
     void *extraArgs[2] = { subListOfAlignedPairs, alignedPairs };
 
     getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
-                                        sM, anchorPairs, sX, sY, lX, lY, p,
+                                        sM, anchorPairs, sX, sY, t,// (*getfPtr),
+                                        lX, lY, p,
                                         alignmentHasRaggedLeftEnd,
                                         alignmentHasRaggedRightEnd,
                                         diagonalCalculationPosteriorMatchProbs,
@@ -1319,30 +1323,45 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM,
 }
 
 stList *getAlignedPairs(StateMachine *sM, const char *sX, const char *sY,
+                        sequenceType t,
+                        //void (*getfPtr),
                         PairwiseAlignmentParameters *p,
                         bool alignmentHasRaggedLeftEnd,
                         bool alignmentHasRaggedRightEnd) {
     printf("getAlignedPairs: started\n");
 
     stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(sX, sY, strlen(sX), strlen(sY), p);
-    stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, sY, anchorPairs, p, alignmentHasRaggedLeftEnd,
-            alignmentHasRaggedRightEnd);
+    stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, sY,
+                                                       t, //(*getfPtr),
+                                                       anchorPairs, p, alignmentHasRaggedLeftEnd,
+                                                       alignmentHasRaggedRightEnd);
     stList_destruct(anchorPairs);
     return alignedPairs;
 }
 
-void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations, const char *sX, const char *sY, stList *anchorPairs,
-        PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
-    getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(sM, anchorPairs, sX, sY, strlen(sX), strlen(sY), p,
-            alignmentHasRaggedLeftEnd, alignmentHasRaggedRightEnd, diagonalCalculationExpectations, NULL,
-            hmmExpectations);
+void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
+                                 const char *sX, const char *sY, sequenceType t,
+                                 stList *anchorPairs,
+                                 PairwiseAlignmentParameters *p,
+                                 bool alignmentHasRaggedLeftEnd,
+                                 bool alignmentHasRaggedRightEnd) {
+
+    getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(sM, anchorPairs,
+                                                               sX, sY, t, strlen(sX), strlen(sY), p,
+                                                               alignmentHasRaggedLeftEnd, alignmentHasRaggedRightEnd,
+                                                               diagonalCalculationExpectations, NULL, hmmExpectations);
 }
 
-void getExpectations(StateMachine *sM, Hmm *hmmExpectations, const char *sX, const char *sY, PairwiseAlignmentParameters *p,
-        bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
+void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
+                     const char *sX, const char *sY, sequenceType t,
+                     PairwiseAlignmentParameters *p,
+                     bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
+
     stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(sX, sY, strlen(sX), strlen(sY), p);
-    getExpectationsUsingAnchors(sM, hmmExpectations, sX, sY, anchorPairs, p, alignmentHasRaggedLeftEnd,
-            alignmentHasRaggedRightEnd);
+
+    getExpectationsUsingAnchors(sM, hmmExpectations, sX, sY, t, anchorPairs, p,
+                                alignmentHasRaggedLeftEnd,
+                                alignmentHasRaggedRightEnd);
     stList_destruct(anchorPairs);
 }
 

@@ -8,12 +8,23 @@
 
 
 // Sequence constructor function
-Sequence* sequenceConstruct(int stringLength, void *elements, void (*getfPtr), sequenceType type) {
-    Sequence* self = malloc(sizeof(Sequence));
+Sequence* sequenceConstruct(int stringLength, void *elements, sequenceType type) {
 
+    Sequence* self = malloc(sizeof(Sequence));
     self->length = correctSeqLength(stringLength, type);
     self->elements = elements;
-    self->get = getfPtr;
+    //self->get = getfPtr;
+    switch (type) {
+        case 0:
+            self->get = getBase;
+            break;
+        case 1:
+            self->get = getKmer;
+            break;
+        case 2:
+            self->get = getEvent;
+            break;
+    }
     //self->n = "n"; // TODO decide on a generic empty/Null character?
     return self;
 }

@@ -180,8 +180,8 @@ static void test_cell(CuTest *testCase) {
     //char* testYseq = "TGCT";
     const char *testXseq = "AGCG";
     const char *testYseq = "AGTTCG";
-    Sequence* xSeq = sequenceConstruct(4, testXseq, getBase, nucleotide);
-    Sequence* ySeq = sequenceConstruct(6, testYseq, getBase, nucleotide);
+    Sequence* xSeq = sequenceConstruct(4, testXseq, nucleotide);
+    Sequence* ySeq = sequenceConstruct(6, testYseq, nucleotide);
     char* cX = xSeq->get(xSeq->elements, 2);
     char* cY = ySeq->get(ySeq->elements, 2);
 //    Symbol cX = a, cY = t;
@@ -292,8 +292,8 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     //SymbolString sY2 = symbolString_construct(sY, lY);
 
     // construct a sequence struct from those sequences and assign the get function as get base
-    Sequence* sX2 = sequenceConstruct(lX, sX, getBase, nucleotide);
-    Sequence* sY2 = sequenceConstruct(lY, sY, getBase, nucleotide);
+    Sequence* sX2 = sequenceConstruct(lX, sX, nucleotide);
+    Sequence* sY2 = sequenceConstruct(lY, sY, nucleotide);
 
     // construct a 5-state state machine, the forward and reverse DP Matrices, the band, the band
     // iterators and the anchor pairs
@@ -438,8 +438,8 @@ static void test_getAlignedPairsWithBanding(CuTest *testCase) {
         st_logInfo("Sequence X to align: %s END\n", sX);
         st_logInfo("Sequence Y to align: %s END\n", sY);
 
-        Sequence* sX2 = sequenceConstruct(lX, sX, getBase, nucleotide);
-        Sequence* sY2 = sequenceConstruct(lY, sY, getBase, nucleotide);
+        Sequence* sX2 = sequenceConstruct(lX, sX, nucleotide);
+        Sequence* sY2 = sequenceConstruct(lY, sY, nucleotide);
 
 
         //Now do alignment
@@ -689,7 +689,7 @@ static void test_getAlignedPairs(CuTest *testCase) {
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
         StateMachine *sM = stateMachine5_construct(fiveState);
 
-        stList *alignedPairs = getAlignedPairs(sM, sX, sY, p, 0, 0);
+        stList *alignedPairs = getAlignedPairs(sM, sX, sY, nucleotide, p, 0, 0);
 
         //Check the aligned pairs.
         checkAlignedPairs(testCase, alignedPairs, lX, lY);
@@ -716,7 +716,7 @@ static void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
         StateMachine *sM = stateMachine5_construct(fiveState);
-        stList *alignedPairs = getAlignedPairs(sM, sX, sY, p, 1, 1);
+        stList *alignedPairs = getAlignedPairs(sM, sX, sY, nucleotide, p, 1, 1);
         alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, sX, sY, 0.2);
 
         //Check the aligned pairs.
@@ -857,7 +857,7 @@ static void test_em(CuTest *testCase, StateMachineType stateMachineType) {
 
         for (int64_t iteration = 0; iteration < 10; iteration++) {
             hmm = hmm_constructEmpty(0.000000000001, stateMachineType); //The tiny pseudo count prevents overflow
-            getExpectations(sM, hmm, sX, sY, p, 0, 0);
+            getExpectations(sM, hmm, sX, sY, nucleotide, p, 0, 0);
             hmm_normalise(hmm);
             //Log stuff
             for (int64_t from = 0; from < sM->stateNumber; from++) {
@@ -904,28 +904,28 @@ static void test_em_3State(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-//    SUITE_ADD_TEST(suite, test_diagonal);
-//    SUITE_ADD_TEST(suite, test_bands);
-//    SUITE_ADD_TEST(suite, test_logAdd);
-//    SUITE_ADD_TEST(suite, test_symbol);
+    SUITE_ADD_TEST(suite, test_diagonal);
+    SUITE_ADD_TEST(suite, test_bands);
+    SUITE_ADD_TEST(suite, test_logAdd);
+    SUITE_ADD_TEST(suite, test_symbol);
     SUITE_ADD_TEST(suite, test_cell);
     SUITE_ADD_TEST(suite, test_dpDiagonal);
     SUITE_ADD_TEST(suite, test_dpMatrix);
     SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
-//    SUITE_ADD_TEST(suite, test_getBlastPairs);
-//    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
+    SUITE_ADD_TEST(suite, test_getBlastPairs);
+    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
     //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap); // TODO has failure
 //    SUITE_ADD_TEST(suite, test_getSplitPoints);
 //    SUITE_ADD_TEST(suite, test_getAlignedPairs);
 //    SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
-//    SUITE_ADD_TEST(suite, test_hmm_5State);
-//    SUITE_ADD_TEST(suite, test_hmm_5StateAsymmetric);
-//    SUITE_ADD_TEST(suite, test_hmm_3State);
-//    SUITE_ADD_TEST(suite, test_hmm_3StateAsymmetric);
+    SUITE_ADD_TEST(suite, test_hmm_5State);
+    SUITE_ADD_TEST(suite, test_hmm_5StateAsymmetric);
+    SUITE_ADD_TEST(suite, test_hmm_3State);
+    SUITE_ADD_TEST(suite, test_hmm_3StateAsymmetric);
     //SUITE_ADD_TEST(suite, test_em_3State); // TODO has segmentation fault
     //SUITE_ADD_TEST(suite, test_em_3StateAsymmetric); //TODO has segmentation fault
-//    SUITE_ADD_TEST(suite, test_em_5State);
+    SUITE_ADD_TEST(suite, test_em_5State);
 
 
     return suite;

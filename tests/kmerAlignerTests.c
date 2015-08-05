@@ -53,8 +53,8 @@ static void test_Kmers_cell(CuTest *testCase) {
     //const char *testXseq = "AATT";
     //const char *testYseq = "AATT";
 
-    Sequence* xSeq = sequenceConstruct(4, testXseq, getKmer, kmer);
-    Sequence* ySeq = sequenceConstruct(6, testYseq, getKmer, kmer);
+    Sequence* xSeq = sequenceConstruct(4, testXseq, kmer);
+    Sequence* ySeq = sequenceConstruct(6, testYseq, kmer);
 
     //char* xkmer = xSeq->get(xSeq->elements, 0);
     //char* ykmer = ySeq->get(ySeq->elements, 0);
@@ -99,8 +99,8 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
     int64_t lY = strlen(sY);
 
     // construct a sequence struct from those sequences and assign the get function as get base
-    Sequence* sX2 = sequenceConstruct(lX, sX, getKmer, kmer);
-    Sequence* sY2 = sequenceConstruct(lY, sY, getKmer, kmer);
+    Sequence* sX2 = sequenceConstruct(lX, sX, kmer);
+    Sequence* sY2 = sequenceConstruct(lY, sY, kmer);
 
     // construct a 5-state state machine, the forward and reverse DP Matrices, the band, the band
     // iterators and the anchor pairs
@@ -256,8 +256,8 @@ static void test_Kmers_getAlignedPairsWithBanding(CuTest *testCase) {
 
         //st_logInfo("Sequence X to align: %s END\n", sX);
         //st_logInfo("Sequence Y to align: %s END\n", sY);
-        Sequence* sX2 = sequenceConstruct(lX, sX, getKmer, kmer);
-        Sequence* sY2 = sequenceConstruct(lY, sY, getKmer, kmer);
+        Sequence* sX2 = sequenceConstruct(lX, sX, kmer);
+        Sequence* sY2 = sequenceConstruct(lY, sY, kmer);
 
 
         //Now do alignment
@@ -289,7 +289,7 @@ static void test_Kmers_getAlignedPairsWithBanding(CuTest *testCase) {
         stList_destruct(alignedPairs);
     }
 }
-
+/*
 // TODO this is next!
 static void test_kmers_getAlignedPairs(CuTest *testCase) {
     printf("Runnung getAlignedPairs_kmers");
@@ -318,7 +318,7 @@ static void test_kmers_getAlignedPairs(CuTest *testCase) {
         stList_destruct(alignedPairs);
     }
 }
-
+*/
 
 CuSuite* kmerTestSuite() {
     CuSuite* suite = CuSuiteNew();

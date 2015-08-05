@@ -27,7 +27,7 @@ typedef enum {
 
 int64_t correctSeqLength(sequenceType type, int64_t stringLength);
 
-Sequence* sequenceConstruct(int length, void *elements, void (*getFcn), sequenceType type);
+Sequence* sequenceConstruct(int length, void *elements, sequenceType type);
 
 void sequenceDestroy(Sequence* seq);
 

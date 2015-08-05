@@ -46,20 +46,27 @@ void pairwiseAlignmentBandingParameters_destruct(PairwiseAlignmentParameters *p)
 /*
  * Gets the set of posterior match probabilities under a simple HMM model of alignment for two DNA sequences.
  */
-stList *getAlignedPairs(StateMachine *sM, const char *string1, const char *string2, PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+stList *getAlignedPairs(StateMachine *sM, const char *string1, const char *string2, sequenceType t, PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignment *pA, int64_t trim);
 
-stList *getAlignedPairsUsingAnchors(StateMachine *sM, const char *sX, const char *sY, stList *anchorPairs, PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+stList *getAlignedPairsUsingAnchors(StateMachine *sM, const char *sX, const char *sY, sequenceType t, stList *anchorPairs, PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 /*
  * Expectation calculation functions for EM algorithms.
  */
 
-void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations, const char *sX, const char *sY, stList *anchorPairs,
-        PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
+                                 const char *sX, const char *sY, sequenceType t,
+                                 stList *anchorPairs,
+                                 PairwiseAlignmentParameters *p,
+                                 bool alignmentHasRaggedLeftEnd,
+                                 bool alignmentHasRaggedRightEnd);
 
-void getExpectations(StateMachine *sM, Hmm *hmmExpectations, const char *sX, const char *sY, PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
+                     const char *sX, const char *sY, sequenceType t,
+                     PairwiseAlignmentParameters *p,
+                     bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 /*
  * Methods tested and possibly useful elsewhere
@@ -215,11 +222,17 @@ stList *filterToRemoveOverlap(stList *overlappingPairs);
 stList *getSplitPoints(stList *anchorPairs, int64_t lX, int64_t lY,
         int64_t maxMatrixSize, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
-void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(StateMachine *sM, stList *anchorPairs, const char *sX, const char *sY, int64_t lX, int64_t lY,
-        PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
-        void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *, DpMatrix *, const Sequence*, const Sequence*,
-                double, PairwiseAlignmentParameters *, void *),
-        void (*coordinateCorrectionFn)(), void *extraArgs);
+void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(StateMachine *sM, stList *anchorPairs,
+                                                const char *sX, const char *sY, sequenceType t, //void (*getfPtr),
+                                                int64_t lX, int64_t lY,
+                                                PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd,
+                                                bool alignmentHasRaggedRightEnd,
+                                                void (*diagonalPosteriorProbFn)(StateMachine *,
+                                                                                int64_t, DpMatrix *, DpMatrix *,
+                                                                                const Sequence*, const Sequence*,
+                                                                                double, PairwiseAlignmentParameters *,
+                                                                                void *),
+                                                void (*coordinateCorrectionFn)(), void *extraArgs);
 
 //Calculate posterior probabilities of being aligned to gaps
 
