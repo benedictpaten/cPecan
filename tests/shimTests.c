@@ -6,10 +6,21 @@
 #include <stdio.h>
 #include "shim.h"
 #include "CuTest.h"
+#include "randomSequences.h"
 #include "../inc/shim.h"
 #include "../../sonLib/lib/CuTest.h"
 #include "../inc/stateMachine.h"
 #include "../inc/pairwiseAligner.h"
+
+static void test_sequenceConstruct(CuTest* testCase) {
+    char *tS = getRandomSequence(100);
+    Sequence* testSequence = sequenceConstruct(100, tS, nucleotide);
+    CuAssertIntEquals(testCase, 100, testSequence->length);
+    CuAssertStrEquals(testCase, tS, testSequence->repr);
+    free(tS);
+    sequenceDestroy(testSequence);
+}
+
 
 // test chars (nucleotides)
 static void test_chars(CuTest* testCase) {
@@ -20,6 +31,7 @@ static void test_chars(CuTest* testCase) {
         char* b = charSeq->get(charSeq->elements, c);
         CuAssertStrEquals(testCase, &testSequence[c], b);
     }
+    sequenceDestroy(testSequence);
 }
 
 static void test_kmers(CuTest* testCase) {
@@ -56,52 +68,10 @@ static void test_events(CuTest* testCase) {
 CuSuite* shimTestSuite() {
     CuSuite* suite = CuSuiteNew();
 
-    //SUITE_ADD_TEST(suite, test_chars);
-    //SUITE_ADD_TEST(suite, test_kmers);
-    //SUITE_ADD_TEST(suite, test_events);
+    SUITE_ADD_TEST(suite, test_sequenceConstruct);
+//    SUITE_ADD_TEST(suite, test_chars);
+//    SUITE_ADD_TEST(suite, test_kmers);
+//    SUITE_ADD_TEST(suite, test_events);
 
     return suite;
 }
-
-/*
-{
-    printf("Quick Tests\n\n");
-    char testKmers[3][6] = {"ATGAC", "TGACA", "GACAT"};
-    double testMeans[] = {45.45, 65.65, 101.101};
-    char testDNA[] = "GATACAGATACA";
-
-    // Test chars
-    int dnaLen = strlen(testDNA);
-    Sequence* charSeq = sequenceConstruct(dnaLen, testDNA, getBase);
-    for (int c = 0; c < dnaLen; c++) {
-        char* b = charSeq->get(charSeq->elements, c);
-        printf("%c is the base at position %d\n", *b, c);
-    }
-    printf("\n");
-    // Test kmers
-    Sequence* kmerSeq = sequenceConstruct(dnaLen, testDNA, getKmer);
-
-    for (int k = 0; k < (dnaLen - 4); k++) {
-        char* kmer = kmerSeq->get(kmerSeq->elements, k);
-        printf("%s is the kmer at position %d\n", kmer, k);
-
-    }
-    printf("\n");
-
-
-    // Test Events
-    void* eventSequence = eventSequenceConstruct(3, testMeans, *testKmers);
-    Sequence* eventSeq = sequenceConstruct(3, eventSequence, getEvent);
-    for (int x = 0; x < 3; x++) {
-//        Event *ev;
-        Event *ev = eventSeq->get(eventSeq->elements, x);
-        printf("Event %d retrieved: kmer: %s mean: %f base: %c \n", x,
-                                                                    ev->kmer,
-                                                                    ev->mean,
-                                                                    ev->base);
-
-    }
-
-    return 0;
-}
-*/

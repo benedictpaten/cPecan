@@ -3,6 +3,7 @@
 
 #ifndef SHIM_H
 #define SHIM_H
+#include <inttypes.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -14,8 +15,8 @@
 typedef struct sequence {
     int64_t length;
     void *elements;
+    char* repr;
     void* (*get)(void *elements, int64_t index);
-    char n;
 } Sequence;
 
 // Types of sequences
@@ -25,19 +26,15 @@ typedef enum {
     event=2
 } sequenceType;
 
-int64_t correctSeqLength(sequenceType type, int64_t stringLength);
+int64_t correctSeqLength(int64_t stringLength, sequenceType type);
 
-Sequence* sequenceConstruct(int length, void *elements, sequenceType type);
+Sequence* sequenceConstruct(int64_t length, void *elements, sequenceType type);
+
+Sequence* getSubSequence(Sequence* wholeSequence, int64_t start, int64_t length, sequenceType t);
 
 void sequenceDestroy(Sequence* seq);
 
 typedef char base;
-
-//typedef enum {
-//    match=0,
-//    transversion=1,
-//    transition=2,
-//} baseMatchTypes;
 
 void* getBase(void *elements, int64_t index);
 
@@ -46,7 +43,6 @@ int64_t getBaseIndex(char base);
 int64_t getKmerIndex(char* kmer);
 
 void* getKmer(void *elements, int64_t index);
-
 
 typedef struct event {
     double mean;

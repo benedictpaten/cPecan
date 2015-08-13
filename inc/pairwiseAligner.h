@@ -46,25 +46,27 @@ void pairwiseAlignmentBandingParameters_destruct(PairwiseAlignmentParameters *p)
 /*
  * Gets the set of posterior match probabilities under a simple HMM model of alignment for two DNA sequences.
  */
-stList *getAlignedPairs(StateMachine *sM, const char *string1, const char *string2, sequenceType t, PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+stList *getAlignedPairs(StateMachine *sM, Sequence *string1, Sequence *string2, sequenceType t, PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignment *pA, int64_t trim);
 
-stList *getAlignedPairsUsingAnchors(StateMachine *sM, const char *sX, const char *sY, sequenceType t, stList *anchorPairs, PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+stList *getAlignedPairsUsingAnchors(StateMachine *sM, Sequence *SsX, Sequence *SsY, sequenceType t,
+                                    stList *anchorPairs, PairwiseAlignmentParameters *p,
+                                    bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 /*
  * Expectation calculation functions for EM algorithms.
  */
 
 void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
-                                 const char *sX, const char *sY, sequenceType t,
+                                 Sequence *sX, Sequence *sY, sequenceType t,
                                  stList *anchorPairs,
                                  PairwiseAlignmentParameters *p,
                                  bool alignmentHasRaggedLeftEnd,
                                  bool alignmentHasRaggedRightEnd);
 
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
-                     const char *sX, const char *sY, sequenceType t,
+                     Sequence *SsX, Sequence *SsY, sequenceType t,
                      PairwiseAlignmentParameters *p,
                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
@@ -210,10 +212,9 @@ void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const S
 
 //Blast pairs
 
-stList *getBlastPairs(const char *sX, const char *sY, int64_t lX, int64_t lY, int64_t trim, bool repeatMask);
+stList *getBlastPairs(Sequence *SsX, Sequence *SsY, int64_t trim, bool repeatMask);
 
-stList *getBlastPairsForPairwiseAlignmentParameters(const char *sX, const char *sY, const int64_t lX, const int64_t lY,
-        PairwiseAlignmentParameters *p);
+stList *getBlastPairsForPairwiseAlignmentParameters(Sequence *SsX, Sequence *SsY, PairwiseAlignmentParameters *p);
 
 stList *filterToRemoveOverlap(stList *overlappingPairs);
 
@@ -223,8 +224,7 @@ stList *getSplitPoints(stList *anchorPairs, int64_t lX, int64_t lY,
         int64_t maxMatrixSize, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(StateMachine *sM, stList *anchorPairs,
-                                                const char *sX, const char *sY, sequenceType t, //void (*getfPtr),
-                                                int64_t lX, int64_t lY,
+                                                Sequence *SsX, Sequence *SsY, sequenceType t,
                                                 PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd,
                                                 bool alignmentHasRaggedRightEnd,
                                                 void (*diagonalPosteriorProbFn)(StateMachine *,

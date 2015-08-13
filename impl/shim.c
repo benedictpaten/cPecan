@@ -1,5 +1,6 @@
 // AR
 
+#include <inttypes.h>
 #include "shim.h"
 #include "../inc/shim.h"
 #include "../inc/pairwiseAligner.h"
@@ -8,12 +9,15 @@
 
 
 // Sequence constructor function
-Sequence* sequenceConstruct(int stringLength, void *elements, sequenceType type) {
-
+// stringLength should be the length of the sequence in bases ie ATGAC has
+// length 5.  *elements is a pointer to the char array, typically.  The
+// sequenceType is 0-nucleotide, 1-kmer, 2-event
+Sequence* sequenceConstruct(int64_t stringLength, void *elements, sequenceType type) {
     Sequence* self = malloc(sizeof(Sequence));
+    // correct the sequence length for kmers/events
     self->length = correctSeqLength(stringLength, type);
     self->elements = elements;
-    //self->get = getfPtr;
+    self->repr = (char*) elements;
     switch (type) {
         case 0:
             self->get = getBase;
@@ -25,8 +29,14 @@ Sequence* sequenceConstruct(int stringLength, void *elements, sequenceType type)
             self->get = getEvent;
             break;
     }
-    //self->n = "n"; // TODO decide on a generic empty/Null character?
     return self;
+}
+
+Sequence* getSubSequence(Sequence* wholeSequence, int64_t start, int64_t length, sequenceType t) {
+    char* wS_string = wholeSequence->repr;
+    char* subString = stString_getSubString(wS_string, start, length);
+    Sequence* subSequence = sequenceConstruct(length, subString, t);
+    return subSequence;
 }
 
 // sequence destroying function
@@ -45,8 +55,7 @@ void* getBase(void *elements, int64_t index) {
     return index >= 0 ? &(((char *)elements)[index]) : n;
 }
 
-// hack that will exchange a char representing a base for an integer to make them
-// compatable with other functions that usually take enum datatype
+// exchanges a char (nucleotide) for a base index
 int64_t getBaseIndex(char base) {
     //char b;
     //b = *base;
@@ -64,7 +73,7 @@ int64_t getBaseIndex(char base) {
     }
 }
 
-// TODO need a proper unit test function for this
+// gets a index for a given kmer.
 int64_t getKmerIndex(char* kmer) {
     //int64_t kmerLength = strlen(kmer);
     //printf("kmer length: %lld\n", kmerLength);
@@ -90,7 +99,8 @@ int64_t getKmerIndex(char* kmer) {
     return x;
 }
 
-int64_t correctSeqLength(sequenceType type, int64_t stringLength) {
+int64_t correctSeqLength(int64_t stringLength, sequenceType type) {
+
     if (stringLength == 0) {
         return 0;
     }
@@ -118,6 +128,7 @@ int64_t getKmerSeqLength(int64_t stringLength) {
 
 // returns a pointer to a kmer within a char array
 void* getKmer(void *elements, int64_t index) {
+
     char* n;
     n = "NN"; // hardwired null kmer
     int64_t i = index;

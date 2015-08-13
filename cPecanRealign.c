@@ -552,12 +552,12 @@ int main(int argc, char *argv[]) {
         stList *filteredAnchoredPairs = stList_filter2(anchorPairs, matchFn, seqs);
         if(expectationsFile != NULL) {
             st_logInfo("Computing expectations\n");
-            getExpectationsUsingAnchors(sM, hmmExpectations, subSeqX, subSeqY, filteredAnchoredPairs,
+            getExpectationsUsingAnchors(sM, hmmExpectations, subSeqX, subSeqY, nucleotide, filteredAnchoredPairs,
                                 pairwiseAlignmentBandingParameters, 1, 1);
         }
         else {
             //Get posterior prob pairs
-            stList *alignedPairs = getAlignedPairsUsingAnchors(sM, subSeqX, subSeqY, filteredAnchoredPairs,
+            stList *alignedPairs = getAlignedPairsUsingAnchors(sM, subSeqX, subSeqY, nucleotide, filteredAnchoredPairs,
                     pairwiseAlignmentBandingParameters, 1, 1);
             //Output all the posterior match probs, if needed
             if(allPosteriorProbsFile != NULL) {

@@ -95,12 +95,16 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
 
     // set lX and lY to the lengths of those sequences
     // NOTE The length of kmers is the length of bases-1
-    int64_t lX = strlen(sX);
-    int64_t lY = strlen(sY);
+    int64_t slX = strlen(sX);
+    int64_t slY = strlen(sY);
+
 
     // construct a sequence struct from those sequences and assign the get function as get base
-    Sequence* sX2 = sequenceConstruct(lX, sX, kmer);
-    Sequence* sY2 = sequenceConstruct(lY, sY, kmer);
+    Sequence* sX2 = sequenceConstruct(slX, sX, kmer);
+    Sequence* sY2 = sequenceConstruct(slY, sY, kmer);
+    int64_t lX = sX2->length;
+    int64_t lY = sY2->length;
+
 
     // construct a 5-state state machine, the forward and reverse DP Matrices, the band, the band
     // iterators and the anchor pairs
@@ -219,6 +223,7 @@ static stList *getRandomAnchorPairs_KmerTests(int64_t lX, int64_t lY) {
 
 static void checkAlignedPairs_kmers(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY) {
     //st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
+    printf("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
     stSortedSet *pairs = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
             (void (*)(void *)) stIntTuple_destruct);
     for (int64_t i = 0; i < stList_length(blastPairs); i++) {
@@ -289,24 +294,26 @@ static void test_Kmers_getAlignedPairsWithBanding(CuTest *testCase) {
         stList_destruct(alignedPairs);
     }
 }
-/*
-// TODO this is next!
+
+
 static void test_kmers_getAlignedPairs(CuTest *testCase) {
-    printf("Runnung getAlignedPairs_kmers");
-    for (int64_t test = 0; test < 100; test++) {
+
+    for (int64_t test = 0; test < 5; test++) {
         //Make a pair of sequences
-        char *sX = getRandomSequence(st_randomInt(0, 100));
+        char *sX = getRandomSequence(st_randomInt(0, 10));
         char *sY = evolveSequence(sX); //stString_copy(seqX);
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
-        st_logInfo("Sequence X to align: %s END\n", sX);
-        st_logInfo("Sequence Y to align: %s END\n", sY);
+        //st_logInfo("Sequence X to align: %s END\n", sX);
+        //st_logInfo("Sequence Y to align: %s END\n", sY);
+        printf("Sequence X to align: %s END\n", sX);
+        printf("Sequence Y to align: %s END\n", sY);
 
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-        StateMachine *sM = stateMachine5_construct(fiveState);
+        StateMachine *sM = stateMachine5_kmer_construct(fiveState);
 
-        stList *alignedPairs = getAlignedPairs(sM, sX, sY, p, 0, 0);
+        stList *alignedPairs = getAlignedPairs(sM, sX, sY, kmer, p, 0, 0);
 
         //Check the aligned pairs.
         checkAlignedPairs_kmers(testCase, alignedPairs, lX, lY);
@@ -318,7 +325,48 @@ static void test_kmers_getAlignedPairs(CuTest *testCase) {
         stList_destruct(alignedPairs);
     }
 }
-*/
+
+
+static void test_kmers_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
+    for (int64_t test = 0; test < 1000; test++) {
+        //Make a pair of sequences
+        int64_t coreLength = 10, randomPortionLength = 10;
+        char *sX = getRandomSequence(coreLength);
+        char *sY = stString_print("%s%s%s", getRandomSequence(randomPortionLength), sX,
+                getRandomSequence(randomPortionLength)); //x with an extra bit at the end.
+
+        //st_logInfo("Sequence X to align: %s END\n", sX);
+        //st_logInfo("Sequence Y to align: %s END\n", sY);
+        printf("Sequence X to align: %s END\n", sX);
+        printf("Sequence Y to align: %s END\n", sY);
+
+        //Now do alignment
+        PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+        StateMachine *sM = stateMachine5_kmer_construct(fiveState);
+        stList *alignedPairs = getAlignedPairs(sM, sX, sY, kmer, p, 1, 1);
+
+        //alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, sX, sY, 0.2);
+
+        //Check the aligned pairs.
+        checkAlignedPairs_kmers(testCase, alignedPairs, strlen(sX), strlen(sY));
+        CuAssertIntEquals(testCase, stList_length(alignedPairs), coreLength);
+        for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
+            stIntTuple *j = stList_get(alignedPairs, i);
+            CuAssertTrue(testCase, stIntTuple_length(j) == 3);
+
+            int64_t x = stIntTuple_get(j, 1);
+            int64_t y = stIntTuple_get(j, 2);
+            CuAssertIntEquals(testCase, x + randomPortionLength, y);
+        }
+
+        //Cleanup
+        stateMachine_destruct(sM);
+        free(sX);
+        free(sY);
+        stList_destruct(alignedPairs);
+    }
+}
+
 
 CuSuite* kmerTestSuite() {
     CuSuite* suite = CuSuiteNew();
@@ -326,5 +374,6 @@ CuSuite* kmerTestSuite() {
 //    SUITE_ADD_TEST(suite, test_Kmers_diagonalDPCalculations);
 //    SUITE_ADD_TEST(suite, test_Kmers_getAlignedPairsWithBanding);
 //    SUITE_ADD_TEST(suite, test_kmers_getAlignedPairs);
+//    SUITE_ADD_TEST(suite, test_kmers_getAlignedPairsWithRaggedEnds); // TODO has a problem
     return suite;
 }
