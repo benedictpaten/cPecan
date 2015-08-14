@@ -353,7 +353,7 @@ static void test_kmers_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         stList *alignedPairs = getAlignedPairs(sM, SsX, SsY, kmer, p, 1, 1);
 
         //printf("Before filtering alignedPairs Length: %lld\n", (int64_t) stList_length(alignedPairs));
-        alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, SsX->repr, SsY->repr, 0.4);
+        alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, SsX->repr, SsY->repr, 0.2);
         //printf("After filtering alignedPairs Length: %lld\n", (int64_t) stList_length(alignedPairs));
 
         //Check the aligned pairs.
@@ -377,12 +377,76 @@ static void test_kmers_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
 }
 
 
+static void test_kmers_em(CuTest *testCase, StateMachineType stateMachineType) {
+    for (int64_t test = 0; test < 100; test++) {
+        //Make a pair of sequences
+        char *sX = getRandomSequence(st_randomInt(10, 100));
+        char *sY = evolveSequence(sX); //stString_copy(seqX);
+        st_logInfo("Sequence X to align: %s END\n", sX);
+        st_logInfo("Sequence Y to align: %s END\n", sY);
+
+        int64_t lX = strlen(sX);
+        int64_t lY = strlen(sY);
+
+        Sequence* SsX = sequenceConstruct(lX, sX, nucleotide);
+        Sequence* SsY = sequenceConstruct(lY, sY, nucleotide);
+
+        //Now do alignment
+        PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+
+        //Currently starts from random model and iterates.
+        double pLikelihood = -INFINITY;
+        Hmm *hmm = hmm_constructEmpty(0.0, stateMachineType);
+        hmm_randomise(hmm);
+        StateMachine *sM = hmm_getStateMachine(hmm);
+        hmm_destruct(hmm);
+
+        for (int64_t iteration = 0; iteration < 10; iteration++) {
+            hmm = hmm_constructEmpty(0.000000000001, stateMachineType); //The tiny pseudo count prevents overflow
+            getExpectations(sM, hmm, SsX, SsY, nucleotide, p, 0, 0);
+            hmm_normalise(hmm);
+            //Log stuff
+            for (int64_t from = 0; from < sM->stateNumber; from++) {
+                for (int64_t to = 0; to < sM->stateNumber; to++) {
+                    st_logInfo("Transition from %" PRIi64 " to %" PRIi64 " has expectation %f\n", from, to,
+                               hmm_getTransition(hmm, from, to));
+                }
+            }
+            for (int64_t x = 0; x < SYMBOL_NUMBER_NO_N; x++) {
+                for (int64_t y = 0; y < SYMBOL_NUMBER_NO_N; y++) {
+                    st_logInfo("Emission x %" PRIi64 " y %" PRIi64 " has expectation %f\n", x, y,
+                               hmm_getEmissionsExpectation(hmm, sM->matchState, x, y));
+                }
+            }
+
+            st_logInfo("->->-> Got expected likelihood %f for trial %" PRIi64 " and  iteration %" PRIi64 "\n",
+                       hmm->likelihood, test, iteration);
+            assert(pLikelihood <= hmm->likelihood * 0.95);
+            CuAssertTrue(testCase, pLikelihood <= hmm->likelihood * 0.95);
+            pLikelihood = hmm->likelihood;
+            stateMachine_destruct(sM);
+            sM = hmm_getStateMachine(hmm);
+            hmm_destruct(hmm);
+        }
+
+        //Cleanup
+        pairwiseAlignmentBandingParameters_destruct(p);
+        free(sX);
+        free(sY);
+    }
+}
+
+static void test_kmers_em_5State(CuTest *testCase) {
+    test_kmers_em(testCase, fiveState);
+}
+
 CuSuite* kmerTestSuite() {
     CuSuite* suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, test_Kmers_cell);
-    SUITE_ADD_TEST(suite, test_Kmers_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_Kmers_getAlignedPairsWithBanding);
-    SUITE_ADD_TEST(suite, test_kmers_getAlignedPairs);
-    SUITE_ADD_TEST(suite, test_kmers_getAlignedPairsWithRaggedEnds);
+//    SUITE_ADD_TEST(suite, test_Kmers_cell);
+//    SUITE_ADD_TEST(suite, test_Kmers_diagonalDPCalculations);
+//    SUITE_ADD_TEST(suite, test_Kmers_getAlignedPairsWithBanding);
+//    SUITE_ADD_TEST(suite, test_kmers_getAlignedPairs);
+//    SUITE_ADD_TEST(suite, test_kmers_getAlignedPairsWithRaggedEnds);
+    SUITE_ADD_TEST(suite, test_kmers_em_5State);
     return suite;
 }

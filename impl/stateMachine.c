@@ -78,6 +78,7 @@ static inline double *hmm_getEmissionsExpectation2(Hmm *hmm, int64_t state, Symb
     return &(hmm->emissions[state * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N + x * SYMBOL_NUMBER_NO_N + y]);
 }
 
+// todo needs to change
 double hmm_getEmissionsExpectation(Hmm *hmm, int64_t state, Symbol x, Symbol y) {
     return *hmm_getEmissionsExpectation2(hmm, state, x, y);
 }

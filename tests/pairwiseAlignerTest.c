@@ -528,10 +528,10 @@ static void test_filterToRemoveOverlap(CuTest *testCase) {
             }
         }
 
-        printf("%lld is pairs length\n", stList_length(pairs));
+        //printf("%lld is pairs length\n", stList_length(pairs));
         //Now run filter pairs
         stList *nonoverlappingPairs = filterToRemoveOverlap(pairs);
-        printf("%lld is nonoverlappingPairs length\n", stList_length(nonoverlappingPairs));
+        //printf("%lld is nonoverlappingPairs length\n", stList_length(nonoverlappingPairs));
 
         //Check non overlapping
         checkBlastPairs(testCase, nonoverlappingPairs, lX, lY, 1);
@@ -759,7 +759,6 @@ static void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
 static void test_hmm(CuTest *testCase, StateMachineType stateMachineType) {
     //Expectation object
     Hmm *hmm = hmm_constructEmpty(0.0, stateMachineType);
-
     //Add some transition expectations
     for (int64_t from = 0; from < hmm->stateNumber; from++) {
         for (int64_t to = 0; to < hmm->stateNumber; to++) {
@@ -858,6 +857,12 @@ static void test_em(CuTest *testCase, StateMachineType stateMachineType) {
         st_logInfo("Sequence X to align: %s END\n", sX);
         st_logInfo("Sequence Y to align: %s END\n", sY);
 
+        int64_t lX = strlen(sX);
+        int64_t lY = strlen(sY);
+
+        Sequence* SsX = sequenceConstruct(lX, sX, nucleotide);
+        Sequence* SsY = sequenceConstruct(lY, sY, nucleotide);
+
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 
@@ -870,7 +875,7 @@ static void test_em(CuTest *testCase, StateMachineType stateMachineType) {
 
         for (int64_t iteration = 0; iteration < 10; iteration++) {
             hmm = hmm_constructEmpty(0.000000000001, stateMachineType); //The tiny pseudo count prevents overflow
-            getExpectations(sM, hmm, sX, sY, nucleotide, p, 0, 0);
+            getExpectations(sM, hmm, SsX, SsY, nucleotide, p, 0, 0);
             hmm_normalise(hmm);
             //Log stuff
             for (int64_t from = 0; from < sM->stateNumber; from++) {
@@ -928,7 +933,7 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     //SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
     //SUITE_ADD_TEST(suite, test_getBlastPairs);
     //SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
-    //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap); // TODO has failure
+    //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
     //SUITE_ADD_TEST(suite, test_getSplitPoints);
     //SUITE_ADD_TEST(suite, test_getAlignedPairs);
     //SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
@@ -936,9 +941,9 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     //SUITE_ADD_TEST(suite, test_hmm_5StateAsymmetric);
     //SUITE_ADD_TEST(suite, test_hmm_3State);
     //SUITE_ADD_TEST(suite, test_hmm_3StateAsymmetric);
-    //SUITE_ADD_TEST(suite, test_em_3State); // TODO has segmentation fault
-    //SUITE_ADD_TEST(suite, test_em_3StateAsymmetric); //TODO has segmentation fault
-    //SUITE_ADD_TEST(suite, test_em_5State); //TODO has seg fault
+    //SUITE_ADD_TEST(suite, test_em_3State);
+    //SUITE_ADD_TEST(suite, test_em_3StateAsymmetric);
+//    SUITE_ADD_TEST(suite, test_em_5State);
 
 
     return suite;
