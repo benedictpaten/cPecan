@@ -917,28 +917,28 @@ static void test_em_3State(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-//    SUITE_ADD_TEST(suite, test_diagonal);
-//    SUITE_ADD_TEST(suite, test_bands);
-//    SUITE_ADD_TEST(suite, test_logAdd);
-//    SUITE_ADD_TEST(suite, test_symbol);
-//    SUITE_ADD_TEST(suite, test_cell);
-//    SUITE_ADD_TEST(suite, test_dpDiagonal);
-//    SUITE_ADD_TEST(suite, test_dpMatrix);
-//    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
-//    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
-//    SUITE_ADD_TEST(suite, test_getBlastPairs);
-//    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
-//    SUITE_ADD_TEST(suite, test_filterToRemoveOverlap); // TODO has failure
-//    SUITE_ADD_TEST(suite, test_getSplitPoints);
-//    SUITE_ADD_TEST(suite, test_getAlignedPairs);
-//    SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
-//    SUITE_ADD_TEST(suite, test_hmm_5State);
-//    SUITE_ADD_TEST(suite, test_hmm_5StateAsymmetric);
-//    SUITE_ADD_TEST(suite, test_hmm_3State);
-//    SUITE_ADD_TEST(suite, test_hmm_3StateAsymmetric);
+    //SUITE_ADD_TEST(suite, test_diagonal);
+    //SUITE_ADD_TEST(suite, test_bands);
+    //SUITE_ADD_TEST(suite, test_logAdd);
+    //SUITE_ADD_TEST(suite, test_symbol);
+    //SUITE_ADD_TEST(suite, test_cell);
+    //SUITE_ADD_TEST(suite, test_dpDiagonal);
+    //SUITE_ADD_TEST(suite, test_dpMatrix);
+    //SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
+    //SUITE_ADD_TEST(suite, test_getBlastPairs);
+    //SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
+    //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap); // TODO has failure
+    //SUITE_ADD_TEST(suite, test_getSplitPoints);
+    //SUITE_ADD_TEST(suite, test_getAlignedPairs);
+    //SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
+    //SUITE_ADD_TEST(suite, test_hmm_5State);
+    //SUITE_ADD_TEST(suite, test_hmm_5StateAsymmetric);
+    //SUITE_ADD_TEST(suite, test_hmm_3State);
+    //SUITE_ADD_TEST(suite, test_hmm_3StateAsymmetric);
     //SUITE_ADD_TEST(suite, test_em_3State); // TODO has segmentation fault
     //SUITE_ADD_TEST(suite, test_em_3StateAsymmetric); //TODO has segmentation fault
-//    SUITE_ADD_TEST(suite, test_em_5State);
+    //SUITE_ADD_TEST(suite, test_em_5State); //TODO has seg fault
 
 
     return suite;

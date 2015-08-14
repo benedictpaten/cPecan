@@ -298,9 +298,9 @@ static void test_Kmers_getAlignedPairsWithBanding(CuTest *testCase) {
 
 static void test_kmers_getAlignedPairs(CuTest *testCase) {
 
-    for (int64_t test = 0; test < 2; test++) {
+    for (int64_t test = 0; test < 100; test++) {
         //Make a pair of sequences
-        char *sX = getRandomSequence(st_randomInt(1, 10));
+        char *sX = getRandomSequence(st_randomInt(1, 100));
         char *sY = evolveSequence(sX); //stString_copy(seqX);
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
@@ -308,8 +308,8 @@ static void test_kmers_getAlignedPairs(CuTest *testCase) {
         Sequence* SsY = sequenceConstruct(lY, sY, kmer);
         //st_logInfo("Sequence X to align: %s END\n", sX);
         //st_logInfo("Sequence Y to align: %s END\n", sY);
-        printf("Sequence X to align: %s END\n", sX);
-        printf("Sequence Y to align: %s END\n", sY);
+        //printf("Sequence X to align: %s END\n", sX);
+        //printf("Sequence Y to align: %s END\n", sY);
 
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -353,7 +353,7 @@ static void test_kmers_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         stList *alignedPairs = getAlignedPairs(sM, SsX, SsY, kmer, p, 1, 1);
 
         //printf("Before filtering alignedPairs Length: %lld\n", (int64_t) stList_length(alignedPairs));
-        //alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, SsX->repr, SsY->repr, 0.4);
+        alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, SsX->repr, SsY->repr, 0.4);
         //printf("After filtering alignedPairs Length: %lld\n", (int64_t) stList_length(alignedPairs));
 
         //Check the aligned pairs.
@@ -381,8 +381,8 @@ CuSuite* kmerTestSuite() {
     CuSuite* suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, test_Kmers_cell);
     SUITE_ADD_TEST(suite, test_Kmers_diagonalDPCalculations);
-    //SUITE_ADD_TEST(suite, test_Kmers_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_Kmers_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_kmers_getAlignedPairs);
-    SUITE_ADD_TEST(suite, test_kmers_getAlignedPairsWithRaggedEnds); // TODO has a problem
+    SUITE_ADD_TEST(suite, test_kmers_getAlignedPairsWithRaggedEnds);
     return suite;
 }
