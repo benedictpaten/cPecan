@@ -32,7 +32,7 @@ Sequence* sequenceConstruct(int64_t stringLength, void *elements, sequenceType t
     return self;
 }
 
-Sequence* getSubSequence(Sequence* wholeSequence, int64_t start, int64_t length, sequenceType t) {
+Sequence* sequence_getSubSequence(Sequence* wholeSequence, int64_t start, int64_t length, sequenceType t) {
     char* wS_string = wholeSequence->repr;
     char* subString = stString_getSubString(wS_string, start, length);
     Sequence* subSequence = sequenceConstruct(length, subString, t);

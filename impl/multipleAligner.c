@@ -11,7 +11,14 @@
 #include <stdlib.h>
 #include <math.h>
 #include "stGraph.h"
+#include "../../sonLib/lib/sonLibTypes.h"
+#include "../../sonLib/lib/sonLibSortedSet.h"
+#include "../../sonLib/lib/sonLibTuples.h"
+#include "../../sonLib/lib/sonLibList.h"
+#include "../../sonLib/lib/sonLibSet.h"
+#include "../inc/multipleAligner.h"
 #include <inttypes.h>
+#include <assert.h>
 
 ///////////////////////////////
 ///////////////////////////////
@@ -506,7 +513,9 @@ stList *makeColumnSequences(stList *seqFrags, stSet *columns) {
     return columnSequences;
 }
 
-stSet *getMultipleSequenceAlignmentProgressive(stList *seqFrags, stList *multipleAlignedPairs, double matchGamma, stList *seqPairSimilarityScores) {
+stSet *getMultipleSequenceAlignmentProgressive(
+        stList *seqFrags, stList *multipleAlignedPairs,
+        double matchGamma, stList *seqPairSimilarityScores) {
     //Get the data-structures needed for the pairwise alignments
     stSet *columns = makeColumns(seqFrags);
     stHash *alignmentWeightAdjLists = makeAlignmentWeightAdjacencyLists(columns, multipleAlignedPairs);
@@ -938,7 +947,9 @@ MultipleAlignment *makeAlignment(StateMachine *sM, stList *seqFrags, int64_t spa
 /*
  * This is a pairwise expected accuracy alignment function that uses the multiple alignment code, kind of odd.
  */
-stList *filterPairwiseAlignmentToMakePairsOrdered(stList *alignedPairs, const char *seqX, const char *seqY, float matchGamma) {
+stList *filterPairwiseAlignmentToMakePairsOrdered(stList *alignedPairs,
+                                                  const char *seqX, const char *seqY,
+                                                  float matchGamma) {
     //Convert to multiple alignment pairs
     stList *multipleAlignedPairs = stList_construct3(0, (void(*)(void *)) stIntTuple_destruct);
     convertAlignedPairsToMultipleAlignedPairs(alignedPairs, multipleAlignedPairs, 0, 1);
@@ -950,7 +961,8 @@ stList *filterPairwiseAlignmentToMakePairsOrdered(stList *alignedPairs, const ch
     stList *seqPairSimilarityScores = stList_construct3(0, (void(*)(void *)) stIntTuple_destruct);
     stList_append(seqPairSimilarityScores, stIntTuple_construct3(0.0, 0, 1));
     //stSet *columns = getMultipleSequenceAlignment(seqFrags, multipleAlignedPairs, matchGamma);
-    stSet *columns = getMultipleSequenceAlignmentProgressive(seqFrags, multipleAlignedPairs, matchGamma, seqPairSimilarityScores);
+    stSet *columns = getMultipleSequenceAlignmentProgressive(seqFrags, multipleAlignedPairs,
+                                                             matchGamma, seqPairSimilarityScores);
 
     //Now filter multiple align pairs to get those consistent with the alignment
     multipleAlignedPairs = filterMultipleAlignedPairs(columns, multipleAlignedPairs);

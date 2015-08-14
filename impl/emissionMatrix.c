@@ -52,7 +52,8 @@ void emissionsKmers_setGapProbsToDefaults(double *emissionGapProbs) {
     /*
      * This is used to set the emissions to reasonable values.
      */
-    const double G = -1.6094379124341003; //log(0.2)
+    //const double G = -1.6094379124341003; //log(0.2)
+    const double G = -3.2188758248682006; //log(0.2)+log(0.2)
     const double i[25] = {
         G, G, G, G, G,
         G, G, G, G, G,

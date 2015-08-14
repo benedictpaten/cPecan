@@ -684,11 +684,13 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
                     posteriorProbability = 1.0;
                 }
                 posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
-                //printf("Adding to alignedPairs! posteriorProb: %lld, X: %lld, Y: %lld\n\n", (int64_t) posteriorProbability, x - 1, y - 1);
+                //printf("Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%s)\n",
+                //       (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
             }
             if (posteriorProbability <= p->threshold) {
-                //printf("NOT adding to aligned pairs! posteriorProb: %f, X: %lld, Y: %lld\n\n", posteriorProbability, x - 1, y - 1);
+                //printf("NOT Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%s)\n",
+                //       (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
             }
         }
         xmy += 2;
@@ -909,7 +911,7 @@ stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignm
     return alignedPairs;
 }
 
-stList *getBlastPairs(Sequence *SsX, Sequence *SsY, int64_t trim, bool repeatMask) {
+stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatMask) {
     /*
      * Uses lastz to compute a bunch of monotonically increasing pairs such that for any pair of consecutive
      * pairs in the list (x1, y1) (x2, y2) in the set of aligned pairs x1 appears before x2 in X and y1
@@ -918,10 +920,8 @@ stList *getBlastPairs(Sequence *SsX, Sequence *SsY, int64_t trim, bool repeatMas
     stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct); //the list to put the output in
 
     // Unpack Sequence objects
-    char* sX = SsX->repr;
-    char* sY = SsY->repr;
-    int64_t lX = SsX->length;
-    int64_t lY = SsY->length;
+    int64_t lX = strlen(sX);
+    int64_t lY = strlen(sY);
 
     if (lX == 0 || lY == 0) {
         return alignedPairs;
@@ -1060,11 +1060,8 @@ static void getBlastPairsForPairwiseAlignmentParametersP(
     int64_t matrixSize = (int64_t) lX2 * lY2;
     if (matrixSize > p->repeatMaskMatrixBiggerThanThis) {
         char *sX2 = stString_getSubString(sX, pX, lX2);
-        Sequence* SsX2 = sequenceConstruct(lX2, sX2, nucleotide); // TODO install sequence type?
         char *sY2 = stString_getSubString(sY, pY, lY2);
-        Sequence* SsY2 = sequenceConstruct(lY2, sY2, nucleotide);
-        // edited
-        stList *unfilteredBottomLevelAnchorPairs = getBlastPairs(SsX2, SsY2, p->constraintDiagonalTrim, 0);
+        stList *unfilteredBottomLevelAnchorPairs = getBlastPairs(sX2, sY2, p->constraintDiagonalTrim, 0);
         stList_sort(unfilteredBottomLevelAnchorPairs, (int (*)(const void *, const void *)) stIntTuple_cmpFn);
         stList *bottomLevelAnchorPairs = filterToRemoveOverlap(unfilteredBottomLevelAnchorPairs);
         st_logDebug("Got %" PRIi64 " bottom level anchor pairs, which reduced to %" PRIi64 " after filtering \n",
@@ -1091,7 +1088,7 @@ stList *getBlastPairsForPairwiseAlignmentParameters(Sequence *SsX, Sequence *SsY
         return stList_construct();
     }
     //Anchor pairs
-    stList *unfilteredTopLevelAnchorPairs = getBlastPairs(SsX, SsY, p->constraintDiagonalTrim, 1);
+    stList *unfilteredTopLevelAnchorPairs = getBlastPairs(sX, sY, p->constraintDiagonalTrim, 1);
     stList_sort(unfilteredTopLevelAnchorPairs, (int (*)(const void *, const void *)) stIntTuple_cmpFn);
     stList *topLevelAnchorPairs = filterToRemoveOverlap(unfilteredTopLevelAnchorPairs);
     st_logDebug("Got %" PRIi64 " top level anchor pairs, which reduced to %" PRIi64 " after filtering \n",
@@ -1206,7 +1203,9 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
                                         PairwiseAlignmentParameters *, void *),
         void (*coordinateCorrectionFn)(), void *extraArgs) {
 
-    stList *splitPoints = getSplitPoints(anchorPairs, SsX->length, SsY->length, //lX, lY,
+    int64_t lX = strlen(SsX->repr);
+    int64_t lY = strlen(SsY->repr);
+    stList *splitPoints = getSplitPoints(anchorPairs, lX, lY,
                                          p->splitMatrixBiggerThanThis,
                                          alignmentHasRaggedLeftEnd,
                                          alignmentHasRaggedRightEnd);
@@ -1225,8 +1224,8 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         //char *sY2 = stString_getSubString(sY, y1, y2 - y1);
         //Sequence* sX3 = sequenceConstruct(x2 - x1, sX2, t);
         //Sequence* sY3 = sequenceConstruct(y2 - y1, sY2, t);
-        Sequence* sX3 = getSubSequence(SsX, x1, x2 - x1, t);
-        Sequence* sY3 = getSubSequence(SsY, y1, y2 - y1, t);
+        Sequence* sX3 = sequence_getSubSequence(SsX, x1, x2 - x1, t);
+        Sequence* sY3 = sequence_getSubSequence(SsY, y1, y2 - y1, t);
 
         //List of anchor pairs
         stList *subListOfAnchorPoints = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);

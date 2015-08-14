@@ -30,7 +30,7 @@ int64_t correctSeqLength(int64_t stringLength, sequenceType type);
 
 Sequence* sequenceConstruct(int64_t length, void *elements, sequenceType type);
 
-Sequence* getSubSequence(Sequence* wholeSequence, int64_t start, int64_t length, sequenceType t);
+Sequence* sequence_getSubSequence(Sequence* wholeSequence, int64_t start, int64_t length, sequenceType t);
 
 void sequenceDestroy(Sequence* seq);
 

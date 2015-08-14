@@ -212,7 +212,7 @@ void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const S
 
 //Blast pairs
 
-stList *getBlastPairs(Sequence *SsX, Sequence *SsY, int64_t trim, bool repeatMask);
+stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatMask);
 
 stList *getBlastPairsForPairwiseAlignmentParameters(Sequence *SsX, Sequence *SsY, PairwiseAlignmentParameters *p);
 

@@ -387,7 +387,6 @@ stList *getRandomAnchorPairs(int64_t lX, int64_t lY) {
 
 static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY) {
     st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
-    //printf("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
     stSortedSet *pairs = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
             (void (*)(void *)) stIntTuple_destruct);
     for (int64_t i = 0; i < stList_length(blastPairs); i++) {
@@ -414,16 +413,16 @@ static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, 
 }
 
 static void test_getAlignedPairsWithBanding(CuTest *testCase) {
-    for (int64_t test = 0; test < 3; test++) {
+    for (int64_t test = 0; test < 100; test++) {
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(0, 100));
         char *sY = evolveSequence(sX); //stString_copy(seqX);
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
-        //st_logInfo("Sequence X to align: %s END\n", sX);
-        //st_logInfo("Sequence Y to align: %s END\n", sY);
-        printf("Sequence X to align: %s END\n", sX);
-        printf("Sequence Y to align: %s END\n", sY);
+        st_logInfo("Sequence X to align: %s END\n", sX);
+        st_logInfo("Sequence Y to align: %s END\n", sY);
+        //printf("Sequence X to align: %s END\n", sX);
+        //printf("Sequence Y to align: %s END\n", sY);
 
         Sequence* sX2 = sequenceConstruct(lX, sX, nucleotide);
         Sequence* sY2 = sequenceConstruct(lY, sY, nucleotide);
@@ -460,7 +459,8 @@ static void test_getAlignedPairsWithBanding(CuTest *testCase) {
 }
 
 static void checkBlastPairs(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY, bool checkNonOverlapping) {
-    st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
+    //st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
+    //printf("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
     int64_t pX = -1;
     int64_t pY = -1;
     for (int64_t i = 0; i < stList_length(blastPairs); i++) {
@@ -492,12 +492,9 @@ static void test_getBlastPairs(CuTest *testCase) {
         char *sX = getRandomSequence(st_randomInt(0, 10000));
         char *sY = evolveSequence(sX); //stString_copy(seqX);
         int64_t lX = strlen(sX), lY = strlen(sY);
-        // Make them into sequence objects
-        Sequence* SsX = sequenceConstruct(lX, sX, nucleotide);
-        Sequence* SsY = sequenceConstruct(lY, sY, nucleotide);
 
-        printf("Sequence X to align: %s END, seq length %" PRIi64 "\n", SsX->repr, SsX->length);
-        printf("Sequence Y to align: %s END, seq length %" PRIi64 "\n", SsY->repr, SsY->length);
+        //printf("Sequence X to align: %s END, seq length %" PRIi64 "\n", SsX->repr, SsX->length);
+        //printf("Sequence Y to align: %s END, seq length %" PRIi64 "\n", SsY->repr, SsY->length);
 
         //st_logInfo("Sequence X to align: %s END, seq length %" PRIi64 "\n", seqX, lX);
         //st_logInfo("Sequence Y to align: %s END, seq length %" PRIi64 "\n", seqY, lY);
@@ -505,9 +502,9 @@ static void test_getBlastPairs(CuTest *testCase) {
         int64_t trim = st_randomInt(0, 5);
         bool repeatMask = st_random() > 0.5;
         //st_logInfo("Using random trim %" PRIi64 ", recursive %" PRIi64 " \n", trim, repeatMask);
-        printf("Using random trim %" PRIi64 ", recursive %" PRIi64 " \n", trim, repeatMask);
+        //printf("Using random trim %" PRIi64 ", recursive %" PRIi64 " \n", trim, repeatMask);
 
-        stList *blastPairs = getBlastPairs(SsX, SsY, trim, repeatMask);
+        stList *blastPairs = getBlastPairs(sX, sY, trim, repeatMask);
 
         checkBlastPairs(testCase, blastPairs, lX, lY, 0);
         stList_destruct(blastPairs);
@@ -517,7 +514,7 @@ static void test_getBlastPairs(CuTest *testCase) {
 }
 
 static void test_filterToRemoveOverlap(CuTest *testCase) {
-    for (int64_t i = 0; i < 100; i++) {
+    for (int64_t i = 0; i < 10; i++) {
         //Make random pairs
         int64_t lX = st_randomInt(0, 100);
         int64_t lY = st_randomInt(0, 100);
@@ -530,8 +527,11 @@ static void test_filterToRemoveOverlap(CuTest *testCase) {
                 }
             }
         }
+
+        printf("%lld is pairs length\n", stList_length(pairs));
         //Now run filter pairs
         stList *nonoverlappingPairs = filterToRemoveOverlap(pairs);
+        printf("%lld is nonoverlappingPairs length\n", stList_length(nonoverlappingPairs));
 
         //Check non overlapping
         checkBlastPairs(testCase, nonoverlappingPairs, lX, lY, 1);
@@ -562,6 +562,8 @@ static void test_filterToRemoveOverlap(CuTest *testCase) {
                 (int (*)(const void *, const void *)) stIntTuple_cmpFn);
         st_logDebug("The non-overlapping set sizes are %" PRIi64 " %" PRIi64 "\n",
                 stSortedSet_size(nonOverlappingPairsSet), stSortedSet_size(nonOverlappingPairsSet2));
+        //printf("The non-overlapping set sizes are %" PRIi64 " %" PRIi64 "\n",
+        //            stSortedSet_size(nonOverlappingPairsSet), stSortedSet_size(nonOverlappingPairsSet2));
 
         // TODO this is failing
         CuAssertTrue(testCase, stSortedSet_equals(nonOverlappingPairsSet, nonOverlappingPairsSet2));
@@ -679,17 +681,19 @@ static void test_getAlignedPairs(CuTest *testCase) {
         char *sY = evolveSequence(sX); //stString_copy(seqX);
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
-        st_logInfo("Sequence X to align: %s END\n", sX);
-        st_logInfo("Sequence Y to align: %s END\n", sY);
+        Sequence* SsX = sequenceConstruct(lX, sX, nucleotide);
+        Sequence* SsY = sequenceConstruct(lY, sY, nucleotide);
+        st_logInfo("Sequence X to align: %s END\n", SsX->repr);
+        st_logInfo("Sequence Y to align: %s END\n", SsY->repr);
 
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
         StateMachine *sM = stateMachine5_construct(fiveState);
 
-        stList *alignedPairs = getAlignedPairs(sM, sX, sY, nucleotide, p, 0, 0);
+        stList *alignedPairs = getAlignedPairs(sM, SsX, SsY, nucleotide, p, 0, 0);
 
         //Check the aligned pairs.
-        checkAlignedPairs(testCase, alignedPairs, lX, lY);
+        checkAlignedPairs(testCase, alignedPairs, SsX->length, SsY->length);
 
         //Cleanup
         stateMachine_destruct(sM);
@@ -707,17 +711,29 @@ static void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         char *sY = stString_print("%s%s%s", getRandomSequence(randomPortionLength), sX,
                 getRandomSequence(randomPortionLength)); //x with an extra bit at the end.
 
-        st_logInfo("Sequence X to align: %s END\n", sX);
-        st_logInfo("Sequence Y to align: %s END\n", sY);
+        int64_t lX = strlen(sX);
+        int64_t lY = strlen(sY);
+
+        Sequence* SsX = sequenceConstruct(lX, sX, nucleotide);
+        Sequence* SsY = sequenceConstruct(lY, sY, nucleotide);
+
+        //st_logInfo("Sequence X to align: %s END\n", SsX->repr);
+        //st_logInfo("Sequence Y to align: %s END\n", SsY->repr);
+
+        //printf("Sequence X to align: %s END\n", SsX->repr);
+        //printf("Sequence Y to align: %s END\n", SsY->repr);
 
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
         StateMachine *sM = stateMachine5_construct(fiveState);
-        stList *alignedPairs = getAlignedPairs(sM, sX, sY, nucleotide, p, 1, 1);
-        alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, sX, sY, 0.2);
+        stList *alignedPairs = getAlignedPairs(sM, SsX, SsY, nucleotide, p, 1, 1);
+
+        //printf("Before filtering alignedPairs Length: %lld\n", (int64_t) stList_length(alignedPairs));
+        alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, SsX->repr, SsY->repr, 0.2);
+        //printf("After filtering alignedPairs Length: %lld\n", (int64_t) stList_length(alignedPairs));
 
         //Check the aligned pairs.
-        checkAlignedPairs(testCase, alignedPairs, strlen(sX), strlen(sY));
+        checkAlignedPairs(testCase, alignedPairs, SsX->length, SsY->length);
         CuAssertIntEquals(testCase, stList_length(alignedPairs), coreLength);
         for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
             stIntTuple *j = stList_get(alignedPairs, i);
@@ -901,16 +917,16 @@ static void test_em_3State(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, test_diagonal);
+//    SUITE_ADD_TEST(suite, test_diagonal);
 //    SUITE_ADD_TEST(suite, test_bands);
 //    SUITE_ADD_TEST(suite, test_logAdd);
 //    SUITE_ADD_TEST(suite, test_symbol);
 //    SUITE_ADD_TEST(suite, test_cell);
 //    SUITE_ADD_TEST(suite, test_dpDiagonal);
 //    SUITE_ADD_TEST(suite, test_dpMatrix);
-    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+//    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
 //    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
-    SUITE_ADD_TEST(suite, test_getBlastPairs);
+//    SUITE_ADD_TEST(suite, test_getBlastPairs);
 //    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
 //    SUITE_ADD_TEST(suite, test_filterToRemoveOverlap); // TODO has failure
 //    SUITE_ADD_TEST(suite, test_getSplitPoints);
