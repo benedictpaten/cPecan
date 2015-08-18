@@ -440,17 +440,12 @@ static void test_Kmers_hmm(CuTest *testCase, StateMachineType stateMachineType) 
     }
 
     //Recheck the emissions
+    double z[5] = {45000, 60625, 76250, 91875, 107500}; // correct totals for each state
     for (int64_t state = 0; state < hmm->stateNumber; state++) {
         for (int64_t x = 0; x < NUM_OF_KMERS; x++) {
             for (int64_t y = 0; y < NUM_OF_KMERS; y++) {
-                double z = SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N * state
-                           + ((SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N) * ((SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N) - 1))
-                             / 2;
-                printf("checking state: %lld x:%lld - y:%lld, z:%f", state, x, y, z);
                 CuAssertTrue(testCase,
-                             hmm_Kmer_getEmissionsExpectation(hmm, state, x, y) == (state * SYMBOL_NUMBER * SYMBOL_NUMBER + x * SYMBOL_NUMBER + y)/z);
-
-                printf(" -> passed\n");
+                             hmm_Kmer_getEmissionsExpectation(hmm, state, x, y) == (state * SYMBOL_NUMBER * SYMBOL_NUMBER + x * SYMBOL_NUMBER + y)/z[state]);
             }
         }
     }

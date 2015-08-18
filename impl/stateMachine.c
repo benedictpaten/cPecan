@@ -181,9 +181,11 @@ void hmm_Kmer_normalise(Hmm *hmm) {
                 total += hmm_Kmer_getEmissionsExpectation(hmm, state, x, y);
             }
         }
-        printf("total:%f\n", total);
+        printf("total for state%lld:%f\n", state, total);
         for (int64_t x = 0; x < NUM_OF_KMERS; x++) {
             for (int64_t y = 0; y < NUM_OF_KMERS; y++) {
+                double ems = hmm_Kmer_getEmissionsExpectation(hmm, state, x, y);
+                printf("Normalizing X:%lld, Y:%lld, total:%f, ems:%f-> ems%f\n", x, y, total, ems, ems/total);
                 hmm_Kmer_setEmissionsExpectation(hmm, state, x, y, hmm_Kmer_getEmissionsExpectation(hmm, state, x, y) / total);
             }
         }
