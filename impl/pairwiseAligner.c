@@ -23,6 +23,7 @@
 #include "../inc/stateMachine.h"
 #include "../inc/shim.h"
 #include "../inc/pairwiseAligner.h"
+#include "../inc/emissionMatrix.h"
 
 ///////////////////////////////////
 ///////////////////////////////////
@@ -366,8 +367,10 @@ double cell_dotProduct2(double *cell, StateMachine *sM, double (*getStateValue)(
     return totalProb;
 }
 
-static inline void updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP,
-        double tP, void *extraArgs) {
+static inline void updateExpectations(double *fromCells, double *toCells,
+                                      int64_t from, int64_t to,
+                                      double eP, double tP,
+                                      void *extraArgs) {
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
     Hmm *hmmExpectations = ((void **) extraArgs)[1];
@@ -382,10 +385,43 @@ static inline void updateExpectations(double *fromCells, double *toCells, int64_
     }
 }
 
-static void cell_calculateExpectation(StateMachine *sM, double *current, double *lower, double *middle, double *upper, void* cX, void* cY,
-        void *extraArgs) {
+static inline void Kmer_updateExpectations(double *fromCells, double *toCells,
+                                           int64_t from, int64_t to,
+                                           double eP, double tP,
+                                           void *extraArgs) {
+
+    //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
+    double totalProbability = *((double *) ((void **) extraArgs)[0]);
+    //printf("Kmer_updateExpectations: total probability:%f\n", totalProbability);
+    Hmm *hmmExpectations = ((void **) extraArgs)[1];
+    int64_t x = *((int64_t *)((void **) extraArgs)[2]);
+    int64_t y = *((int64_t *)((void **) extraArgs)[3]);
+    //printf("Kmer_updateExpectations: x:%lld, y:%lld\n", x, y);
+    //Calculate posterior probability of the transition/emission pair
+    double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
+    //Add in the expectation of the transition
+    hmm_addToTransitionExpectation(hmmExpectations, from, to, p);
+    if(x < NUM_OF_KMERS && y < NUM_OF_KMERS) { //Ignore gaps involving Ns. TODO implement this for kmers
+        hmm_Kmer_addToEmissionsExpectation(hmmExpectations, to, x, y, p);
+    }
+}
+
+static void cell_calculateExpectation(StateMachine *sM,
+                                      double *current, double *lower, double *middle, double *upper,
+                                      void* cX, void* cY,
+                                      void *extraArgs) {
+
     void *extraArgs2[4] = { ((void **)extraArgs)[0], ((void **)extraArgs)[1], &cX, &cY };
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, updateExpectations, extraArgs2);
+}
+
+static void Kmer_cell_calculateExpectation(StateMachine *sM,
+                                      double *current, double *lower, double *middle, double *upper,
+                                      char* cX, char* cY,
+                                      void *extraArgs) {
+
+    void *extraArgs2[4] = { ((void **)extraArgs)[0], ((void **)extraArgs)[1], &cX, &cY };
+    sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, Kmer_updateExpectations, extraArgs2);
 }
 
 ///////////////////////////////////
@@ -700,9 +736,10 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
     //printf("final length for alignedPairs: %lld\n", stList_length(alignedPairs));
 }
 
-static void diagonalCalculationExpectations(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
-                                            DpMatrix *backwardDpMatrix, const Sequence* sX, const Sequence* sY,
-                                            double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs) {
+static void diagonalCalculationExpectations(
+        StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
+        DpMatrix *backwardDpMatrix, const Sequence* sX, const Sequence* sY,
+        double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs) {
     /*
      * Updates the expectations of the transitions/emissions for the given diagonal.
      */
@@ -712,8 +749,35 @@ static void diagonalCalculationExpectations(StateMachine *sM, int64_t xay, DpMat
     // We do this once per diagonal, which is a hack, rather than for the
     // whole matrix. The correction factor is approximately 1/number of
     // diagonals.
-    diagonalCalculation(sM, dpMatrix_getDiagonal(backwardDpMatrix, xay), dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
-            dpMatrix_getDiagonal(forwardDpMatrix, xay - 2), sX, sY, cell_calculateExpectation, extraArgs2);
+    diagonalCalculation(sM,
+                        dpMatrix_getDiagonal(backwardDpMatrix, xay),
+                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
+                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
+                        sX, sY, cell_calculateExpectation, extraArgs2);
+}
+
+static void Kmer_diagonalCalculationExpectations(
+        StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
+        DpMatrix *backwardDpMatrix, const Sequence* sX, const Sequence* sY,
+        double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs) {
+    /*
+     * Updates the expectations of the transitions/emissions for the given diagonal.
+     */
+    //printf("diagonalCalculationExpectations: totalProb at start:%f\n", totalProbability);
+    Hmm *hmmExpectations = extraArgs;
+    //printf("diagonalCalculationExpectations: hmmExpectations-likelihood at start:%f\n", hmmExpectations->likelihood);// nan here!
+    void *extraArgs2[2] = { &totalProbability, hmmExpectations };
+    hmmExpectations->likelihood += totalProbability;
+
+    // We do this once per diagonal, which is a hack, rather than for the
+    // whole matrix. The correction factor is approximately 1/number of
+    // diagonals.
+    diagonalCalculation(sM,
+                        dpMatrix_getDiagonal(backwardDpMatrix, xay),
+                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
+                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
+                        sX, sY, Kmer_cell_calculateExpectation,
+                        extraArgs2);
 }
 
 ///////////////////////////////////
@@ -1344,11 +1408,20 @@ void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                  PairwiseAlignmentParameters *p,
                                  bool alignmentHasRaggedLeftEnd,
                                  bool alignmentHasRaggedRightEnd) {
+    if (t == nucleotide) {
+        getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
+                sM, anchorPairs, SsX, SsY, t, p,
+                alignmentHasRaggedLeftEnd, alignmentHasRaggedRightEnd,
+                diagonalCalculationExpectations, NULL, hmmExpectations);
+    }
+    if (t == kmer) {
+        //printf("-->Kmer!!\n");
+        getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
+                sM, anchorPairs, SsX, SsY, t, p,
+                alignmentHasRaggedLeftEnd, alignmentHasRaggedRightEnd,
+                Kmer_diagonalCalculationExpectations, NULL, hmmExpectations);
+    }
 
-    getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
-            sM, anchorPairs, SsX, SsY, t, p,
-            alignmentHasRaggedLeftEnd, alignmentHasRaggedRightEnd,
-            diagonalCalculationExpectations, NULL, hmmExpectations);
 }
 
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,

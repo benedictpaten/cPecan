@@ -54,6 +54,7 @@ Hmm *hmm_constructEmpty(double pseudoExpectation, StateMachineType type) {
 
 
 Hmm *hmm_Kmer_constructEmpty(double pseudoExpectation, StateMachineType type) {
+    //printf("hmm_Kmer_constructEmpty: start\n");
     Hmm *hmm = st_malloc(sizeof(Hmm));
     hmm->type = type;
     switch (type) {
@@ -70,6 +71,7 @@ Hmm *hmm_Kmer_constructEmpty(double pseudoExpectation, StateMachineType type) {
     }
     hmm->transitions = st_malloc(hmm->stateNumber * hmm->stateNumber * sizeof(double));
     for (int64_t i = 0; i < hmm->stateNumber * hmm->stateNumber; i++) {
+        //printf("Added %f to transitions[%lld]\n", pseudoExpectation, i);
         hmm->transitions[i] = pseudoExpectation;
     }
     hmm->emissions = st_malloc(hmm->stateNumber * MATRIX_SIZE * sizeof(double));
@@ -111,7 +113,7 @@ static inline double *hmm_Kmer_getEmissionsExpectation2(Hmm *hmm, int64_t state,
     return &(hmm->emissions[(state * MATRIX_SIZE) + tableIndex]);
 }
 
-// todo needs to change
+
 double hmm_getEmissionsExpectation(Hmm *hmm, int64_t state, Symbol x, Symbol y) {
     return *hmm_getEmissionsExpectation2(hmm, state, x, y);
 }
@@ -163,7 +165,7 @@ void hmm_normalise(Hmm *hmm) {
 }
 
 void hmm_Kmer_normalise(Hmm *hmm) {
-    printf("Normalizing HMM\n");
+
     for (int64_t from = 0; from < hmm->stateNumber; from++) {
         double total = 0.0;
         for (int64_t to = 0; to < hmm->stateNumber; to++) {
@@ -181,11 +183,11 @@ void hmm_Kmer_normalise(Hmm *hmm) {
                 total += hmm_Kmer_getEmissionsExpectation(hmm, state, x, y);
             }
         }
-        printf("total for state%lld:%f\n", state, total);
+        //printf("total for state%lld:%f\n", state, total);
         for (int64_t x = 0; x < NUM_OF_KMERS; x++) {
             for (int64_t y = 0; y < NUM_OF_KMERS; y++) {
                 double ems = hmm_Kmer_getEmissionsExpectation(hmm, state, x, y);
-                printf("Normalizing X:%lld, Y:%lld, total:%f, ems:%f-> ems%f\n", x, y, total, ems, ems/total);
+                //printf("Normalizing X:%lld, Y:%lld, total:%f, ems:%f-> ems%f\n", x, y, total, ems, ems/total);
                 hmm_Kmer_setEmissionsExpectation(hmm, state, x, y, hmm_Kmer_getEmissionsExpectation(hmm, state, x, y) / total);
             }
         }
@@ -210,6 +212,25 @@ void hmm_randomise(Hmm *hmm) {
     }
 
     hmm_normalise(hmm);
+}
+
+void hmm_Kmer_randomise(Hmm *hmm) {
+    //Transitions
+    for (int64_t from = 0; from < hmm->stateNumber; from++) {
+        for (int64_t to = 0; to < hmm->stateNumber; to++) {
+            hmm_setTransition(hmm, from, to, st_random());
+        }
+    }
+    //Emissions
+    for (int64_t state = 0; state < hmm->stateNumber; state++) {
+        for (int64_t x = 0; x < NUM_OF_KMERS; x++) {
+            for (int64_t y = 0; y < NUM_OF_KMERS; y++) {
+                hmm_Kmer_setEmissionsExpectation(hmm, state, x, y, st_random());
+            }
+        }
+    }
+
+    hmm_Kmer_normalise(hmm);
 }
 
 void hmm_write(Hmm *hmm, FILE *fileHandle) {
@@ -302,36 +323,36 @@ Hmm *hmm_Kmer_loadFromFile(const char *fileName) {
     char *string = stFile_getLineFromFile(fH);
     stList *tokens = stString_split(string);
     if (stList_length(tokens) < 2) {
-        st_errAbort("Got an empty line in the input state machine file %s\n", fileName);
         printf("Got an empty line in the input state machine file %s\n", fileName);
+        st_errAbort("Got an empty line in the input state machine file %s\n", fileName);
     }
     int type;
     int64_t j = sscanf(stList_get(tokens, 0), "%i", &type);
     if (j != 1) {
-        st_errAbort("Failed to parse state number (int) from string: %s\n", string);
         printf("Failed to parse state number (int) from string: %s\n", string);
+        st_errAbort("Failed to parse state number (int) from string: %s\n", string);
     }
     Hmm *hmm = hmm_constructEmpty(0.0, type);
     if (stList_length(tokens) != hmm->stateNumber * hmm->stateNumber + 2) {
+        printf("Got the wrong number of transitions in the input state machine file %s, got %" PRIi64 " instead of %" PRIi64 "\n",
+               fileName, stList_length(tokens), hmm->stateNumber * hmm->stateNumber + 2);
         st_errAbort(
                 "Got the wrong number of transitions in the input state machine file %s, got %" PRIi64 " instead of %" PRIi64 "\n",
                 fileName, stList_length(tokens), hmm->stateNumber * hmm->stateNumber + 2);
-        printf(
-                "Got the wrong number of transitions in the input state machine file %s, got %" PRIi64 " instead of %" PRIi64 "\n",
-                fileName, stList_length(tokens), hmm->stateNumber * hmm->stateNumber + 2);
+
     }
 
     for (int64_t i = 0; i < hmm->stateNumber * hmm->stateNumber; i++) {
         j = sscanf(stList_get(tokens, i + 1), "%lf", &(hmm->transitions[i]));
         if (j != 1) {
-            st_errAbort("Failed to parse transition prob (float) from string: %s\n", string);
             printf("Failed to parse transition prob (float) from string: %s\n", string);
+            st_errAbort("Failed to parse transition prob (float) from string: %s\n", string);
         }
     }
     j = sscanf(stList_get(tokens, stList_length(tokens) - 1), "%lf", &(hmm->likelihood));
     if (j != 1) {
-        st_errAbort("Failed to parse likelihood (float) from string: %s\n", string);
         printf("Failed to parse likelihood (float) from string: %s\n", string);
+        st_errAbort("Failed to parse likelihood (float) from string: %s\n", string);
     }
 
     //Cleanup transitions line
@@ -343,19 +364,19 @@ Hmm *hmm_Kmer_loadFromFile(const char *fileName) {
     tokens = stString_split(string);
 
     if (stList_length(tokens) != hmm->stateNumber * MATRIX_SIZE) {
+        printf("Got the wrong number of emissions in the input state machine file %s, got %" PRIi64 " instead of %" PRIi64 "\n",
+               fileName, stList_length(tokens), hmm->stateNumber * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N);
         st_errAbort(
                 "Got the wrong number of emissions in the input state machine file %s, got %" PRIi64 " instead of %" PRIi64 "\n",
                 fileName, stList_length(tokens), hmm->stateNumber * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N);
-        printf("Got the wrong number of emissions in the input state machine file %s, got %" PRIi64 " instead of %" PRIi64 "\n",
-                fileName, stList_length(tokens), hmm->stateNumber * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N);
     }
 
-    for (int64_t i = 0; i < hmm->stateNumber * MATRIX_SIZE; i++) {
-        //printf("adding %lf to emissions\n", stList_get(tokens, i));
+    for (int64_t i = 0; i < (hmm->stateNumber * MATRIX_SIZE); i++) {
+        printf("%lld adding %f to emissions\n", i, stList_get(tokens, i));
         j = sscanf(stList_get(tokens, i), "%lf", &(hmm->emissions[i]));
         if (j != 1) {
-            st_errAbort("Failed to parse emission prob (float) from string: %s\n", string);
             printf("Failed to parse emission prob (float) from string: %s\n", string);
+            st_errAbort("Failed to parse emission prob (float) from string: %s\n", string);
         }
     }
 
@@ -422,6 +443,15 @@ static void emissions_loadMatchProbs(double *emissionMatchProbs, Hmm *hmm, int64
     }
 }
 
+static void emissions_Kmer_loadMatchProbs(double *emissionMatchProbs, Hmm *hmm, int64_t matchState) {
+    //Load the matches
+    for(int64_t x=0; x<SYMBOL_NUMBER_NO_N; x++) {
+        for(int64_t y=0; y<SYMBOL_NUMBER_NO_N; y++) {
+            emissionMatchProbs[x * SYMBOL_NUMBER_NO_N + y] = log(hmm_getEmissionsExpectation(hmm, matchState, x, y));
+        }
+    }
+}
+
 static void emissions_loadMatchProbsSymmetrically(double *emissionMatchProbs, Hmm *hmm, int64_t matchState) {
     //Load the matches
     for(int64_t x=0; x<SYMBOL_NUMBER_NO_N; x++) {
@@ -434,6 +464,18 @@ static void emissions_loadMatchProbsSymmetrically(double *emissionMatchProbs, Hm
     }
 }
 
+static void emissions_Kmer_loadMatchProbsSymmetrically(double *emissionMatchProbs, Hmm *hmm, int64_t matchState) {
+    //Load the matches
+    for(int64_t x=0; x<NUM_OF_KMERS; x++) {
+        emissionMatchProbs[x * NUM_OF_KMERS + x] = log(hmm_Kmer_getEmissionsExpectation(hmm, matchState, x, x));
+        for(int64_t y=x+1; y<NUM_OF_KMERS; y++) {
+            double d = log((hmm_Kmer_getEmissionsExpectation(hmm, matchState, x, y) + hmm_Kmer_getEmissionsExpectation(hmm, matchState, y, x))/2.0);
+            emissionMatchProbs[x * NUM_OF_KMERS + y] = d;
+            emissionMatchProbs[y * NUM_OF_KMERS + x] = d;
+        }
+    }
+}
+
 static void collapseMatrixEmissions(Hmm *hmm, int64_t state, double *gapEmissions, bool collapseToX) {
     for(int64_t x=0; x<SYMBOL_NUMBER_NO_N; x++) {
         for(int64_t y=0; y<SYMBOL_NUMBER_NO_N; y++) {
@@ -442,9 +484,17 @@ static void collapseMatrixEmissions(Hmm *hmm, int64_t state, double *gapEmission
     }
 }
 
+static void Kmer_collapseMatrixEmissions(Hmm *hmm, int64_t state, double *gapEmissions, bool collapseToX) {
+    for(int64_t x=0; x<NUM_OF_KMERS; x++) {
+        for(int64_t y=0; y<NUM_OF_KMERS; y++) {
+            gapEmissions[collapseToX ? x : y] += hmm_Kmer_getEmissionsExpectation(hmm, state, x, y);
+        }
+    }
+}
+
 static void emissions_loadGapProbs(double *emissionGapProbs, Hmm *hmm,
-        int64_t *xGapStates, int64_t xGapStateNo,
-        int64_t *yGapStates, int64_t yGapStateNo) {
+                                   int64_t *xGapStates, int64_t xGapStateNo,
+                                   int64_t *yGapStates, int64_t yGapStateNo) {
     //Initialise to 0.0
     for(int64_t i=0; i<SYMBOL_NUMBER_NO_N; i++) {
         emissionGapProbs[i] = 0.0;
@@ -462,6 +512,30 @@ static void emissions_loadGapProbs(double *emissionGapProbs, Hmm *hmm,
         total += emissionGapProbs[i];
     }
     for(int64_t i=0; i<SYMBOL_NUMBER_NO_N; i++) {
+        emissionGapProbs[i] = log(emissionGapProbs[i]/total);
+    }
+}
+
+static void emissions_Kmer_loadGapProbs(double *emissionGapProbs, Hmm *hmm,
+                                        int64_t *xGapStates, int64_t xGapStateNo,
+                                        int64_t *yGapStates, int64_t yGapStateNo) {
+    //Initialise to 0.0
+    for(int64_t i=0; i < NUM_OF_KMERS; i++) {
+        emissionGapProbs[i] = 0.0;
+    }
+    //Load the probs taking the average over all the gap states
+    for(int64_t i=0; i<xGapStateNo; i++) {
+        Kmer_collapseMatrixEmissions(hmm, xGapStates[i], emissionGapProbs, 1);
+    }
+    for(int64_t i=0; i<yGapStateNo; i++) {
+        Kmer_collapseMatrixEmissions(hmm, yGapStates[i], emissionGapProbs, 0);
+    }
+    //Now normalise
+    double total = 0.0;
+    for(int64_t i=0; i<NUM_OF_KMERS; i++) {
+        total += emissionGapProbs[i];
+    }
+    for(int64_t i=0; i<NUM_OF_KMERS; i++) {
         emissionGapProbs[i] = log(emissionGapProbs[i]/total);
     }
 }
@@ -841,6 +915,7 @@ static void stateMachine5_loadAsymmetric(StateMachine5 *sM5, Hmm *hmm) {
 
 static void stateMachine5_loadSymmetric(StateMachine5 *sM5, Hmm *hmm) {
     if (hmm->type != fiveState) {
+        printf("Wrong hmm type");
         st_errAbort("Wrong hmm type");
     }
     sM5->TRANSITION_MATCH_CONTINUE = log(hmm_getTransition(hmm, match, match)); //0.9703833696510062f
@@ -883,6 +958,54 @@ static void stateMachine5_loadSymmetric(StateMachine5 *sM5, Hmm *hmm) {
     int64_t yGapStates[2] = { shortGapY, longGapY };
     emissions_loadGapProbs(sM5->EMISSION_GAP_X_PROBS, hmm, xGapStates, 2, yGapStates, 2);
     emissions_loadGapProbs(sM5->EMISSION_GAP_Y_PROBS, hmm, xGapStates, 2, yGapStates, 2);
+}
+
+static void stateMachine5_Kmer_loadSymmetric(StateMachine5 *sM5, Hmm *hmm) {
+    if (hmm->type != fiveState) {
+        printf("Wrong hmm type");
+        st_errAbort("Wrong hmm type");
+    }
+    sM5->TRANSITION_MATCH_CONTINUE = log(hmm_getTransition(hmm, match, match)); //0.9703833696510062f
+    sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X = log(
+            (hmm_getTransition(hmm, shortGapX, match) + hmm_getTransition(hmm, shortGapY, match)) / 2); //1.0 - gapExtend - gapSwitch = 0.280026392297485
+    sM5->TRANSITION_MATCH_FROM_LONG_GAP_X = log(
+            (hmm_getTransition(hmm, longGapX, match) + hmm_getTransition(hmm, longGapY, match)) / 2); //1.0 - gapExtend = 0.00343657420938
+    sM5->TRANSITION_GAP_SHORT_OPEN_X = log(
+            (hmm_getTransition(hmm, match, shortGapX) + hmm_getTransition(hmm, match, shortGapY)) / 2); //0.0129868352330243
+    sM5->TRANSITION_GAP_SHORT_EXTEND_X = log(
+            (hmm_getTransition(hmm, shortGapX, shortGapX) + hmm_getTransition(hmm, shortGapY, shortGapY)) / 2); //0.7126062401851738f;
+    sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X = log(
+            (hmm_getTransition(hmm, shortGapX, shortGapY) + hmm_getTransition(hmm, shortGapY, shortGapX)) / 2); //0.0073673675173412815f;
+    sM5->TRANSITION_GAP_LONG_OPEN_X = log(
+            (hmm_getTransition(hmm, match, longGapX) + hmm_getTransition(hmm, match, longGapY)) / 2); //(1.0 - match - 2*gapOpenShort)/2 = 0.001821479941473
+    sM5->TRANSITION_GAP_LONG_EXTEND_X = log(
+            (hmm_getTransition(hmm, longGapX, longGapX) + hmm_getTransition(hmm, longGapY, longGapY)) / 2);
+    sM5->TRANSITION_GAP_LONG_SWITCH_TO_X = log(
+            (hmm_getTransition(hmm, longGapX, longGapY) + hmm_getTransition(hmm, longGapY, longGapX)) / 2); //0.0073673675173412815f;
+
+    if(sM5->TRANSITION_GAP_SHORT_EXTEND_X > sM5->TRANSITION_GAP_LONG_EXTEND_X) {
+        //Switch the long and short gap parameters if one the "long states" have a smaller extend probability than the "short states", as can randomly happen during EM training.
+        switchDoubles(&(sM5->TRANSITION_GAP_SHORT_EXTEND_X), &(sM5->TRANSITION_GAP_LONG_EXTEND_X));
+        switchDoubles(&(sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X), &(sM5->TRANSITION_MATCH_FROM_LONG_GAP_X));
+        switchDoubles(&(sM5->TRANSITION_GAP_SHORT_OPEN_X), &(sM5->TRANSITION_GAP_LONG_OPEN_X));
+        switchDoubles(&(sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X), &(sM5->TRANSITION_GAP_LONG_SWITCH_TO_X));
+    }
+
+    sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y = sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X;
+    sM5->TRANSITION_MATCH_FROM_LONG_GAP_Y = sM5->TRANSITION_MATCH_FROM_LONG_GAP_X;
+    sM5->TRANSITION_GAP_SHORT_OPEN_Y = sM5->TRANSITION_GAP_SHORT_OPEN_X;
+    sM5->TRANSITION_GAP_SHORT_EXTEND_Y = sM5->TRANSITION_GAP_SHORT_EXTEND_X;
+    sM5->TRANSITION_GAP_SHORT_SWITCH_TO_Y = sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X;
+    sM5->TRANSITION_GAP_LONG_OPEN_Y = sM5->TRANSITION_GAP_LONG_OPEN_X;
+    sM5->TRANSITION_GAP_LONG_EXTEND_Y = sM5->TRANSITION_GAP_LONG_EXTEND_X;
+    sM5->TRANSITION_GAP_LONG_SWITCH_TO_Y = sM5->TRANSITION_GAP_LONG_SWITCH_TO_X;
+
+    //emissions_Kmer_loadMatchProbsSymmetrically(sM5->EMISSION_MATCH_PROBS, hmm, match);
+    emissions_Kmer_loadMatchProbs(sM5->EMISSION_MATCH_PROBS, hmm, match);
+    int64_t xGapStates[2] = { shortGapX, longGapX };
+    int64_t yGapStates[2] = { shortGapY, longGapY };
+    emissions_Kmer_loadGapProbs(sM5->EMISSION_GAP_X_PROBS, hmm, xGapStates, 2, yGapStates, 2);
+    emissions_Kmer_loadGapProbs(sM5->EMISSION_GAP_Y_PROBS, hmm, xGapStates, 2, yGapStates, 2);
 }
 
 ///////////////////////////////////
@@ -1080,6 +1203,14 @@ StateMachine *hmm_getStateMachine(Hmm *hmm) {
         return (StateMachine *) sM3;
     }
     return NULL;
+}
+
+StateMachine *hmm_Kmer_getStateMachine(Hmm *hmm) {
+    if (hmm->type == fiveState) {
+        StateMachine5 *sM5 = (StateMachine5 *) stateMachine5_kmer_construct(fiveState);
+        stateMachine5_Kmer_loadSymmetric(sM5, hmm);
+        return (StateMachine *) sM5;
+    }
 }
 
 void stateMachine_destruct(StateMachine *stateMachine) {

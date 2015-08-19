@@ -72,6 +72,8 @@ Hmm *hmm_Kmer_constructEmpty(double pseudoExpectation, StateMachineType type);
 
 void hmm_randomise(Hmm *hmm); //Creates normalised HMM with parameters set to small random values.
 
+void hmm_Kmer_randomise(Hmm *hmm);
+
 void hmm_destruct(Hmm *hmmExpectations);
 
 void hmm_write(Hmm *hmmExpectations, FILE *fileHandle);
@@ -105,6 +107,8 @@ void hmm_normalise(Hmm *hmm);
 void hmm_Kmer_normalise(Hmm *hmm);
 
 StateMachine *hmm_getStateMachine(Hmm *hmm);
+
+StateMachine *hmm_Kmer_getStateMachine(Hmm *hmm);
 
 StateMachine *stateMachine5_construct(StateMachineType type);
 

@@ -376,10 +376,9 @@ static void test_kmers_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
     }
 }
 
-static void test_Kmers_hmm(CuTest *testCase, StateMachineType stateMachineType) {
+static void test_Kmer_hmm(CuTest *testCase, StateMachineType stateMachineType) {
     //Expectation object
     Hmm *hmm = hmm_Kmer_constructEmpty(0.0, stateMachineType);
-    printf("kmer hmm constructed\n");
     //Add some transition expectations
     for (int64_t from = 0; from < hmm->stateNumber; from++) {
         for (int64_t to = 0; to < hmm->stateNumber; to++) {
@@ -393,23 +392,25 @@ static void test_Kmers_hmm(CuTest *testCase, StateMachineType stateMachineType) 
             for (int64_t y = 0; y < NUM_OF_KMERS; y++) {
                 double dummy = state * SYMBOL_NUMBER * SYMBOL_NUMBER + x * SYMBOL_NUMBER + y;
                 hmm_Kmer_addToEmissionsExpectation(hmm, state, x, y, dummy);
-                printf("state %lld added %f to x:%lld y:%lld\n", state, dummy, x, y);
+                //printf("state %lld added %f to x:%lld y:%lld\n", state, dummy, x, y);
             }
         }
     }
 
+    /* TODO the reading from file does not work
     //Write to a file
-    //char *tempFile = stString_print("./temp%" PRIi64 ".hmm", st_randomInt(0, INT64_MAX));
-    //printf("file written to %s\n", tempFile);
-    //CuAssertTrue(testCase, !stFile_exists(tempFile)); //Quick check that we don't write over anything.
-    //FILE *fH = fopen(tempFile, "w");
-    //printf("file opened\n");
-    //hmm_Kmer_write(hmm, fH);
-    //fclose(fH);
-    //hmm_destruct(hmm);
+    char *tempFile = stString_print("./temp%" PRIi64 ".hmm", st_randomInt(0, INT64_MAX));
+    printf("file written to %s\n", tempFile);
+    CuAssertTrue(testCase, !stFile_exists(tempFile)); //Quick check that we don't write over anything.
+    FILE *fH = fopen(tempFile, "w");
+    printf("file opened\n");
+    hmm_Kmer_write(hmm, fH);
+    fclose(fH);
+    hmm_destruct(hmm);
     //Load from a file
-    //hmm = hmm_Kmer_loadFromFile(tempFile);
-    //stFile_rmrf(tempFile);
+    hmm = hmm_Kmer_loadFromFile(tempFile);
+    stFile_rmrf(tempFile);
+    */
 
     //Check the transition expectations
     for (int64_t from = 0; from < hmm->stateNumber; from++) {
@@ -422,8 +423,13 @@ static void test_Kmers_hmm(CuTest *testCase, StateMachineType stateMachineType) 
     for (int64_t state = 0; state < hmm->stateNumber; state++) {
         for (int64_t x = 0; x < NUM_OF_KMERS; x++) {
             for (int64_t y = 0; y < NUM_OF_KMERS; y++) {
-                CuAssertTrue(testCase,
-                             hmm_Kmer_getEmissionsExpectation(hmm, state, x, y) == state * SYMBOL_NUMBER * SYMBOL_NUMBER + x * SYMBOL_NUMBER + y);
+                double expected = state * SYMBOL_NUMBER * SYMBOL_NUMBER + x * SYMBOL_NUMBER + y;
+                double actual = hmm_Kmer_getEmissionsExpectation(hmm, state, x, y);
+                //printf("testing x:%lld, y:%lld, ems = %f", x, y, actual);
+                CuAssertDblEquals(testCase, expected, actual, 0.001);
+                //CuAssertTrue(testCase,
+                //             hmm_Kmer_getEmissionsExpectation(hmm, state, x, y) == state * SYMBOL_NUMBER * SYMBOL_NUMBER + x * SYMBOL_NUMBER + y);
+                //printf("-> passed\n");
             }
         }
     }
@@ -454,18 +460,84 @@ static void test_Kmers_hmm(CuTest *testCase, StateMachineType stateMachineType) 
     hmm_destruct(hmm);
 }
 
-static void test_Kmers_hmm_5State(CuTest *testCase) {
-    test_Kmers_hmm(testCase, fiveState);
+static void test_Kmer_em(CuTest *testCase, StateMachineType stateMachineType) {
+    for (int64_t test = 0; test < 100; test++) {
+        //Make a pair of sequences
+        char *sX = getRandomSequence(st_randomInt(10, 150));
+        char *sY = evolveSequence(sX); //stString_copy(seqX);
+        
+        int64_t lX = strlen(sX);
+        int64_t lY = strlen(sY);
+
+        Sequence* SsX = sequenceConstruct(lX, sX, kmer);
+        Sequence* SsY = sequenceConstruct(lY, sY, kmer);
+
+        //Now do alignment
+        PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+
+        //Currently starts from random model and iterates.
+        double pLikelihood = -INFINITY;
+        Hmm *hmm = hmm_Kmer_constructEmpty(0.0, stateMachineType);
+        hmm_Kmer_randomise(hmm);
+        StateMachine *sM = hmm_Kmer_getStateMachine(hmm);
+        hmm_destruct(hmm);
+
+        for (int64_t iteration = 0; iteration < 10; iteration++) {
+            hmm = hmm_Kmer_constructEmpty(0.000000000001, stateMachineType); //The tiny pseudo count prevents overflow 0.000000000001
+            getExpectations(sM, hmm, SsX, SsY, kmer, p, 0, 0);
+            hmm_Kmer_normalise(hmm);
+            //Log stuff
+            // Transitions
+            for (int64_t from = 0; from < sM->stateNumber; from++) {
+                for (int64_t to = 0; to < sM->stateNumber; to++) {
+                    //printf("Transition from %" PRIi64 " to %" PRIi64 " has expectation %f\n", from, to,
+                    //           hmm_getTransition(hmm, from, to));
+                }
+            }
+            // Emissions
+            for (int64_t x = 0; x < NUM_OF_KMERS; x++) {
+                for (int64_t y = 0; y < NUM_OF_KMERS; y++) {
+                    //printf("Emission x %" PRIi64 " y %" PRIi64 " has expectation %f\n", x, y,
+                    //           hmm_Kmer_getEmissionsExpectation(hmm, sM->matchState, x, y));
+                }
+            }
+
+            st_logInfo("->->-> Got expected likelihood %f for trial %" PRIi64 " and  iteration %" PRIi64 "\n",
+                       hmm->likelihood, test, iteration);
+            printf("->->-> Got expected likelihood %f for trial %" PRIi64 " and  iteration %" PRIi64 "\n",
+                       hmm->likelihood, test, iteration);
+            assert(pLikelihood <= hmm->likelihood * 0.85); //0.95);
+            CuAssertTrue(testCase, pLikelihood <= hmm->likelihood * 0.85);//* 0.95);
+            pLikelihood = hmm->likelihood;
+            stateMachine_destruct(sM);
+            sM = hmm_getStateMachine(hmm);
+            hmm_destruct(hmm);
+        }
+
+        //Cleanup
+        pairwiseAlignmentBandingParameters_destruct(p);
+        // TODO destruct sequence objects
+        free(sX);
+        free(sY);
+    }
 }
 
+static void test_Kmer_hmm_5State(CuTest *testCase) {
+    test_Kmer_hmm(testCase, fiveState);
+}
+
+static void test_Kmer_em_5State(CuTest *testCase) {
+    test_Kmer_em(testCase, fiveState);
+}
 
 CuSuite* kmerTestSuite() {
     CuSuite* suite = CuSuiteNew();
-//    SUITE_ADD_TEST(suite, test_Kmers_cell);
-//    SUITE_ADD_TEST(suite, test_Kmers_diagonalDPCalculations);
-//    SUITE_ADD_TEST(suite, test_Kmers_getAlignedPairsWithBanding);
-//    SUITE_ADD_TEST(suite, test_kmers_getAlignedPairs);
-//    SUITE_ADD_TEST(suite, test_kmers_getAlignedPairsWithRaggedEnds);
-    SUITE_ADD_TEST(suite, test_Kmers_hmm_5State);
+    SUITE_ADD_TEST(suite, test_Kmers_cell);
+    SUITE_ADD_TEST(suite, test_Kmers_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_Kmers_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_kmers_getAlignedPairs);
+    SUITE_ADD_TEST(suite, test_kmers_getAlignedPairsWithRaggedEnds);
+    SUITE_ADD_TEST(suite, test_Kmer_hmm_5State);
+    SUITE_ADD_TEST(suite, test_Kmer_em_5State);
     return suite;
 }
