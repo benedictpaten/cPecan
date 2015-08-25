@@ -4,6 +4,10 @@
 #include <string.h>
 #include <inttypes.h>
 
+/*
+ * Code-generated emissions matrix for 2-mers
+ */
+
 void emissionsKmers_setMatchProbsToDefaults(double *emissionMatchProbs) {
     /*
      * This sets the match probabilities to default values for matching kmers
