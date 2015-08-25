@@ -50,7 +50,7 @@ stList *getAlignedPairs(StateMachine *sM, Sequence *string1, Sequence *string2, 
 
 stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignment *pA, int64_t trim);
 
-stList *getAlignedPairsUsingAnchors(StateMachine *sM, Sequence *SsX, Sequence *SsY, sequenceType t,
+stList *getAlignedPairsUsingAnchors(StateMachine *sM, Sequence *SsX, Sequence *SsY, //sequenceType t,
                                     stList *anchorPairs, PairwiseAlignmentParameters *p,
                                     bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
@@ -59,14 +59,14 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM, Sequence *SsX, Sequence *S
  */
 
 void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
-                                 Sequence *sX, Sequence *sY, sequenceType t,
+                                 Sequence *sX, Sequence *sY, //sequenceType t,
                                  stList *anchorPairs,
                                  PairwiseAlignmentParameters *p,
                                  bool alignmentHasRaggedLeftEnd,
                                  bool alignmentHasRaggedRightEnd);
 
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
-                     Sequence *SsX, Sequence *SsY, sequenceType t,
+                     Sequence *SsX, Sequence *SsY, //sequenceType t,
                      PairwiseAlignmentParameters *p,
                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
@@ -223,16 +223,17 @@ stList *filterToRemoveOverlap(stList *overlappingPairs);
 stList *getSplitPoints(stList *anchorPairs, int64_t lX, int64_t lY,
         int64_t maxMatrixSize, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
-void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(StateMachine *sM, stList *anchorPairs,
-                                                Sequence *SsX, Sequence *SsY, sequenceType t,
-                                                PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd,
-                                                bool alignmentHasRaggedRightEnd,
-                                                void (*diagonalPosteriorProbFn)(StateMachine *,
-                                                                                int64_t, DpMatrix *, DpMatrix *,
-                                                                                const Sequence*, const Sequence*,
-                                                                                double, PairwiseAlignmentParameters *,
-                                                                                void *),
-                                                void (*coordinateCorrectionFn)(), void *extraArgs);
+void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
+        StateMachine *sM, stList *anchorPairs,
+        Sequence *SsX, Sequence *SsY, //sequenceType t,
+        PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd,
+        bool alignmentHasRaggedRightEnd,
+        void (*diagonalPosteriorProbFn)(StateMachine *,
+                                        int64_t, DpMatrix *, DpMatrix *,
+                                        const Sequence*, const Sequence*,
+                                        double, PairwiseAlignmentParameters *,
+                                        void *),
+        void (*coordinateCorrectionFn)(), void *extraArgs);
 
 //Calculate posterior probabilities of being aligned to gaps
 

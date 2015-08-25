@@ -195,7 +195,6 @@ static void test_cell(CuTest *testCase) {
     double totalProbForward = cell_dotProduct2(currentF, sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(middleB, sM, sM->startStateProb);
     st_logInfo("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
-    printf("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.00001); //Check the forward and back probabilities are about equal
 }
 
@@ -875,7 +874,7 @@ static void test_em(CuTest *testCase, StateMachineType stateMachineType) {
 
         for (int64_t iteration = 0; iteration < 10; iteration++) {
             hmm = hmm_constructEmpty(0.000000000001, stateMachineType); //The tiny pseudo count prevents overflow
-            getExpectations(sM, hmm, SsX, SsY, nucleotide, p, 0, 0);
+            getExpectations(sM, hmm, SsX, SsY, p, 0, 0);
             hmm_normalise(hmm);
             //Log stuff
             for (int64_t from = 0; from < sM->stateNumber; from++) {
@@ -893,6 +892,7 @@ static void test_em(CuTest *testCase, StateMachineType stateMachineType) {
 
             st_logInfo("->->-> Got expected likelihood %f for trial %" PRIi64 " and  iteration %" PRIi64 "\n",
                     hmm->likelihood, test, iteration);
+
             assert(pLikelihood <= hmm->likelihood * 0.95);
             CuAssertTrue(testCase, pLikelihood <= hmm->likelihood * 0.95);
             pLikelihood = hmm->likelihood;
@@ -922,29 +922,28 @@ static void test_em_3State(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-//    SUITE_ADD_TEST(suite, test_diagonal);
-//    SUITE_ADD_TEST(suite, test_bands);
-//    SUITE_ADD_TEST(suite, test_logAdd);
+    SUITE_ADD_TEST(suite, test_diagonal);
+    SUITE_ADD_TEST(suite, test_bands);
+    SUITE_ADD_TEST(suite, test_logAdd);
     //SUITE_ADD_TEST(suite, test_symbol);
-//    SUITE_ADD_TEST(suite, test_cell);
-//    SUITE_ADD_TEST(suite, test_dpDiagonal);
-//    SUITE_ADD_TEST(suite, test_dpMatrix);
-//    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
-//    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
-//    SUITE_ADD_TEST(suite, test_getBlastPairs);
-//    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
-//    SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
-//    SUITE_ADD_TEST(suite, test_getSplitPoints);
-//    SUITE_ADD_TEST(suite, test_getAlignedPairs);
-//    SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
-//    SUITE_ADD_TEST(suite, test_hmm_5State);
-//    SUITE_ADD_TEST(suite, test_hmm_5StateAsymmetric);
+    SUITE_ADD_TEST(suite, test_cell);
+    SUITE_ADD_TEST(suite, test_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_dpMatrix);
+    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_getBlastPairs);
+    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
+    SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
+    SUITE_ADD_TEST(suite, test_getSplitPoints);
+    SUITE_ADD_TEST(suite, test_getAlignedPairs);
+    SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
+    SUITE_ADD_TEST(suite, test_hmm_5State);
+    SUITE_ADD_TEST(suite, test_hmm_5StateAsymmetric);
     //SUITE_ADD_TEST(suite, test_hmm_3State);
     //SUITE_ADD_TEST(suite, test_hmm_3StateAsymmetric);
     //SUITE_ADD_TEST(suite, test_em_3State);
     //SUITE_ADD_TEST(suite, test_em_3StateAsymmetric);
-//    SUITE_ADD_TEST(suite, test_em_5State);
-
+    SUITE_ADD_TEST(suite, test_em_5State);
 
     return suite;
 }

@@ -318,7 +318,7 @@ Hmm *hmm_loadFromFile(const char *fileName) {
 }
 
 Hmm *hmm_Kmer_loadFromFile(const char *fileName) {
-    printf("loading HMM from file\n");
+
     FILE *fH = fopen(fileName, "r");
     char *string = stFile_getLineFromFile(fH);
     stList *tokens = stString_split(string);
@@ -329,17 +329,16 @@ Hmm *hmm_Kmer_loadFromFile(const char *fileName) {
     int type;
     int64_t j = sscanf(stList_get(tokens, 0), "%i", &type);
     if (j != 1) {
-        printf("Failed to parse state number (int) from string: %s\n", string);
+        //printf("Failed to parse state number (int) from string: %s\n", string);
         st_errAbort("Failed to parse state number (int) from string: %s\n", string);
     }
-    Hmm *hmm = hmm_constructEmpty(0.0, type);
+    Hmm *hmm = hmm_Kmer_constructEmpty(0.0, type);
     if (stList_length(tokens) != hmm->stateNumber * hmm->stateNumber + 2) {
         printf("Got the wrong number of transitions in the input state machine file %s, got %" PRIi64 " instead of %" PRIi64 "\n",
                fileName, stList_length(tokens), hmm->stateNumber * hmm->stateNumber + 2);
         st_errAbort(
                 "Got the wrong number of transitions in the input state machine file %s, got %" PRIi64 " instead of %" PRIi64 "\n",
                 fileName, stList_length(tokens), hmm->stateNumber * hmm->stateNumber + 2);
-
     }
 
     for (int64_t i = 0; i < hmm->stateNumber * hmm->stateNumber; i++) {
@@ -372,7 +371,6 @@ Hmm *hmm_Kmer_loadFromFile(const char *fileName) {
     }
 
     for (int64_t i = 0; i < (hmm->stateNumber * MATRIX_SIZE); i++) {
-        printf("%lld adding %f to emissions\n", i, stList_get(tokens, i));
         j = sscanf(stList_get(tokens, i), "%lf", &(hmm->emissions[i]));
         if (j != 1) {
             printf("Failed to parse emission prob (float) from string: %s\n", string);
@@ -568,7 +566,6 @@ static inline double emission_kmer_getGapProb(const double *emissionGapProbs, in
 
 static inline double emission_kmer_getMatchProb(const double *emissionMatchProbs, int64_t x, int64_t y) {
     int64_t tableIndex = x * NUM_OF_KMERS + y;
-    //printf("emissionMatchProbs[%lld] = %f\n", tableIndex, emissionMatchProbs[tableIndex]);
     return emissionMatchProbs[tableIndex];
 }
 

@@ -43,7 +43,7 @@ static void test_Kmers_cell(CuTest *testCase) {
         currentB[i] = sM->endStateProb(sM, i);
     }
 
-    // These are the same sequences as in test_cell
+    // Make some test sequences, these are the same sequences as in test_cell
     const char *testXseq = "AGCG";
     const char *testYseq = "AGTTCG";
 
@@ -53,17 +53,12 @@ static void test_Kmers_cell(CuTest *testCase) {
     //const char *testXseq = "AATT";
     //const char *testYseq = "AATT";
 
+    // Initialize the sequence objects
     Sequence* xSeq = sequenceConstruct(4, testXseq, kmer);
     Sequence* ySeq = sequenceConstruct(6, testYseq, kmer);
-
-    //char* xkmer = xSeq->get(xSeq->elements, 0);
-    //char* ykmer = ySeq->get(ySeq->elements, 0);
-    //printf("%s is the kmer at position %d\n", xkmer, 0);
-    //printf("%s is the kmer at position %d\n", ykmer, 0);
-
+    // Use the get function to retrieve one element of the sequence
     char* cX = xSeq->get(xSeq->elements, 1);
     char* cY = ySeq->get(ySeq->elements, 1);
-
 
     //Do forward
     cell_calculateForward(sM, lowerF, NULL, NULL, middleF, cX, cY, NULL);
@@ -76,50 +71,40 @@ static void test_Kmers_cell(CuTest *testCase) {
     double totalProbForward = cell_dotProduct2(currentF, sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(middleB, sM, sM->startStateProb);
     st_logInfo("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
-    //printf("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.00001); //Check the forward and back probabilities are about equal
+
+    // clean up
+    sequenceDestroy(xSeq);
+    sequenceDestroy(ySeq);
 }
 
 static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
-    // Sets up a complete matrix for the following example and checks the total
-    // marginal probability and the posterior probabilities of the matches
-
-    // make some simple DNA sequences
     // These are the originals:
     const char *sX = "AGCG";
     const char *sY = "AGTTCG";
 
-    // These are not the originals
+    // These are alternative sequences for testing
     //const char *sX = getRandomSequence(5);
     //const char *sY = evolveSequence(sX);
 
     // set lX and lY to the lengths of those sequences
-    // NOTE The length of kmers is the length of bases-1
     int64_t slX = strlen(sX);
     int64_t slY = strlen(sY);
 
-
-    // construct a sequence struct from those sequences and assign the get function as get base
+    // construct a sequence struct from those sequences
     Sequence* sX2 = sequenceConstruct(slX, sX, kmer);
     Sequence* sY2 = sequenceConstruct(slY, sY, kmer);
     int64_t lX = sX2->length;
     int64_t lY = sY2->length;
 
-
-    // construct a 5-state state machine, the forward and reverse DP Matrices, the band, the band
+    // construct a 5-state Kmer state machine, the forward and reverse DP Matrices, the band, the band
     // iterators and the anchor pairs
     StateMachine *sM = stateMachine5_kmer_construct(fiveState);
-    //printf("just finished running stateMachine5 kmer construct, states: %lld\n", sM->stateNumber);
-
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
-    //printf("just finished running dpMatrix_construct, twice\n");
-
     stList *anchorPairs = stList_construct();
     Band *band = band_construct(anchorPairs, lX, lY, 2);
-    //printf("just finished running band_construct\n");
     BandIterator *bandIt = bandIterator_construct(band);
-    //printf("just finished running bandIterator_construct\n");
 
     //Initialise matrices
     for (int64_t i = 0; i <= lX + lY; i++) {
@@ -128,20 +113,15 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
         dpDiagonal_zeroValues(dpMatrix_createDiagonal(dpMatrixBackward, d));
         dpDiagonal_zeroValues(dpMatrix_createDiagonal(dpMatrixForward, d));
     }
-    //printf("just finished initializing matrices\n");
-
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixForward, 0), sM, sM->startStateProb);
     dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixBackward, lX + lY), sM, sM->endStateProb);
-    //printf("just finished initializing values\n");
 
     //Forward algorithm
-    //printf("\n-->At forward algorithm\n");
     for (int64_t i = 1; i <= lX + lY; i++) {
         //Do the forward calculation
         diagonalCalculationForward(sM, i, dpMatrixForward, sX2, sY2);
     }
     //Backward algorithm
-    //printf("\n-->At Backward algorithm\n");
     for (int64_t i = lX + lY; i > 0; i--) {
         //Do the backward calculation
         diagonalCalculationBackward(sM, i, dpMatrixBackward, sX2, sY2);
@@ -151,16 +131,12 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
     double totalProbForward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY), sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
     st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
-    //printf("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
-    //Check the forward and back probabilities are about equal
 
+    //Check the forward and back probabilities are about equal
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);
 
-    // Test calculating the posterior probabilities along the diagonals of the
-    // matrix.
-    //printf("\n-->Calculating posterior probabilities\n");
+    // Test the posterior probabilities along the diagonals of the matrix.
     for (int64_t i = 0; i <= lX + lY; i++) {
-        //Calculate the total probs
         double totalDiagonalProb = diagonalCalculationTotalProbability(sM, i,
                                                                        dpMatrixForward,
                                                                        dpMatrixBackward,
@@ -169,10 +145,10 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
         CuAssertDblEquals(testCase, totalProbForward, totalDiagonalProb, 0.01);
     }
 
-    //Now do the posterior probabilities
+    // Now do the posterior probabilities, get aligned pairs with posterior match probs above threshold
     stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
-    // aligned pairs has length 0 here, just constructed
     void *extraArgs[1] = { alignedPairs };
+    // Perform alignment
     for (int64_t i = 1; i <= lX + lY; i++) {
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
         p->threshold = 0.4; // used to be 0.2 needs to be doubled for kmers;
@@ -185,11 +161,12 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
     stSortedSet *alignedPairsSet = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
                                                           (void (*)(void *)) stIntTuple_destruct);
 
+    // these are correct for AGCG and AGTTCG
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(0, 0));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(1, 1));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 4));
 
-
+    // make sure alignedPairs is correct
     for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
         stIntTuple *pair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
@@ -197,11 +174,14 @@ static void test_Kmers_diagonalDPCalculations(CuTest *testCase) {
         //printf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
         CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
-
     CuAssertIntEquals(testCase, 3, (int) stList_length(alignedPairs));
 
+    // clean up
+    sequenceDestroy(sX2);
+    sequenceDestroy(sY2);
 }
 
+// repeat of getRandomAnchorPairs for Kmer aligner tests
 static stList *getRandomAnchorPairs_KmerTests(int64_t lX, int64_t lY) {
     stList *anchorPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
     int64_t x = -1;
@@ -219,13 +199,11 @@ static stList *getRandomAnchorPairs_KmerTests(int64_t lX, int64_t lY) {
     return anchorPairs;
 }
 
-
-
 static void checkAlignedPairs_kmers(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY) {
-    //st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
-    //printf("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
+    st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
     stSortedSet *pairs = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
-            (void (*)(void *)) stIntTuple_destruct);
+                                                (void (*)(void *)) stIntTuple_destruct
+                                                );
     for (int64_t i = 0; i < stList_length(blastPairs); i++) {
         stIntTuple *j = stList_get(blastPairs, i);
         CuAssertTrue(testCase, stIntTuple_length(j) == 3);
@@ -251,19 +229,17 @@ static void checkAlignedPairs_kmers(CuTest *testCase, stList *blastPairs, int64_
 
 static void test_Kmers_getAlignedPairsWithBanding(CuTest *testCase) {
     for (int64_t test = 0; test < 3; test++) {
-        //Make a pair of sequences
+        // Get two random sequences
         char *sX = getRandomSequence(st_randomInt(0, 100));
         char *sY = evolveSequence(sX); //stString_copy(seqX);
-
-
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
 
-        //st_logInfo("Sequence X to align: %s END\n", sX);
-        //st_logInfo("Sequence Y to align: %s END\n", sY);
+        st_logInfo("Sequence X to align: %s END\n", sX);
+        st_logInfo("Sequence Y to align: %s END\n", sY);
+        // Make sequence objects
         Sequence* sX2 = sequenceConstruct(lX, sX, kmer);
         Sequence* sY2 = sequenceConstruct(lY, sY, kmer);
-
 
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -272,15 +248,16 @@ static void test_Kmers_getAlignedPairsWithBanding(CuTest *testCase) {
         p->diagonalExpansion = st_randomInt(0, 10) * 2;
         StateMachine *sM = stateMachine5_kmer_construct(fiveState);
         stList *anchorPairs = getRandomAnchorPairs_KmerTests(lX, lY);
-
         stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
         void *extraArgs[1] = { alignedPairs };
-        getPosteriorProbsWithBanding(sM,
-                                     anchorPairs,
-                                     sX2, sY2,
-                                     p,
-                                     0, 0,
-                                     diagonalCalculationPosteriorMatchProbs, extraArgs);
+        getPosteriorProbsWithBanding(sM,                                     //state machine
+                                     anchorPairs,                            //(random) anchor pairs
+                                     sX2, sY2,                               //sequence objects
+                                     p,                                      //params
+                                     0, 0,                                   //ragged left and right end booleans
+                                     diagonalCalculationPosteriorMatchProbs, //posterior probability function
+                                     extraArgs);                             //bin for aligned pairs
+
         //Check the aligned pairs.
         checkAlignedPairs_kmers(testCase, alignedPairs, lX, lY);
 
@@ -288,16 +265,13 @@ static void test_Kmers_getAlignedPairsWithBanding(CuTest *testCase) {
         stateMachine_destruct(sM);
         free(sX);
         free(sY);
-        // TODO need sequence destruct function
-        //free(sX2->elements);
-        //free(sY2->elements);
+        sequenceDestroy(sX2);
+        sequenceDestroy(sY2);
         stList_destruct(alignedPairs);
     }
 }
 
-
 static void test_kmers_getAlignedPairs(CuTest *testCase) {
-
     for (int64_t test = 0; test < 100; test++) {
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(1, 100));
@@ -308,15 +282,12 @@ static void test_kmers_getAlignedPairs(CuTest *testCase) {
         Sequence* SsY = sequenceConstruct(lY, sY, kmer);
         //st_logInfo("Sequence X to align: %s END\n", sX);
         //st_logInfo("Sequence Y to align: %s END\n", sY);
-        //printf("Sequence X to align: %s END\n", sX);
-        //printf("Sequence Y to align: %s END\n", sY);
 
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
         p->threshold=0.02;
         StateMachine *sM = stateMachine5_kmer_construct(fiveState);
-
-        stList *alignedPairs = getAlignedPairs(sM, SsX, SsY, kmer, p, 0, 0);
+        stList *alignedPairs = getAlignedPairs(sM, SsX, SsY, kmer, p, 0, 0); // this is where the magic happens
 
         //Check the aligned pairs.
         checkAlignedPairs_kmers(testCase, alignedPairs, SsX->length, SsY->length);
@@ -325,18 +296,19 @@ static void test_kmers_getAlignedPairs(CuTest *testCase) {
         stateMachine_destruct(sM);
         free(sX);
         free(sY);
+        sequenceDestroy(SsX);
+        sequenceDestroy(SsY);
         stList_destruct(alignedPairs);
     }
 }
 
-
 static void test_kmers_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
     for (int64_t test = 0; test < 1000; test++) {
-        //Make a pair of sequences
+        //Make a core sequence and then add a random portion to either end of it
         int64_t coreLength = 100, randomPortionLength = 100;
         char *sX = getRandomSequence(coreLength);
         char *sY = stString_print("%s%s%s", getRandomSequence(randomPortionLength), sX,
-                getRandomSequence(randomPortionLength)); //x with an extra bit at the end.
+                                  getRandomSequence(randomPortionLength)); //x with an extra bit at the end.
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
         Sequence* SsX = sequenceConstruct(lX, sX, kmer);
@@ -344,19 +316,14 @@ static void test_kmers_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
 
         st_logInfo("Sequence X to align: %s END\n", sX);
         st_logInfo("Sequence Y to align: %s END\n", sY);
-        //printf("Sequence X to align: %s END\n", SsX->repr);
-        //printf("Sequence Y to align: %s END\n", SsY->repr);
 
-        //Now do alignment
+        // Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
         StateMachine *sM = stateMachine5_kmer_construct(fiveState);
         stList *alignedPairs = getAlignedPairs(sM, SsX, SsY, kmer, p, 1, 1);
-
-        //printf("Before filtering alignedPairs Length: %lld\n", (int64_t) stList_length(alignedPairs));
         alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, SsX->repr, SsY->repr, 0.2);
-        //printf("After filtering alignedPairs Length: %lld\n", (int64_t) stList_length(alignedPairs));
 
-        //Check the aligned pairs.
+        // Check the aligned pairs.
         checkAlignedPairs_kmers(testCase, alignedPairs, strlen(SsX->repr), strlen(SsY->repr));
         CuAssertIntEquals(testCase, stList_length(alignedPairs), coreLength-1);
         for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
@@ -372,6 +339,8 @@ static void test_kmers_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         stateMachine_destruct(sM);
         free(sX);
         free(sY);
+        sequenceDestroy(SsX);
+        sequenceDestroy(SsY);
         stList_destruct(alignedPairs);
     }
 }
@@ -392,25 +361,21 @@ static void test_Kmer_hmm(CuTest *testCase, StateMachineType stateMachineType) {
             for (int64_t y = 0; y < NUM_OF_KMERS; y++) {
                 double dummy = state * SYMBOL_NUMBER * SYMBOL_NUMBER + x * SYMBOL_NUMBER + y;
                 hmm_Kmer_addToEmissionsExpectation(hmm, state, x, y, dummy);
-                //printf("state %lld added %f to x:%lld y:%lld\n", state, dummy, x, y);
             }
         }
     }
 
-    /* TODO the reading from file does not work
     //Write to a file
     char *tempFile = stString_print("./temp%" PRIi64 ".hmm", st_randomInt(0, INT64_MAX));
-    printf("file written to %s\n", tempFile);
     CuAssertTrue(testCase, !stFile_exists(tempFile)); //Quick check that we don't write over anything.
     FILE *fH = fopen(tempFile, "w");
-    printf("file opened\n");
     hmm_Kmer_write(hmm, fH);
     fclose(fH);
     hmm_destruct(hmm);
+
     //Load from a file
     hmm = hmm_Kmer_loadFromFile(tempFile);
     stFile_rmrf(tempFile);
-    */
 
     //Check the transition expectations
     for (int64_t from = 0; from < hmm->stateNumber; from++) {
@@ -425,11 +390,9 @@ static void test_Kmer_hmm(CuTest *testCase, StateMachineType stateMachineType) {
             for (int64_t y = 0; y < NUM_OF_KMERS; y++) {
                 double expected = state * SYMBOL_NUMBER * SYMBOL_NUMBER + x * SYMBOL_NUMBER + y;
                 double actual = hmm_Kmer_getEmissionsExpectation(hmm, state, x, y);
-                //printf("testing x:%lld, y:%lld, ems = %f", x, y, actual);
                 CuAssertDblEquals(testCase, expected, actual, 0.001);
                 //CuAssertTrue(testCase,
                 //             hmm_Kmer_getEmissionsExpectation(hmm, state, x, y) == state * SYMBOL_NUMBER * SYMBOL_NUMBER + x * SYMBOL_NUMBER + y);
-                //printf("-> passed\n");
             }
         }
     }
@@ -455,27 +418,24 @@ static void test_Kmer_hmm(CuTest *testCase, StateMachineType stateMachineType) {
             }
         }
     }
-
     //Clean up
     hmm_destruct(hmm);
 }
 
 static void test_Kmer_em(CuTest *testCase, StateMachineType stateMachineType) {
-    for (int64_t test = 0; test < 100; test++) {
+    for (int64_t test = 0; test < 10; test++) {
         //Make a pair of sequences
-        char *sX = getRandomSequence(st_randomInt(10, 150));
+        char *sX = getRandomSequence(st_randomInt(10, 200));
         char *sY = evolveSequence(sX); //stString_copy(seqX);
-        
+
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
 
         Sequence* SsX = sequenceConstruct(lX, sX, kmer);
         Sequence* SsY = sequenceConstruct(lY, sY, kmer);
 
-        //Now do alignment
-        PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-
         //Currently starts from random model and iterates.
+        PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
         double pLikelihood = -INFINITY;
         Hmm *hmm = hmm_Kmer_constructEmpty(0.0, stateMachineType);
         hmm_Kmer_randomise(hmm);
@@ -484,7 +444,7 @@ static void test_Kmer_em(CuTest *testCase, StateMachineType stateMachineType) {
 
         for (int64_t iteration = 0; iteration < 10; iteration++) {
             hmm = hmm_Kmer_constructEmpty(0.000000000001, stateMachineType); //The tiny pseudo count prevents overflow 0.000000000001
-            getExpectations(sM, hmm, SsX, SsY, kmer, p, 0, 0);
+            getExpectations(sM, hmm, SsX, SsY, p, 0, 0);
             hmm_Kmer_normalise(hmm);
             //Log stuff
             // Transitions
@@ -504,10 +464,10 @@ static void test_Kmer_em(CuTest *testCase, StateMachineType stateMachineType) {
 
             st_logInfo("->->-> Got expected likelihood %f for trial %" PRIi64 " and  iteration %" PRIi64 "\n",
                        hmm->likelihood, test, iteration);
-            printf("->->-> Got expected likelihood %f for trial %" PRIi64 " and  iteration %" PRIi64 "\n",
-                       hmm->likelihood, test, iteration);
-            assert(pLikelihood <= hmm->likelihood * 0.85); //0.95);
-            CuAssertTrue(testCase, pLikelihood <= hmm->likelihood * 0.85);//* 0.95);
+            //printf("->->-> Got expected likelihood %f for trial %" PRIi64 " and  iteration %" PRIi64 "\n",
+            //           hmm->likelihood, test, iteration);
+            assert(pLikelihood <= hmm->likelihood * 0.85); //Used to be 0.95 for nucleotide model
+            CuAssertTrue(testCase, pLikelihood <= hmm->likelihood * 0.85); // same here
             pLikelihood = hmm->likelihood;
             stateMachine_destruct(sM);
             sM = hmm_getStateMachine(hmm);
@@ -516,7 +476,8 @@ static void test_Kmer_em(CuTest *testCase, StateMachineType stateMachineType) {
 
         //Cleanup
         pairwiseAlignmentBandingParameters_destruct(p);
-        // TODO destruct sequence objects
+        sequenceDestroy(SsX);
+        sequenceDestroy(SsY);
         free(sX);
         free(sY);
     }
@@ -532,6 +493,7 @@ static void test_Kmer_em_5State(CuTest *testCase) {
 
 CuSuite* kmerTestSuite() {
     CuSuite* suite = CuSuiteNew();
+
     SUITE_ADD_TEST(suite, test_Kmers_cell);
     SUITE_ADD_TEST(suite, test_Kmers_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_Kmers_getAlignedPairsWithBanding);
@@ -539,5 +501,6 @@ CuSuite* kmerTestSuite() {
     SUITE_ADD_TEST(suite, test_kmers_getAlignedPairsWithRaggedEnds);
     SUITE_ADD_TEST(suite, test_Kmer_hmm_5State);
     SUITE_ADD_TEST(suite, test_Kmer_em_5State);
+
     return suite;
 }

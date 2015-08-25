@@ -9,22 +9,22 @@
 #include <stdio.h>
 #include <assert.h>
 
-
-
-// Generalized sequence struct
-typedef struct sequence {
-    int64_t length;
-    void *elements;
-    char* repr;
-    void* (*get)(void *elements, int64_t index);
-} Sequence;
-
 // Types of sequences
 typedef enum {
     nucleotide=0,
     kmer=1,
     event=2
 } sequenceType;
+
+// Generalized sequence struct
+typedef struct sequence {
+    int64_t length;
+    void *elements;
+    char* repr;
+    sequenceType type;
+    void* (*get)(void *elements, int64_t index);
+} Sequence;
+
 
 int64_t correctSeqLength(int64_t stringLength, sequenceType type);
 

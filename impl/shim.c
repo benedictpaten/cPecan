@@ -8,17 +8,20 @@
 #include <assert.h>
 
 
-// Sequence constructor function
-// stringLength should be the length of the sequence in bases ie ATGAC has
-// length 5.  *elements is a pointer to the char array, typically.  The
-// sequenceType is 0-nucleotide, 1-kmer, 2-event
-Sequence* sequenceConstruct(int64_t stringLength, void *elements, sequenceType type) {
+/*
+ * Sequence constructor function
+ * stringLength should be the length of the sequence in bases ie ATGAC has
+ * length 5.  *elements is a pointer to the char array, typically.  The
+ * sequenceType is 0-nucleotide, 1-kmer, 2-event
+ */
+Sequence* sequenceConstruct(int64_t stringLength, void *elements, sequenceType t) {
     Sequence* self = malloc(sizeof(Sequence));
     // correct the sequence length for kmers/events
-    self->length = correctSeqLength(stringLength, type);
+    self->length = correctSeqLength(stringLength, t);
+    self->type = t;
     self->elements = elements;
     self->repr = (char*) elements;
-    switch (type) {
+    switch (t) {
         case 0:
             self->get = getBase;
             break;
@@ -32,6 +35,9 @@ Sequence* sequenceConstruct(int64_t stringLength, void *elements, sequenceType t
     return self;
 }
 
+/*
+ * Function to retrieve a sub sequence of a sequence object.
+ */
 Sequence* sequence_getSubSequence(Sequence* wholeSequence, int64_t start, int64_t length, sequenceType t) {
     char* wS_string = wholeSequence->repr;
     char* subString = stString_getSubString(wS_string, start, length);
@@ -39,23 +45,40 @@ Sequence* sequence_getSubSequence(Sequence* wholeSequence, int64_t start, int64_
     return subSequence;
 }
 
-// sequence destroying function
 void sequenceDestroy(Sequence* seq) {
-    assert(seq != NULL);
+    //assert(seq != NULL);
     free(seq);
 }
 
-// Get functions: retrieve a single element (base, kmer, or event) from an
-// array of elements.
-
-// returns a pointer to base in a char array
+/*
+ * Returns a single base from a sequence object
+ */
 void* getBase(void *elements, int64_t index) {
     char* n;
     n = "n";
     return index >= 0 ? &(((char *)elements)[index]) : n;
 }
 
-// exchanges a char (nucleotide) for a base index
+/*
+ * Returns a kmer from a sequence object
+ */
+void* getKmer(void *elements, int64_t index) {
+    char* n;
+    n = "NN"; // hardwired null kmer
+    int64_t i = index;
+    // change kmer length here, hardwired so far...
+    int kmerLength = KMER_LENGTH;
+    char *k_i = malloc((kmerLength+1) * sizeof(char)); // TODO remove this malloc
+    for (int x = 0; x < kmerLength; x++) {
+        k_i[x] = *((char *)elements+(i+x));
+    }
+    return index >= 0 ? k_i : n;
+
+}
+
+/*
+ * Returns the index for a base, for use with matrices and getKmerIndex
+ */
 int64_t getBaseIndex(char base) {
     //char b;
     //b = *base;
@@ -73,7 +96,9 @@ int64_t getBaseIndex(char base) {
     }
 }
 
-// gets a index for a given kmer.
+/*
+ * Returns the index of a kmer
+ */
 int64_t getKmerIndex(char* kmer) {
     //int64_t kmerLength = strlen(kmer);
     //printf("kmer length: %lld\n", kmerLength);
@@ -90,17 +115,18 @@ int64_t getKmerIndex(char* kmer) {
         i += 1;
         l = l/5;
     }
-
     int64_t last = strlen(kmer)-1;
     //printf("last:%lld\n", last);
     x += getBaseIndex(kmer[last]);
 
-
     return x;
 }
 
+/*
+ * Correct the sequence length for non-nucleotide sequences, eg. kmers/events.
+ */
 int64_t correctSeqLength(int64_t stringLength, sequenceType type) {
-
+    // for trivial case
     if (stringLength == 0) {
         return 0;
     }
@@ -115,44 +141,13 @@ int64_t correctSeqLength(int64_t stringLength, sequenceType type) {
     }
 }
 
-int64_t getKmerSeqLength(int64_t stringLength) {
-    //int64_t l = stringLength;
-    if (stringLength == 0) {
-        return 0;
-    }
-    if (stringLength > 0) {
-        return stringLength - 1;
-    }
-}
-
-
-// returns a pointer to a kmer within a char array
-void* getKmer(void *elements, int64_t index) {
-
-    char* n;
-    n = "NN"; // hardwired null kmer
-    int64_t i = index;
-    // change kmer length here, hardwired so far...
-    int kmerLength = KMER_LENGTH;
-    char *k_i = malloc((kmerLength+1) * sizeof(char)); // TODO remove this malloc
-    for (int x = 0; x < kmerLength; x++) {
-        k_i[x] = *((char *)elements+(i+x));
-    }
-
-    return index >= 0 ? k_i : n;
-
-}
-
-// TODO make a function that compares kmers
-
-// getEvent function, returns a pointer to a event in a sequence
+/*
+ * Returns an event from an eventSequence
+ */
 void* getEvent(void* elements, int64_t index) {
     return (Event *) elements + index;
 }
 
-
-// Event-specific functions:
-// event constructor function.
 Event* event_construct(double mean, char kmer[6]) {
     Event *event = malloc(sizeof(Event));
     event->mean = mean;

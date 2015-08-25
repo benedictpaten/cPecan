@@ -13,6 +13,9 @@
 #include "pairwiseAligner.h"
 #include "multipleAligner.h"
 #include "commonC.h"
+#include "inc/shim.h"
+#include "inc/pairwiseAligner.h"
+#include "inc/multipleAligner.h"
 
 void usage() {
     fprintf(stderr, "cPecanRelign [options] seq1[fasta] seq2[fasta], version 0.2\n");
@@ -552,12 +555,12 @@ int main(int argc, char *argv[]) {
         stList *filteredAnchoredPairs = stList_filter2(anchorPairs, matchFn, seqs);
         if(expectationsFile != NULL) {
             st_logInfo("Computing expectations\n");
-            getExpectationsUsingAnchors(sM, hmmExpectations, subSeqX, subSeqY, nucleotide, filteredAnchoredPairs,
+            getExpectationsUsingAnchors(sM, hmmExpectations, subSeqX, subSeqY, filteredAnchoredPairs,
                                 pairwiseAlignmentBandingParameters, 1, 1);
         }
         else {
             //Get posterior prob pairs
-            stList *alignedPairs = getAlignedPairsUsingAnchors(sM, subSeqX, subSeqY, nucleotide, filteredAnchoredPairs,
+            stList *alignedPairs = getAlignedPairsUsingAnchors(sM, subSeqX, subSeqY, filteredAnchoredPairs,
                     pairwiseAlignmentBandingParameters, 1, 1);
             //Output all the posterior match probs, if needed
             if(allPosteriorProbsFile != NULL) {

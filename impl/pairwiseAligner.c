@@ -269,6 +269,7 @@ double logAdd(double x, double y) {
 ///////////////////////////////////
 ///////////////////////////////////
 
+/*
 Symbol symbol_convertCharToSymbol(char i) {
     switch (i) {
     case 'A':
@@ -308,6 +309,7 @@ SymbolString symbolString_construct(const char *sequence, int64_t length) {
 void symbolString_destruct(SymbolString s) {
     free(s.sequence);
 }
+*/
 
 ///////////////////////////////////
 ///////////////////////////////////
@@ -321,33 +323,23 @@ void symbolString_destruct(SymbolString s) {
 
 static inline void doTransitionForward(double *fromCells, double *toCells, int64_t from, int64_t to,
                                        double eP, double tP, void *extraArgs) {
-    //printf("Running doTransitionForward!\n");
-    //printf("toCells[to] at start %f\n", toCells[to]);
-    //printf("from: %lld, to: %lld, eP: %f, tP: %f\n", from, to, eP, tP);
     toCells[to] = logAdd(toCells[to], fromCells[from] + (eP + tP));
-    //printf("toCells[to] at end %f\n", toCells[to]);
 }
 
 void cell_calculateForward(StateMachine *sM,
                            double *current, double *lower, double *middle, double *upper,
                            void* cX, void* cY, void *extraArgs) {
-    //printf("Running cell_calculateForward, looking at kmers cX: %s cY: %s\n", (char*) cX, (char*) cY);
-    //printf("current: %f, lower: %f, middle: %f, upper: %f\n", *current, *lower, *middle, *upper);
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, doTransitionForward, extraArgs);
 }
 
 static inline void doTransitionBackward(double *fromCells, double *toCells, int64_t from, int64_t to,
                                         double eP, double tP, void *extraArgs) {
-    //printf("Running doTransitionBackward with: ");
-    //printf("from: %lld, to: %lld, eP: %f, tP: %f\n", from, to, eP, tP);
     fromCells[from] = logAdd(fromCells[from], toCells[to] + (eP + tP));
 }
 
 void cell_calculateBackward(StateMachine *sM,
                             double *current, double *lower, double *middle, double *upper,
                             void* cX, void* cY, void *extraArgs) {
-    //printf("Running cell_calculateBackward, looking at bases cX: %c cY: %c\n", cX, cY);
-    //printf("current: %f, lower: %f, middle: %f, upper: %f\n", *current, *lower, *middle, *upper);
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, doTransitionBackward, extraArgs);
 }
 
@@ -374,13 +366,13 @@ static inline void updateExpectations(double *fromCells, double *toCells,
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
     Hmm *hmmExpectations = ((void **) extraArgs)[1];
-    Symbol x = *((Symbol *)((void **) extraArgs)[2]);
-    Symbol y = *((Symbol *)((void **) extraArgs)[3]);
+    int64_t x = *((int64_t *)((void **) extraArgs)[2]);
+    int64_t y = *((int64_t *)((void **) extraArgs)[3]);
     //Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
     //Add in the expectation of the transition
     hmm_addToTransitionExpectation(hmmExpectations, from, to, p);
-    if(x < SYMBOL_NUMBER_NO_N && y < SYMBOL_NUMBER_NO_N) { //Ignore gaps involving Ns.
+    if(x < SYMBOL_NUMBER_NO_N && y < SYMBOL_NUMBER_NO_N) { // Not sure if this is working correctly...
         hmm_addToEmissionsExpectation(hmmExpectations, to, x, y, p);
     }
 }
@@ -389,19 +381,18 @@ static inline void Kmer_updateExpectations(double *fromCells, double *toCells,
                                            int64_t from, int64_t to,
                                            double eP, double tP,
                                            void *extraArgs) {
-
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
-    //printf("Kmer_updateExpectations: total probability:%f\n", totalProbability);
     Hmm *hmmExpectations = ((void **) extraArgs)[1];
     int64_t x = *((int64_t *)((void **) extraArgs)[2]);
     int64_t y = *((int64_t *)((void **) extraArgs)[3]);
-    //printf("Kmer_updateExpectations: x:%lld, y:%lld\n", x, y);
+
     //Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
+
     //Add in the expectation of the transition
     hmm_addToTransitionExpectation(hmmExpectations, from, to, p);
-    if(x < NUM_OF_KMERS && y < NUM_OF_KMERS) { //Ignore gaps involving Ns. TODO implement this for kmers
+    if(x < NUM_OF_KMERS && y < NUM_OF_KMERS) {
         hmm_Kmer_addToEmissionsExpectation(hmmExpectations, to, x, y, p);
     }
 }
@@ -416,10 +407,9 @@ static void cell_calculateExpectation(StateMachine *sM,
 }
 
 static void Kmer_cell_calculateExpectation(StateMachine *sM,
-                                      double *current, double *lower, double *middle, double *upper,
-                                      char* cX, char* cY,
-                                      void *extraArgs) {
-
+                                           double *current, double *lower, double *middle, double *upper,
+                                           char* cX, char* cY,
+                                           void *extraArgs) {
     void *extraArgs2[4] = { ((void **)extraArgs)[0], ((void **)extraArgs)[1], &cX, &cY };
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, Kmer_updateExpectations, extraArgs2);
 }
@@ -526,7 +516,6 @@ struct _dpMatrix {
 };
 
 DpMatrix *dpMatrix_construct(int64_t diagonalNumber, int64_t stateNumber) {
-    //printf("running dpMatrix_construct\n");
     assert(diagonalNumber >= 0);
     DpMatrix *dpMatrix = st_malloc(sizeof(DpMatrix));
     dpMatrix->diagonalNumber = diagonalNumber;
@@ -583,6 +572,7 @@ void dpMatrix_deleteDiagonal(DpMatrix *dpMatrix, int64_t xay) {
 ///////////////////////////////////
 ///////////////////////////////////
 
+/*
 static Symbol getXCharacter(const SymbolString sX, int64_t xay, int64_t xmy) {
     int64_t x = diagonal_getXCoordinate(xay, xmy);
     assert(x >= 0 && x <= sX.length);
@@ -594,8 +584,11 @@ static Symbol getYCharacter(const SymbolString sY, int64_t xay, int64_t xmy) {
     assert(y >= 0 && y <= sY.length);
     return y > 0 ? sY.sequence[y - 1] : n;
 }
-// Index functions for interacting with diagonals when using sequence structures
-// TODO need unit tests for these functions
+*/
+
+/*
+ * Functions for indexing through Sequence objects
+ */
 int64_t getXindex(Sequence* sX, int64_t xay, int64_t xmy) {
     int64_t x = diagonal_getXCoordinate(xay, xmy);
     assert(x >= 0 && x <= sX->length);
@@ -614,29 +607,20 @@ static void diagonalCalculation(StateMachine *sM,
                                 void (*cellCalculation)(StateMachine *, double *, double *, double *, double *,
                                                         void *, void *, void *),
                                 void *extraArgs) {
-    // what does dbDiagonalM1 and M2 mean?
-    //printf("Running diagonalCalculation!\n");
     Diagonal diagonal = dpDiagonal->diagonal;
     int64_t xmy = diagonal_getMinXmy(diagonal); // get the smallest x - y coordinate
     int64_t maxXmY = diagonal_getMaxXmy(diagonal);
-    //printf("starting xmy=%lld, MaxXmY=%lld\n", xmy, maxXmY);
+
     // work from smallest to largest
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
-
         int64_t indexX = getXindex(sX, diagonal_getXay(diagonal), xmy) - 1;
         int64_t indexY = getYindex(sY, diagonal_getXay(diagonal), xmy) - 1;
-
-        //printf("Got indexX=%lld, indexY=%lld \n", indexX, indexY);
-
         char* x = sX->get(sX->elements, indexX);
         char* y = sY->get(sY->elements, indexY);
-        //printf("for xmy=%lld, x=%s, y=%s\n", xmy, (char*) x, (char*) y);
-
         double *current = dpDiagonal_getCell(dpDiagonal, xmy);
         double *lower = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy - 1);
         double *middle = dpDiagonalM2 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM2, xmy);
         double *upper = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy + 1);
-        //printf("Just about to perform cellCalculation\n");
         cellCalculation(sM, current, lower, middle, upper, x, y, extraArgs);
         xmy += 2;
     }
@@ -683,12 +667,11 @@ double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatr
     }
     return totalProbability;
 }
-// How are sX and sY being used by this function?
+
 void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
                                             DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
                                             double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs) {
-    //printf("\nRunning diagonalCalculationPosteriorMatchProbs!\n");
-    //printf("going in, totalProbability=%f\n", totalProbability);
+    //fprintf(stderr, "going in, totalProbability=%f\n", totalProbability);
     assert(p->threshold >= 0.0);
     assert(p->threshold <= 1.0);
     stList *alignedPairs = ((void **) extraArgs)[0];
@@ -697,43 +680,34 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
     Diagonal diagonal = forwardDiagonal->diagonal;
     int64_t xmy = diagonal_getMinXmy(diagonal);
 
-    //printf("before loop alignedPairs has length: %lld\n", stList_length(alignedPairs));
-
     //Walk over the cells computing the posteriors
-    //printf("xmy will increase until < %lld\n", diagonal_getMaxXmy(diagonal));
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
-        //printf("At start xmy: %lld \n", xmy);
         int64_t x = diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy);
         int64_t y = diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy);
-        //printf("walking here x=%lld, y=%lld\n", x, y);
         if (x > 0 && y > 0) {
             double *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
-            //printf("cellForward->MatchState: %f \n", cellForward[sM->matchState]);
+            //fprintf(stderr, "cellForward->MatchState: %f \n", cellForward[sM->matchState]);
             double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
-            //printf("cellBackward->MatchState: %f \n", cellBackward[sM->matchState]);
+            //fprintf(stderr, "cellBackward->MatchState: %f \n", cellBackward[sM->matchState]);
 
             double posteriorProbability = exp(
                     (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
-            //printf("posteriorProb: %f\n", posteriorProbability);
+            //fprintf(stderr, "posteriorProb: %f\n", posteriorProbability);
             if (posteriorProbability >= p->threshold) {
                 if (posteriorProbability > 1.0) {
                     posteriorProbability = 1.0;
                 }
                 posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
-                //printf("Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%s)\n",
-                //       (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
+                //fprintf(stderr, "Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%s)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
             }
             if (posteriorProbability <= p->threshold) {
-                //printf("NOT Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%s)\n",
-                //       (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
+                //fprintf(stderr, "NOT Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%s)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
             }
         }
         xmy += 2;
-        //printf("at end xmy=%lld\n", xmy);
-        //printf("After loop for xmy: %lld, alignedPairs has length %lld\n", xmy, stList_length(alignedPairs));
     }
-    //printf("final length for alignedPairs: %lld\n", stList_length(alignedPairs));
+    //fprintf(stderr, "final length for alignedPairs: %lld\n", stList_length(alignedPairs));
 }
 
 static void diagonalCalculationExpectations(
@@ -749,42 +723,27 @@ static void diagonalCalculationExpectations(
     // We do this once per diagonal, which is a hack, rather than for the
     // whole matrix. The correction factor is approximately 1/number of
     // diagonals.
-    diagonalCalculation(sM,
-                        dpMatrix_getDiagonal(backwardDpMatrix, xay),
-                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
-                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
-                        sX, sY, cell_calculateExpectation, extraArgs2);
-}
-
-static void Kmer_diagonalCalculationExpectations(
-        StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
-        DpMatrix *backwardDpMatrix, const Sequence* sX, const Sequence* sY,
-        double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs) {
-    /*
-     * Updates the expectations of the transitions/emissions for the given diagonal.
-     */
-    //printf("diagonalCalculationExpectations: totalProb at start:%f\n", totalProbability);
-    Hmm *hmmExpectations = extraArgs;
-    //printf("diagonalCalculationExpectations: hmmExpectations-likelihood at start:%f\n", hmmExpectations->likelihood);// nan here!
-    void *extraArgs2[2] = { &totalProbability, hmmExpectations };
-    hmmExpectations->likelihood += totalProbability;
-
-    // We do this once per diagonal, which is a hack, rather than for the
-    // whole matrix. The correction factor is approximately 1/number of
-    // diagonals.
-    diagonalCalculation(sM,
-                        dpMatrix_getDiagonal(backwardDpMatrix, xay),
-                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
-                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
-                        sX, sY, Kmer_cell_calculateExpectation,
-                        extraArgs2);
+    int64_t alignmentType = sX->type + sY->type;
+    if (alignmentType == 0) { //for nucleotide/nucleotide alignments
+        diagonalCalculation(sM,
+                            dpMatrix_getDiagonal(backwardDpMatrix, xay),
+                            dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
+                            dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
+                            sX, sY, cell_calculateExpectation, extraArgs2);
+    }
+    if (alignmentType > 0) { //For kmer/kmer and eventually event/kmer alignments
+        diagonalCalculation(sM,
+                            dpMatrix_getDiagonal(backwardDpMatrix, xay),
+                            dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
+                            dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
+                            sX, sY, Kmer_cell_calculateExpectation,
+                            extraArgs2);
+    }
 }
 
 ///////////////////////////////////
 ///////////////////////////////////
 //Banded alignment routine to calculate posterior match probs
-//
-//
 ///////////////////////////////////
 ///////////////////////////////////
 
@@ -792,11 +751,10 @@ void getPosteriorProbsWithBanding(
         StateMachine *sM, stList *anchorPairs, const Sequence* sX, const Sequence* sY,
         PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
         void (*diagonalPosteriorProbFn)(
-            StateMachine *, int64_t, DpMatrix *, DpMatrix *, const Sequence*, const Sequence*, double,
-            PairwiseAlignmentParameters *, void *
-            ),
-        void *extraArgs
-        ) {
+              StateMachine *, int64_t, DpMatrix *, DpMatrix *, const Sequence*, const Sequence*,
+              double, PairwiseAlignmentParameters *, void *
+             ),
+        void *extraArgs) {
     //Prerequisites
     assert(p->traceBackDiagonals >= 1);
     assert(p->diagonalExpansion >= 0);
@@ -810,7 +768,6 @@ void getPosteriorProbsWithBanding(
     }
 
     //Primitives for the forward matrix recursion
-
     Band *band = band_construct(anchorPairs, sX->length, sY->length, p->diagonalExpansion);
     BandIterator *forwardBandIterator = bandIterator_construct(band);
     DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
@@ -880,10 +837,10 @@ void getPosteriorProbsWithBanding(
                         totalProbability = newTotalProbability;
                     }
 
-                    diagonalPosteriorProbFn(
-                            sM, diagonal_getXay(diagonal2), forwardDpMatrix, backwardDpMatrix, sX, sY,
-                            totalProbability, p, extraArgs
-                            );
+                    diagonalPosteriorProbFn(sM, diagonal_getXay(diagonal2),
+                                            forwardDpMatrix, backwardDpMatrix,
+                                            sX, sY,
+                                            totalProbability, p, extraArgs);
 
                     if (diagonal_getXay(diagonal2) < tracedBackFrom || atEnd) {
                         dpMatrix_deleteDiagonal(forwardDpMatrix, diagonal_getXay(diagonal2)); //Delete forward diagonal after last access in posterior calculation
@@ -905,7 +862,6 @@ void getPosteriorProbsWithBanding(
                 assert(dpMatrix_getActiveDiagonalNumber(forwardDpMatrix) == p->traceBackDiagonals + 2);
             }
         }
-
         if (atEnd) {
             break;
         }
@@ -1259,7 +1215,8 @@ static void convertAlignedPairs(stList *alignedPairs2, int64_t offsetX, int64_t 
 
 void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         StateMachine *sM, stList *anchorPairs, Sequence *SsX, Sequence *SsY,
-        sequenceType t, PairwiseAlignmentParameters *p,
+        //sequenceType t, // todo remove this
+        PairwiseAlignmentParameters *p,
         bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
         void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *,
                                         DpMatrix *, const Sequence*,
@@ -1283,13 +1240,8 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         int64_t x2 = stIntTuple_get(subRegion, 2);
         int64_t y2 = stIntTuple_get(subRegion, 3);
 
-        //Sub sequences
-        //char *sX2 = stString_getSubString(sX, x1, x2 - x1);
-        //char *sY2 = stString_getSubString(sY, y1, y2 - y1);
-        //Sequence* sX3 = sequenceConstruct(x2 - x1, sX2, t);
-        //Sequence* sY3 = sequenceConstruct(y2 - y1, sY2, t);
-        Sequence* sX3 = sequence_getSubSequence(SsX, x1, x2 - x1, t);
-        Sequence* sY3 = sequence_getSubSequence(SsY, y1, y2 - y1, t);
+        Sequence* sX3 = sequence_getSubSequence(SsX, x1, x2 - x1, SsX->type);
+        Sequence* sY3 = sequence_getSubSequence(SsY, y1, y2 - y1, SsY->type);
 
         //List of anchor pairs
         stList *subListOfAnchorPoints = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
@@ -1320,8 +1272,8 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         stList_destruct(subListOfAnchorPoints);
         //free(sX2); TODO finish destructors
         //free(sY2);
-//        symbolString_destruct(sX3);
-//        symbolString_destruct(sY3);
+        sequenceDestroy(sX3);
+        sequenceDestroy(sY3);
     }
     assert(j == stList_length(anchorPairs));
     stList_destruct(splitPoints);
@@ -1363,7 +1315,6 @@ static void alignedPairCoordinateCorrectionFn(int64_t offsetX, int64_t offsetY, 
 
 stList *getAlignedPairsUsingAnchors(StateMachine *sM,
                                     Sequence *SsX, Sequence *SsY,
-                                    sequenceType t,
                                     stList *anchorPairs,
                                     PairwiseAlignmentParameters *p,
                                     bool alignmentHasRaggedLeftEnd,
@@ -1375,7 +1326,8 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM,
     void *extraArgs[2] = { subListOfAlignedPairs, alignedPairs };
 
     getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
-                                        sM, anchorPairs, SsX, SsY, t, p,
+                                        sM, anchorPairs, SsX, SsY,
+                                        p,
                                         alignmentHasRaggedLeftEnd,
                                         alignmentHasRaggedRightEnd,
                                         diagonalCalculationPosteriorMatchProbs,
@@ -1395,7 +1347,7 @@ stList *getAlignedPairs(StateMachine *sM, Sequence *SsX, Sequence *SsY, sequence
 
     stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(SsX, SsY, p);
 
-    stList *alignedPairs = getAlignedPairsUsingAnchors(sM, SsX, SsY, t,
+    stList *alignedPairs = getAlignedPairsUsingAnchors(sM, SsX, SsY,// t,
                                                        anchorPairs, p, alignmentHasRaggedLeftEnd,
                                                        alignmentHasRaggedRightEnd);
     stList_destruct(anchorPairs);
@@ -1403,35 +1355,41 @@ stList *getAlignedPairs(StateMachine *sM, Sequence *SsX, Sequence *SsY, sequence
 }
 
 void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
-                                 Sequence *SsX, Sequence *SsY, sequenceType t,
+                                 Sequence *SsX, Sequence *SsY,
                                  stList *anchorPairs,
                                  PairwiseAlignmentParameters *p,
                                  bool alignmentHasRaggedLeftEnd,
                                  bool alignmentHasRaggedRightEnd) {
-    if (t == nucleotide) {
+    //int64_t alignmentType = SsX->type + SsY->type;
+    getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
+            sM, anchorPairs, SsX, SsY,// t,
+            p,
+            alignmentHasRaggedLeftEnd, alignmentHasRaggedRightEnd,
+            diagonalCalculationExpectations, NULL, hmmExpectations);
+    /*if (alignmentType == 0) {
         getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
                 sM, anchorPairs, SsX, SsY, t, p,
                 alignmentHasRaggedLeftEnd, alignmentHasRaggedRightEnd,
                 diagonalCalculationExpectations, NULL, hmmExpectations);
     }
-    if (t == kmer) {
-        //printf("-->Kmer!!\n");
+    if (alignmentType > 0) {
         getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
                 sM, anchorPairs, SsX, SsY, t, p,
                 alignmentHasRaggedLeftEnd, alignmentHasRaggedRightEnd,
                 Kmer_diagonalCalculationExpectations, NULL, hmmExpectations);
-    }
+    }*/
 
 }
 
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
-                     Sequence *SsX, Sequence *SsY, sequenceType t,
+                     Sequence *SsX, Sequence *SsY, //sequenceType t,
                      PairwiseAlignmentParameters *p,
                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
 
     stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(SsX, SsY, p);
 
-    getExpectationsUsingAnchors(sM, hmmExpectations, SsX, SsY, t, anchorPairs, p,
+    getExpectationsUsingAnchors(sM, hmmExpectations, SsX, SsY,// t,
+                                anchorPairs, p,
                                 alignmentHasRaggedLeftEnd,
                                 alignmentHasRaggedRightEnd);
     stList_destruct(anchorPairs);
