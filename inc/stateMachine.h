@@ -68,17 +68,17 @@ typedef struct _hmm {
 
 Hmm *hmm_constructEmpty(double pseudoExpectation, StateMachineType type);
 
-Hmm *hmm_Kmer_constructEmpty(double pseudoExpectation, StateMachineType type);
+Hmm *hmm_kmer_constructEmpty(double pseudoExpectation, StateMachineType type);
 
 void hmm_randomise(Hmm *hmm); //Creates normalised HMM with parameters set to small random values.
 
-void hmm_Kmer_randomise(Hmm *hmm);
+void hmm_kmer_randomise(Hmm *hmm);
 
 void hmm_destruct(Hmm *hmmExpectations);
 
 void hmm_write(Hmm *hmmExpectations, FILE *fileHandle);
 
-void hmm_Kmer_write(Hmm *hmm, FILE *fileHandle);
+void hmm_kmer_write(Hmm *hmm, FILE *fileHandle);
 
 void hmm_addToTransitionExpectation(Hmm *hmmExpectations, int64_t from, int64_t to, double p);
 
@@ -88,27 +88,27 @@ void hmm_setTransition(Hmm *hmm, int64_t from, int64_t to, double p);
 
 void hmm_addToEmissionsExpectation(Hmm *hmmExpectations, int64_t state, Symbol x, Symbol y, double p);
 
-void hmm_Kmer_addToEmissionsExpectation(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p); //kmer addition
+void hmm_kmer_addToEmissionsExpectation(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p); //kmer addition
 
 double hmm_getEmissionsExpectation(Hmm *hmm, int64_t state, Symbol x, Symbol y);
 
-double hmm_Kmer_getEmissionsExpectation(Hmm *hmm, int64_t state, int64_t x, int64_t y); //kmer addition
+double hmm_kmer_getEmissionsExpectation(Hmm *hmm, int64_t state, int64_t x, int64_t y); //kmer addition
 
 void hmm_setEmissionsExpectation(Hmm *hmm, int64_t state, Symbol x, Symbol y, double p);
 
-void hmm_Kmer_setEmissionsExpectation(Hmm *hmm, int64_t state, Symbol x, Symbol y, double p);
+void hmm_kmer_setEmissionsExpectation(Hmm *hmm, int64_t state, Symbol x, Symbol y, double p);
 
 Hmm *hmm_loadFromFile(const char *fileName);
 
-Hmm *hmm_Kmer_loadFromFile(const char *fileName);
+Hmm *hmm_kmer_loadFromFile(const char *fileName);
 
 void hmm_normalise(Hmm *hmm);
 
-void hmm_Kmer_normalise(Hmm *hmm);
+void hmm_kmer_normalise(Hmm *hmm);
 
 StateMachine *hmm_getStateMachine(Hmm *hmm);
 
-StateMachine *hmm_Kmer_getStateMachine(Hmm *hmm);
+StateMachine *hmm_kmer_getStateMachine(Hmm *hmm);
 
 StateMachine *stateMachine5_construct(StateMachineType type);
 

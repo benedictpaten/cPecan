@@ -9,7 +9,7 @@ cPecanDependencies =  ${basicLibsDependencies}
 cPecanLibs = ${basicLibs}
 
 all : ${libPath}/cPecanLib.a ${binPath}/cPecanLibTests ${binPath}/cPecanRealign ${binPath}/cPecanEm 
-	cd externalTools && make all
+	#cd externalTools && make all
 	
 clean : 
 	rm -f ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/cPecanLibTests  ${libPath}/cPecanLib.a

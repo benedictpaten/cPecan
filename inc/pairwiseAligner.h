@@ -18,13 +18,44 @@
 #include "sonLib.h"
 #include "../../sonLib/lib/pairwiseAlignment.h"
 #include "stateMachine.h"
-#include "shim.h"
+//#include "shim.h"
 
 //The exception string
 extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
 
 //Constant that gives the integer value equal to probability 1. Integer probability zero is always 0.
 #define PAIR_ALIGNMENT_PROB_1 10000000
+
+//Sequence
+typedef enum {
+    nucleotide=0,
+    kmer=1,
+    event=2
+} sequenceType;
+
+typedef struct sequence {
+    int64_t length;
+    void *elements;
+    char* repr;
+    sequenceType type;
+    void* (*get)(void *elements, int64_t index);
+} Sequence;
+
+Sequence* sequenceConstruct(int64_t length, void *elements, sequenceType type);
+
+Sequence* sequence_getSubSequence(Sequence* wholeSequence, int64_t start, int64_t length, sequenceType t);
+
+void sequenceDestroy(Sequence* seq);
+
+void* getBase(void *elements, int64_t index);
+
+void* getKmer(void *elements, int64_t index);
+
+int64_t correctSeqLength(int64_t stringLength, sequenceType type);
+
+int64_t getBaseIndex(char base);
+
+int64_t getKmerIndex(char* kmer);
 
 typedef struct _pairwiseAlignmentBandingParameters {
     double threshold; //Minimum posterior probability of a match to be added to the output
@@ -46,7 +77,10 @@ void pairwiseAlignmentBandingParameters_destruct(PairwiseAlignmentParameters *p)
 /*
  * Gets the set of posterior match probabilities under a simple HMM model of alignment for two DNA sequences.
  */
-stList *getAlignedPairs(StateMachine *sM, Sequence *string1, Sequence *string2, sequenceType t, PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+stList *getAlignedPairs(StateMachine *sM, Sequence *string1, Sequence *string2,
+                        //sequenceType t,
+                        PairwiseAlignmentParameters *p,
+                        bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignment *pA, int64_t trim);
 
@@ -130,7 +164,7 @@ Diagonal bandIterator_getPrevious(BandIterator *bandIterator);
 double logAdd(double x, double y);
 
 //Symbols
-
+/*
 Symbol symbol_convertCharToSymbol(char i);
 
 Symbol *symbol_convertStringToSymbols(const char *s, int64_t sL);
@@ -141,6 +175,8 @@ typedef struct _symbolString {
 } SymbolString;
 
 SymbolString symbolString_construct(const char *sequence, int64_t length);
+*/
+
 
 //Cell calculations
 
