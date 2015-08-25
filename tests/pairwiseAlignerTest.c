@@ -165,6 +165,26 @@ static void test_symbol(CuTest *testCase) {
 }
 */
 
+static void test_sequenceConstruct(CuTest* testCase) {
+    char *tS = getRandomSequence(100);
+    Sequence* testSequence = sequenceConstruct(100, tS, nucleotide);
+    CuAssertIntEquals(testCase, 100, testSequence->length);
+    CuAssertStrEquals(testCase, tS, testSequence->repr);
+    free(tS);
+    sequenceDestroy(testSequence);
+}
+
+static void test_getKmerIndex(CuTest* testCase) {
+    char kmer2Set[25][3] = {"AA", "AC", "AG", "AT", "AN", "CA", "CC", "CG", "CT", "CN",
+                            "GA", "GC", "GG", "GT", "GN", "TA", "TC", "TG", "TT", "TN",
+                            "NA", "NC", "NG", "NT", "NN"};
+
+    for (int64_t i = 0; i < NUM_OF_KMERS; i++) {
+        int64_t kmer_index_result = getKmerIndex(kmer2Set[i]);
+        CuAssertIntEquals(testCase, kmer_index_result, i);
+    }
+}
+
 static void test_cell(CuTest *testCase) {
     StateMachine *sM = stateMachine5_construct(fiveState);
     double lowerF[sM->stateNumber], middleF[sM->stateNumber], upperF[sM->stateNumber], currentF[sM->stateNumber];
@@ -1382,6 +1402,8 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_logAdd);
     //SUITE_ADD_TEST(suite, test_symbol);
+    SUITE_ADD_TEST(suite, test_sequenceConstruct);
+    SUITE_ADD_TEST(suite, test_getKmerIndex);
     SUITE_ADD_TEST(suite, test_cell);
     SUITE_ADD_TEST(suite, test_kmer_cell);
     SUITE_ADD_TEST(suite, test_dpDiagonal);
@@ -1407,5 +1429,6 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     //SUITE_ADD_TEST(suite, test_em_3StateAsymmetric);
     SUITE_ADD_TEST(suite, test_em_5State);
     SUITE_ADD_TEST(suite, test_kmer_em_5State);
+
     return suite;
 }
