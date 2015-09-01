@@ -41,9 +41,9 @@ typedef struct sequence {
     void* (*get)(void *elements, int64_t index);
 } Sequence;
 
-Sequence* sequenceConstruct(int64_t length, void *elements, sequenceType type);
+Sequence* sequenceConstruct(int64_t length, void *elements, void (*getFcn));
 
-Sequence* sequence_getSubSequence(Sequence* wholeSequence, int64_t start, int64_t length, sequenceType t);
+Sequence* sequence_getSubSequence(Sequence* wholeSequence, int64_t start, int64_t length, void (*getFcn));
 
 void sequenceDestroy(Sequence* seq);
 
@@ -100,7 +100,7 @@ void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                  bool alignmentHasRaggedRightEnd);
 
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
-                     Sequence *SsX, Sequence *SsY, //sequenceType t,
+                     char* sX, char* sY,
                      PairwiseAlignmentParameters *p,
                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
@@ -162,20 +162,6 @@ Diagonal bandIterator_getPrevious(BandIterator *bandIterator);
 #define LOG_ZERO -INFINITY
 
 double logAdd(double x, double y);
-
-//Symbols
-/*
-Symbol symbol_convertCharToSymbol(char i);
-
-Symbol *symbol_convertStringToSymbols(const char *s, int64_t sL);
-
-typedef struct _symbolString {
-        Symbol *sequence;
-                int64_t length;
-} SymbolString;
-
-SymbolString symbolString_construct(const char *sequence, int64_t length);
-*/
 
 
 //Cell calculations
@@ -250,7 +236,7 @@ void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const S
 
 stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatMask);
 
-stList *getBlastPairsForPairwiseAlignmentParameters(Sequence *SsX, Sequence *SsY, PairwiseAlignmentParameters *p);
+stList *getBlastPairsForPairwiseAlignmentParameters(char *sX, char *sY, PairwiseAlignmentParameters *p);
 
 stList *filterToRemoveOverlap(stList *overlappingPairs);
 
@@ -282,9 +268,9 @@ stList *reweightAlignedPairs(stList *alignedPairs,
 stList *reweightAlignedPairs2(stList *alignedPairs, int64_t seqLengthX, int64_t seqLengthY, double gapGamma);
 
 // additions from Art
-int64_t getXindex(Sequence* sX, int64_t xay, int64_t xmy);
+int64_t getXposition(Sequence *sX, int64_t xay, int64_t xmy);
 
-int64_t getYindex(Sequence* sY, int64_t xay, int64_t xmy);
+int64_t getYposition(Sequence *sY, int64_t xay, int64_t xmy);
 
 
 #endif /* PAIRWISEALIGNER_H_ */

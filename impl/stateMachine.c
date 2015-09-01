@@ -13,6 +13,7 @@
 #include "bioioC.h"
 #include "sonLib.h"
 #include "pairwiseAligner.h"
+
 #include "../inc/stateMachine.h"
 #include "../../sonLib/lib/sonLibCommon.h"
 #include "../inc/pairwiseAligner.h"
@@ -395,6 +396,7 @@ static void state_check(StateMachine *sM, State s) {
 static void emissions_setMatchProbsToDefaults(double *emissionMatchProbs) {
     /*
      * This is used to set the emissions to reasonable values. For nucleotide/nucleotide alignment
+     * TODO maybe use realloc here so that we can have one stateMachine object?
      */
     const double EMISSION_MATCH=-2.1149196655034745; //log(0.12064298095701059);
     const double EMISSION_TRANSVERSION=-4.5691014376830479; //log(0.010367271172731285);
@@ -408,6 +410,7 @@ static void emissions_setMatchProbsToDefaults(double *emissionMatchProbs) {
             EMISSION_TRANSITION, EMISSION_TRANSVERSION, EMISSION_MATCH, EMISSION_TRANSVERSION,
             EMISSION_TRANSVERSION, EMISSION_TRANSITION, EMISSION_TRANSVERSION, EMISSION_MATCH };
     memcpy(emissionMatchProbs, i, sizeof(double)*SYMBOL_NUMBER_NO_N*SYMBOL_NUMBER_NO_N);
+    // realloc here?
 }
 
 static void emissions_setGapProbsToDefaults(double *emissionGapProbs) {
@@ -674,6 +677,50 @@ static double stateMachine5_raggedEndStateProb(StateMachine *sM, int64_t state) 
     return 0.0;
 }
 
+static void stateMachine5_NEW_cellCalculate(StateMachine *sM, double *current, double *lower, double *middle, double *upper,
+                                            int64_t iX, int64_t iY,
+                                            double (*getGapProbFcn)(const double *, int64_t ),
+                                            double (*getMatchProbFcn)(const double *, int64_t , int64_t),
+                                            void (*doTransition)(double *, double *, // fromCells, toCells
+                                                                 int64_t, int64_t,   // from, to
+                                                                 double, double,     // emissionProb, transitionProb
+                                                                 void *),            // extraArgs
+                                            void *extraArgs) {
+    /*
+     * cell calculate for nucleotide/nucleotide state machine, right now uses a char* but could be improved to use
+     * indices of bases
+     */
+    StateMachine5 *sM5 = (StateMachine5 *) sM;
+    if (lower != NULL) {
+        double eP = getGapProbFcn(sM5->EMISSION_GAP_X_PROBS, iX);
+        //printf("emissionProb=%f\n", eP);
+        doTransition(lower, current, match, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_OPEN_X, extraArgs);
+        doTransition(lower, current, shortGapX, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_X, extraArgs);
+        // how come these are commented out?
+        //doTransition(lower, current, shortGapY, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X, extraArgs);
+        doTransition(lower, current, match, longGapX, eP, sM5->TRANSITION_GAP_LONG_OPEN_X, extraArgs);
+        doTransition(lower, current, longGapX, longGapX, eP, sM5->TRANSITION_GAP_LONG_EXTEND_X, extraArgs);
+        //doTransition(lower, current, longGapY, longGapX, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_X, extraArgs);
+    }
+    if (middle != NULL) {
+        double eP = getMatchProbFcn(sM5->EMISSION_MATCH_PROBS, iX, iY);
+        doTransition(middle, current, match, match, eP, sM5->TRANSITION_MATCH_CONTINUE, extraArgs);
+        doTransition(middle, current, shortGapX, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X, extraArgs);
+        doTransition(middle, current, shortGapY, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y, extraArgs);
+        doTransition(middle, current, longGapX, match, eP, sM5->TRANSITION_MATCH_FROM_LONG_GAP_X, extraArgs);
+        doTransition(middle, current, longGapY, match, eP, sM5->TRANSITION_MATCH_FROM_LONG_GAP_Y, extraArgs);
+    }
+    if (upper != NULL) {
+        double eP = getGapProbFcn(sM5->EMISSION_GAP_Y_PROBS, iY);
+        doTransition(upper, current, match, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_OPEN_Y, extraArgs);
+        doTransition(upper, current, shortGapY, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_Y, extraArgs);
+        //doTransition(upper, current, shortGapX, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_SWITCH_TO_Y, extraArgs);
+        doTransition(upper, current, match, longGapY, eP, sM5->TRANSITION_GAP_LONG_OPEN_Y, extraArgs);
+        doTransition(upper, current, longGapY, longGapY, eP, sM5->TRANSITION_GAP_LONG_EXTEND_Y, extraArgs);
+        //doTransition(upper, current, longGapX, longGapY, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_Y, extraArgs);
+    }
+}
+
 static void stateMachine5_cellCalculate(StateMachine *sM, double *current, double *lower, double *middle, double *upper,
         char* cX, char* cY, void (*doTransition)(double *, double *, int64_t, int64_t, double, double, void *),
         void *extraArgs) {
@@ -759,6 +806,51 @@ void stateMachine5_kmer_cellCalculate(StateMachine *sM, double *current, double 
     }
 }
 
+StateMachine *stateMachine5_NEW_construct(StateMachineType type,
+                                          int64_t (*elementIndexFcn)(void *),
+                                          void (*setMatchDefaultsFcn)(double *), void (setGapDefaultsFcn)(double *),
+                                          double* (*gapProbFcn)(int64_t), double* (*matchProbFcn)(int64_t)) {
+    StateMachine5 *sM5 = st_malloc(sizeof(StateMachine5));
+    sM5->TRANSITION_MATCH_CONTINUE = -0.030064059121770816; //0.9703833696510062f
+    sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X = -1.272871422049609; //1.0 - gapExtend - gapSwitch = 0.280026392297485
+    sM5->TRANSITION_MATCH_FROM_LONG_GAP_X = -5.673280173170473; //1.0 - gapExtend = 0.00343657420938
+    sM5->TRANSITION_GAP_SHORT_OPEN_X = -4.34381910900448; //0.0129868352330243
+    sM5->TRANSITION_GAP_SHORT_EXTEND_X = -0.3388262689231553; //0.7126062401851738f;
+    sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X = -4.910694825551255; //0.0073673675173412815f;
+    sM5->TRANSITION_GAP_LONG_OPEN_X = -6.30810595366929; //(1.0 - match - 2*gapOpenShort)/2 = 0.001821479941473
+    sM5->TRANSITION_GAP_LONG_EXTEND_X = -0.003442492794189331; //0.99656342579062f;
+    sM5->TRANSITION_GAP_LONG_SWITCH_TO_X = -6.30810595366929; //0.99656342579062f;
+
+    sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y = sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X;
+    sM5->TRANSITION_MATCH_FROM_LONG_GAP_Y = sM5->TRANSITION_MATCH_FROM_LONG_GAP_X;
+    sM5->TRANSITION_GAP_SHORT_OPEN_Y = sM5->TRANSITION_GAP_SHORT_OPEN_X;
+    sM5->TRANSITION_GAP_SHORT_EXTEND_Y = sM5->TRANSITION_GAP_SHORT_EXTEND_X;
+    sM5->TRANSITION_GAP_SHORT_SWITCH_TO_Y = sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X;
+    sM5->TRANSITION_GAP_LONG_OPEN_Y = sM5->TRANSITION_GAP_LONG_OPEN_X;
+    sM5->TRANSITION_GAP_LONG_EXTEND_Y = sM5->TRANSITION_GAP_LONG_EXTEND_X;
+    sM5->TRANSITION_GAP_LONG_SWITCH_TO_Y = sM5->TRANSITION_GAP_LONG_SWITCH_TO_X;
+
+    // now using argument functions to make stateMachine more general
+    setMatchDefaultsFcn(sM5->EMISSION_MATCH_PROBS);
+    setGapDefaultsFcn(sM5->EMISSION_GAP_X_PROBS);
+    setGapDefaultsFcn(sM5->EMISSION_GAP_Y_PROBS);
+    if(type != fiveState && type != fiveStateAsymmetric) {
+        st_errAbort("Wrong type for five state %i", type);
+    }
+    sM5->model.type = type;
+    sM5->model.stateNumber = 5;
+    sM5->model.matchState = match;
+    sM5->model.startStateProb = stateMachine5_startStateProb;
+    sM5->model.endStateProb = stateMachine5_endStateProb;
+    sM5->model.raggedStartStateProb = stateMachine5_raggedStartStateProb;
+    sM5->model.raggedEndStateProb = stateMachine5_raggedEndStateProb;
+    sM5->model.getMatchProbFcn = matchProbFcn;
+    sM5->model.getGapProbFcn = gapProbFcn;
+    sM5->model.getElementIndexFcn = elementIndexFcn;
+    sM5->model.cellCalculate = stateMachine5_NEW_cellCalculate;
+
+    return (StateMachine *) sM5;
+}
 
 StateMachine *stateMachine5_construct(StateMachineType type) {
     StateMachine5 *sM5 = st_malloc(sizeof(StateMachine5));
@@ -823,9 +915,9 @@ StateMachine *stateMachine5_kmer_construct(StateMachineType type) {
     sM5->TRANSITION_GAP_LONG_EXTEND_Y = sM5->TRANSITION_GAP_LONG_EXTEND_X;
     sM5->TRANSITION_GAP_LONG_SWITCH_TO_Y = sM5->TRANSITION_GAP_LONG_SWITCH_TO_X;
 
-    emissionsKmers_setMatchProbsToDefaults(sM5->EMISSION_MATCH_PROBS);
-    emissionsKmers_setGapProbsToDefaults(sM5->EMISSION_GAP_X_PROBS);
-    emissionsKmers_setGapProbsToDefaults(sM5->EMISSION_GAP_Y_PROBS);
+    emissions_kmers_setMatchProbsToDefaults(sM5->EMISSION_MATCH_PROBS);
+    emissions_kmers_setGapProbsToDefaults(sM5->EMISSION_GAP_X_PROBS);
+    emissions_kmers_setGapProbsToDefaults(sM5->EMISSION_GAP_Y_PROBS);
     if(type != fiveState && type != fiveStateAsymmetric) {
         st_errAbort("Wrong type for five state %i", type);
     }

@@ -9,6 +9,7 @@
 #define STATEMACHINE_H_
 
 #include "sonLib.h"
+#include "../impl/stateMachine.c"
 
 #define SYMBOL_NUMBER 5
 #define SYMBOL_NUMBER_NO_N 4
@@ -35,7 +36,7 @@ typedef enum {
 typedef struct _stateMachine StateMachine;
 
 struct _stateMachine {
-    StateMachineType type;
+    StateMachineType type; // TODO get rid of this
     int64_t stateNumber;
     int64_t matchState;
 
@@ -46,6 +47,16 @@ struct _stateMachine {
     double (*raggedEndStateProb)(StateMachine *sM, int64_t state);
 
     double (*raggedStartStateProb)(StateMachine *sM, int64_t state);
+
+    int64_t (*getElementIndexFcn)(void* element);
+
+    void (*setMatchDefaultsFcn)(double* emissionMatchProbs);
+
+    void (*setGabDefaultsFcn)(double* emissionGapProbs);
+
+    double* (*getGapProbFcn)(int64_t);
+
+    double* (*getMatchProbFcn)(int64_t);
 
     //Cells (states at a given coordinate)
     void (*cellCalculate)(StateMachine *sM, double *current, double *lower, double *middle, double *upper,
@@ -109,6 +120,11 @@ void hmm_kmer_normalise(Hmm *hmm);
 StateMachine *hmm_getStateMachine(Hmm *hmm);
 
 StateMachine *hmm_kmer_getStateMachine(Hmm *hmm);
+
+StateMachine *stateMachine5_NEW_construct(StateMachineType type,
+                                          int64_t (*elementIndexFcn)(void *),
+                                          void (*setMatchDefaultsFcn)(double *), void (setGapDefaultsFcn)(double *),
+                                          double* (*gapProbFcn)(int64_t), double* (*matchProbFcn)(int64_t));
 
 StateMachine *stateMachine5_construct(StateMachineType type);
 

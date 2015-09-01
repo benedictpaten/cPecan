@@ -15,16 +15,17 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
-//#include "shim.h"
+#include "sonLib.h"
 #include "bioioC.h"
-#include "../../sonLib/lib/sonLib.h"
-#include "../../sonLib/C/inc/bioioC.h"
 #include "pairwiseAligner.h"
 #include "pairwiseAlignment.h"
-#include "../inc/stateMachine.h"
-//#include "../inc/shim.h"
+#include "stateMachine.h"
+#include "emissionMatrix.h"
+
 #include "../inc/pairwiseAligner.h"
 #include "../inc/emissionMatrix.h"
+#include "../../sonLib/C/inc/bioioC.h"
+
 
 ///////////////////////////////////
 ///////////////////////////////////
@@ -262,56 +263,6 @@ double logAdd(double x, double y) {
     return (y == LOG_ZERO || x - y >= logUnderflowThreshold) ? x : lookup(x - y) + y;
 }
 
-///////////////////////////////////
-///////////////////////////////////
-//Symbols
-//
-//Emissions probs/functions to convert to symbol sequence
-//Depreciated
-///////////////////////////////////
-///////////////////////////////////
-
-/*
-Symbol symbol_convertCharToSymbol(char i) {
-    switch (i) {
-    case 'A':
-    case 'a':
-        return a;
-    case 'C':
-    case 'c':
-        return c;
-    case 'G':
-    case 'g':
-        return g;
-    case 'T':
-    case 't':
-        return t;
-    default:
-        return n;
-    }
-}
-
-Symbol *symbol_convertStringToSymbols(const char *s, int64_t sL) {
-    assert(sL >= 0);
-    assert(strlen(s) == sL);
-    Symbol *cS = st_malloc(sL * sizeof(Symbol));
-    for (int64_t i = 0; i < sL; i++) {
-        cS[i] = symbol_convertCharToSymbol(s[i]);
-    }
-    return cS;
-}
-
-SymbolString symbolString_construct(const char *sequence, int64_t length) {
-    SymbolString symbolString;
-    symbolString.sequence = symbol_convertStringToSymbols(sequence, length);
-    symbolString.length = length;
-    return symbolString;
-}
-
-void symbolString_destruct(SymbolString s) {
-    free(s.sequence);
-}
-*/
 
 ///////////////////////////////////
 ///////////////////////////////////
@@ -321,7 +272,7 @@ void symbolString_destruct(SymbolString s) {
 ///////////////////////////////////
 ///////////////////////////////////
 
-Sequence* sequenceConstruct(int64_t stringLength, void *elements, sequenceType t) {
+Sequence* sequenceConstruct(int64_t length, void *elements, void (*getFcn)) {
     /*
      * Sequence constructor function
      * stringLength should be the length of the sequence in bases ie ATGAC has
@@ -330,34 +281,25 @@ Sequence* sequenceConstruct(int64_t stringLength, void *elements, sequenceType t
      */
     Sequence* self = malloc(sizeof(Sequence));
     // correct the sequence length for kmers/events
-    self->length = correctSeqLength(stringLength, t);
-    self->type = t;
+    self->length = length;
     self->elements = elements;
-    self->repr = (char*) elements;
-    switch (t) {
-        case 0:
-            self->get = getBase;
-            break;
-        case 1:
-            self->get = getKmer;
-            break;
-        case 2:
-        //    self->get = getEvent; not implemented yet
-            break;
-    }
+    self->repr = (char*) elements; // TODO get rid of this
+    self->get = getFcn;
     return self;
 }
 
 Sequence* sequence_getSubSequence(Sequence* wholeSequence,
                                   int64_t start, int64_t length,
-                                  sequenceType t) {
+                                  void (*getFcn)) {
     /*
      * Function to retrieve a sub sequence of a sequence object. Could also be used
      * to convert between Sequence types by specifying a different type with argument t
      */
+    // TODO //maybe here you can cast all of the elements in the whole sequence to char or something
+    // TODO //and then chop it up into a sub-sequence
     char* wS_string = wholeSequence->repr;
     char* subString = stString_getSubString(wS_string, start, length);
-    Sequence* subSequence = sequenceConstruct(length, subString, t);
+    Sequence* subSequence = sequenceConstruct(length, subString, getFcn);
     return subSequence;
 }
 
@@ -366,11 +308,12 @@ void sequenceDestroy(Sequence* seq) {
     free(seq);
 }
 
-void* getBase(void *elements, int64_t index) {
+char* getBase(void *elements, int64_t index) {
     /*
      * Returns a single base from a sequence object. This will likely be depreciated in favor of
      * using only indexes for elements
      */
+    // TODO add check to make sure index is within bounds
     char* n;
     n = "n";
     return index >= 0 ? &(((char *)elements)[index]) : n;
@@ -382,6 +325,7 @@ void* getKmer(void *elements, int64_t index) {
      * if we decide to only use indicies for kmers/events/nucleotides. That would also make it easy to
      * remove the malloc...
      */
+    // TODO add check to make sure index is within bounds
     char* n;
     n = "NN"; // hardwired null kmer
     int64_t i = index;
@@ -394,21 +338,21 @@ void* getKmer(void *elements, int64_t index) {
     return index >= 0 ? k_i : n;
 }
 
-int64_t correctSeqLength(int64_t stringLength, sequenceType type) {
+int64_t correctSeqLength(int64_t length, sequenceType type) {
     /*
      * Correct the sequence length for non-nucleotide sequences, eg. kmers/events.
      */
     // for trivial case
-    if (stringLength == 0) {
+    if (length == 0) {
         return 0;
     }
-    if (stringLength > 0) {
+    if (length > 0) {
         switch (type) {
             case 0: // nucleotide sequence
-                return stringLength;
+                return length;
             case 1: // event and kmer sequence
             case 2:
-                return stringLength - 1;
+                return length - (KMER_LENGTH - 1);
         }
     }
 }
@@ -738,13 +682,13 @@ static Symbol getYCharacter(const SymbolString sY, int64_t xay, int64_t xmy) {
 /*
  * Functions for indexing through Sequence objects
  */
-int64_t getXindex(Sequence* sX, int64_t xay, int64_t xmy) {
+int64_t getXposition(Sequence *sX, int64_t xay, int64_t xmy) {
     int64_t x = diagonal_getXCoordinate(xay, xmy);
     assert(x >= 0 && x <= sX->length);
     return x;
 }
 
-int64_t getYindex(Sequence* sY, int64_t xay, int64_t xmy) {
+int64_t getYposition(Sequence *sY, int64_t xay, int64_t xmy) {
     int64_t y = diagonal_getYCoordinate(xay, xmy);
     assert(y >= 0 && y <= sY->length);
     return y;
@@ -765,15 +709,27 @@ static void diagonalCalculation(StateMachine *sM,
 
     // work from smallest to largest
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
-        int64_t indexX = getXindex(sX, diagonal_getXay(diagonal), xmy) - 1;
-        int64_t indexY = getYindex(sY, diagonal_getXay(diagonal), xmy) - 1;
-        char* x = sX->get(sX->elements, indexX);
-        char* y = sY->get(sY->elements, indexY);
+        // get the position in the sequence based on the diagonals
+        int64_t indexX = getXposition(sX, diagonal_getXay(diagonal), xmy) - 1;
+        int64_t indexY = getYposition(sY, diagonal_getXay(diagonal), xmy) - 1;
+
+        // get the element from the sequence at that position. At this point the element is still a void, so
+        // it could be anything (base, kmer, event, etc.)
+        void* x = sX->get(sX->elements, indexX);
+        void* y = sY->get(sY->elements, indexY);
+
+        // get the index of the element for use with the state machine. The logic here is that the state machine has
+        // the associated matrices that need to be used with the index, and thus the elementIndexFcn is specific to
+        // the state machine, not the sequence.
+        int64_t iX = sM->getElementIndexFcn(x);
+        int64_t iY = sM->getElementIndexFcn(y);
+
+        // do the calculations
         double *current = dpDiagonal_getCell(dpDiagonal, xmy);
         double *lower = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy - 1);
         double *middle = dpDiagonalM2 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM2, xmy);
         double *upper = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy + 1);
-        cellCalculation(sM, current, lower, middle, upper, x, y, extraArgs);
+        cellCalculation(sM, current, lower, middle, upper, iX, iY, extraArgs);
         xmy += 2;
     }
 }
@@ -1265,13 +1221,11 @@ static void getBlastPairsForPairwiseAlignmentParametersP(
 /*
  * This function take Sequence objects but then umpacks them into char strings for use with lastz
  */
-stList *getBlastPairsForPairwiseAlignmentParameters(Sequence *SsX, Sequence *SsY, PairwiseAlignmentParameters *p) {
+stList *getBlastPairsForPairwiseAlignmentParameters(char *sX, char *sY, PairwiseAlignmentParameters *p) {
 
     // Unpack Sequence Object
-    int64_t lX = SsX->length;
-    int64_t lY = SsY->length;
-    char *sX = SsX->repr;
-    char *sY = SsY->repr;
+    int64_t lX = strlen(sX);
+    int64_t lY = strlen(sY);
 
     if ((int64_t) lX * lY <= p->anchorMatrixBiggerThanThis) {
         return stList_construct();
@@ -1540,11 +1494,18 @@ void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
 }
 
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
-                     Sequence *SsX, Sequence *SsY,
+                     char *sX, char *sY,
                      PairwiseAlignmentParameters *p,
                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
 
-    stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(SsX, SsY, p);
+    // TODO make this function take char arrays then make into sequence object before get expectations
+
+    stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(sX, sY, p);
+
+    int64_t lX = strlen(sX);
+    int64_t lY = strlen(sY);
+
+    // TODO when do you decide on the alignment type?
 
     getExpectationsUsingAnchors(sM, hmmExpectations, SsX, SsY,
                                 anchorPairs, p,

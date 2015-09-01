@@ -1,16 +1,20 @@
-#include "emissionMatrix.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
+#include "emissionMatrix.h"
+
+#include "../inc/emissionMatrix.h"
 
 /*
  * Code-generated emissions matrix for 2-mers
  */
 
-void emissionsKmers_setMatchProbsToDefaults(double *emissionMatchProbs) {
+void emissions_kmers_setMatchProbsToDefaults(double *emissionMatchProbs) {
     /*
      * This sets the match probabilities to default values for matching kmers
+     * TODO maybe use relloc here so that we can have one stateMachine object?
      */
 
     const double M=-2.1149196655034745; //log(0.12064298095701059);
@@ -52,7 +56,7 @@ void emissionsKmers_setMatchProbsToDefaults(double *emissionMatchProbs) {
 }
 
 
-void emissionsKmers_setGapProbsToDefaults(double *emissionGapProbs) {
+void emissions_kmers_setGapProbsToDefaults(double *emissionGapProbs) {
     /*
      * This is used to set the emissions to reasonable values.
      */
