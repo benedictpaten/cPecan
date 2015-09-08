@@ -10,15 +10,16 @@
 #include <math.h>
 #include <ctype.h>
 
-#include "bioioC.h"
-#include "sonLib.h"
-#include "pairwiseAligner.h"
+//#include "bioioC.h"
+//#include "sonLib.h"
+//#include "pairwiseAligner.h"
+//#include "stateMachine.h"
 
 #include "../inc/stateMachine.h"
 #include "../../sonLib/lib/sonLibCommon.h"
 #include "../inc/pairwiseAligner.h"
 #include "../inc/emissionMatrix.h"
-//#include "../inc/shim.h"
+
 
 ///////////////////////////////////
 ///////////////////////////////////
@@ -393,27 +394,26 @@ static void state_check(StateMachine *sM, State s) {
     assert(s >= 0 && s < sM->stateNumber);
 }
 
-static void emissions_setMatchProbsToDefaults(double *emissionMatchProbs) {
+void emissions_setMatchProbsToDefaults(double *emissionMatchProbs) {
     /*
      * This is used to set the emissions to reasonable values. For nucleotide/nucleotide alignment
-     * TODO maybe use realloc here so that we can have one stateMachine object?
+     * TODO figure out how to make realloc work
      */
     const double EMISSION_MATCH=-2.1149196655034745; //log(0.12064298095701059);
     const double EMISSION_TRANSVERSION=-4.5691014376830479; //log(0.010367271172731285);
     const double EMISSION_TRANSITION=-3.9833860032220842; //log(0.01862247669752685);
 
     //Symmetric matrix of transition probabilities. TODO do you mean emission probs here?
-
     const double i[SYMBOL_NUMBER_NO_N*SYMBOL_NUMBER_NO_N] = {
             EMISSION_MATCH, EMISSION_TRANSVERSION, EMISSION_TRANSITION, EMISSION_TRANSVERSION,
             EMISSION_TRANSVERSION, EMISSION_MATCH, EMISSION_TRANSVERSION, EMISSION_TRANSITION,
             EMISSION_TRANSITION, EMISSION_TRANSVERSION, EMISSION_MATCH, EMISSION_TRANSVERSION,
             EMISSION_TRANSVERSION, EMISSION_TRANSITION, EMISSION_TRANSVERSION, EMISSION_MATCH };
+
     memcpy(emissionMatchProbs, i, sizeof(double)*SYMBOL_NUMBER_NO_N*SYMBOL_NUMBER_NO_N);
-    // realloc here?
 }
 
-static void emissions_setGapProbsToDefaults(double *emissionGapProbs) {
+void emissions_setGapProbsToDefaults(double *emissionGapProbs) {
     /*
      * This is used to set the emissions to reasonable values.
      */
@@ -422,9 +422,6 @@ static void emissions_setGapProbsToDefaults(double *emissionGapProbs) {
     memcpy(emissionGapProbs, i, sizeof(double)*SYMBOL_NUMBER_NO_N);
 }
 
-static void symbol_check(Symbol c) {
-    assert(c >= 0 && c < SYMBOL_NUMBER);
-}
 
 static void index_check(int64_t c) {
     assert(c >= 0 && c < NUM_OF_KMERS);
@@ -536,7 +533,7 @@ static void emissions_kmer_loadGapProbs(double *emissionGapProbs, Hmm *hmm,
     }
 }
 
-static inline double emission_getGapProb(const double *emissionGapProbs, int64_t i) {
+double emission_getGapProb(const double *emissionGapProbs, int64_t i) {
     index_check(i);
     if(i == 4) {
         return -1.386294361; //log(0.25)
@@ -544,7 +541,7 @@ static inline double emission_getGapProb(const double *emissionGapProbs, int64_t
     return emissionGapProbs[i];
 }
 
-static inline double emission_getMatchProb(const double *emissionMatchProbs, int64_t x, int64_t y) {
+double emission_getMatchProb(const double *emissionMatchProbs, int64_t x, int64_t y) {
     index_check(x);
     index_check(y);
     if(x == 4 || y == 4) {
@@ -553,7 +550,7 @@ static inline double emission_getMatchProb(const double *emissionMatchProbs, int
     return emissionMatchProbs[x * SYMBOL_NUMBER_NO_N + y];
 }
 
-static inline double emission_kmer_getGapProb(const double *emissionGapProbs, int64_t i) {
+double emission_kmer_getGapProb(const double *emissionGapProbs, int64_t i) {
     index_check(i);
     //if(i == NUM_OF_KMERS) {
     //    return -1.386294361; //log(0.25)
@@ -561,7 +558,7 @@ static inline double emission_kmer_getGapProb(const double *emissionGapProbs, in
     return emissionGapProbs[i];
 }
 
-static inline double emission_kmer_getMatchProb(const double *emissionMatchProbs, int64_t x, int64_t y) {
+double emission_kmer_getMatchProb(const double *emissionMatchProbs, int64_t x, int64_t y) {
     int64_t tableIndex = x * NUM_OF_KMERS + y;
     return emissionMatchProbs[tableIndex];
 }
@@ -594,9 +591,14 @@ struct _StateMachine5 {
     double TRANSITION_GAP_LONG_OPEN_Y; //(1.0 - match - 2*gapOpenShort)/2 = 0.001821479941473
     double TRANSITION_GAP_LONG_EXTEND_Y; //0.99656342579062f;
     double TRANSITION_GAP_LONG_SWITCH_TO_Y; //0.0073673675173412815f;
-    double EMISSION_MATCH_PROBS[SYMBOL_NUMBER_NO_N*SYMBOL_NUMBER_NO_N]; //Match emission probs
-    double EMISSION_GAP_X_PROBS[SYMBOL_NUMBER_NO_N]; //Gap emission probs
-    double EMISSION_GAP_Y_PROBS[SYMBOL_NUMBER_NO_N]; //Gap emission probs
+
+    double EMISSION_MATCH_PROBS[MATRIX_SIZE]; //Match emission probs
+    double EMISSION_GAP_X_PROBS[NUM_OF_KMERS]; //Gap emission probs
+    double EMISSION_GAP_Y_PROBS[NUM_OF_KMERS]; //Gap emission probs
+
+    //double EMISSION_MATCH_PROBS[SYMBOL_NUMBER_NO_N*SYMBOL_NUMBER_NO_N]; //Match emission probs
+    //double EMISSION_GAP_X_PROBS[SYMBOL_NUMBER_NO_N]; //Gap emission probs
+    //double EMISSION_GAP_Y_PROBS[SYMBOL_NUMBER_NO_N]; //Gap emission probs
 };
 
 /*
@@ -675,50 +677,6 @@ static double stateMachine5_raggedEndStateProb(StateMachine *sM, int64_t state) 
         return sM5->TRANSITION_GAP_LONG_EXTEND_Y;
     }
     return 0.0;
-}
-
-static void stateMachine5_NEW_cellCalculate(StateMachine *sM, double *current, double *lower, double *middle, double *upper,
-                                            int64_t iX, int64_t iY,
-                                            double (*getGapProbFcn)(const double *, int64_t ),
-                                            double (*getMatchProbFcn)(const double *, int64_t , int64_t),
-                                            void (*doTransition)(double *, double *, // fromCells, toCells
-                                                                 int64_t, int64_t,   // from, to
-                                                                 double, double,     // emissionProb, transitionProb
-                                                                 void *),            // extraArgs
-                                            void *extraArgs) {
-    /*
-     * cell calculate for nucleotide/nucleotide state machine, right now uses a char* but could be improved to use
-     * indices of bases
-     */
-    StateMachine5 *sM5 = (StateMachine5 *) sM;
-    if (lower != NULL) {
-        double eP = getGapProbFcn(sM5->EMISSION_GAP_X_PROBS, iX);
-        //printf("emissionProb=%f\n", eP);
-        doTransition(lower, current, match, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_OPEN_X, extraArgs);
-        doTransition(lower, current, shortGapX, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_X, extraArgs);
-        // how come these are commented out?
-        //doTransition(lower, current, shortGapY, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X, extraArgs);
-        doTransition(lower, current, match, longGapX, eP, sM5->TRANSITION_GAP_LONG_OPEN_X, extraArgs);
-        doTransition(lower, current, longGapX, longGapX, eP, sM5->TRANSITION_GAP_LONG_EXTEND_X, extraArgs);
-        //doTransition(lower, current, longGapY, longGapX, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_X, extraArgs);
-    }
-    if (middle != NULL) {
-        double eP = getMatchProbFcn(sM5->EMISSION_MATCH_PROBS, iX, iY);
-        doTransition(middle, current, match, match, eP, sM5->TRANSITION_MATCH_CONTINUE, extraArgs);
-        doTransition(middle, current, shortGapX, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X, extraArgs);
-        doTransition(middle, current, shortGapY, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y, extraArgs);
-        doTransition(middle, current, longGapX, match, eP, sM5->TRANSITION_MATCH_FROM_LONG_GAP_X, extraArgs);
-        doTransition(middle, current, longGapY, match, eP, sM5->TRANSITION_MATCH_FROM_LONG_GAP_Y, extraArgs);
-    }
-    if (upper != NULL) {
-        double eP = getGapProbFcn(sM5->EMISSION_GAP_Y_PROBS, iY);
-        doTransition(upper, current, match, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_OPEN_Y, extraArgs);
-        doTransition(upper, current, shortGapY, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_Y, extraArgs);
-        //doTransition(upper, current, shortGapX, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_SWITCH_TO_Y, extraArgs);
-        doTransition(upper, current, match, longGapY, eP, sM5->TRANSITION_GAP_LONG_OPEN_Y, extraArgs);
-        doTransition(upper, current, longGapY, longGapY, eP, sM5->TRANSITION_GAP_LONG_EXTEND_Y, extraArgs);
-        //doTransition(upper, current, longGapX, longGapY, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_Y, extraArgs);
-    }
 }
 
 static void stateMachine5_cellCalculate(StateMachine *sM, double *current, double *lower, double *middle, double *upper,
@@ -806,10 +764,62 @@ void stateMachine5_kmer_cellCalculate(StateMachine *sM, double *current, double 
     }
 }
 
+static void stateMachine5_NEW_cellCalculate(StateMachine *sM,
+                                            double *current, double *lower, double *middle, double *upper,
+                                            void* cX, void* cY,
+                                            void (*doTransition)(double *, double *, // fromCells, toCells
+                                                                 int64_t, int64_t,   // from, to
+                                                                 double, double,     // emissionProb, transitionProb
+                                                                 void *),            // extraArgs
+                                            void *extraArgs) {
+    /*
+     * New cellCalculate function.  Main difference: uses functions that are
+     * members of the stateMachine struct
+     */
+    StateMachine5 *sM5 = (StateMachine5 *) sM;
+    if (lower != NULL) {
+        int64_t iX = sM5->model.getElementIndexFcn(cX);
+        double eP = sM5->model.getGapProbFcn(sM5->EMISSION_GAP_X_PROBS, iX);
+        doTransition(lower, current, match, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_OPEN_X, extraArgs);
+        doTransition(lower, current, shortGapX, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_X, extraArgs);
+        // how come these are commented out?
+        //doTransition(lower, current, shortGapY, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X, extraArgs);
+        doTransition(lower, current, match, longGapX, eP, sM5->TRANSITION_GAP_LONG_OPEN_X, extraArgs);
+        doTransition(lower, current, longGapX, longGapX, eP, sM5->TRANSITION_GAP_LONG_EXTEND_X, extraArgs);
+        //doTransition(lower, current, longGapY, longGapX, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_X, extraArgs);
+    }
+    if (middle != NULL) {
+        int64_t iX = sM5->model.getElementIndexFcn(cX);
+        int64_t iY = sM5->model.getElementIndexFcn(cY);
+        double eP = sM5->model.getMatchProbFcn(sM5->EMISSION_MATCH_PROBS, iX, iY);
+        doTransition(middle, current, match, match, eP, sM5->TRANSITION_MATCH_CONTINUE, extraArgs);
+        doTransition(middle, current, shortGapX, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X, extraArgs);
+        doTransition(middle, current, shortGapY, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y, extraArgs);
+        doTransition(middle, current, longGapX, match, eP, sM5->TRANSITION_MATCH_FROM_LONG_GAP_X, extraArgs);
+        doTransition(middle, current, longGapY, match, eP, sM5->TRANSITION_MATCH_FROM_LONG_GAP_Y, extraArgs);
+    }
+    if (upper != NULL) {
+        int64_t iY = sM5->model.getElementIndexFcn(cY);
+        double eP = sM5->model.getGapProbFcn(sM5->EMISSION_GAP_Y_PROBS, iY);
+        doTransition(upper, current, match, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_OPEN_Y, extraArgs);
+        doTransition(upper, current, shortGapY, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_Y, extraArgs);
+        //doTransition(upper, current, shortGapX, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_SWITCH_TO_Y, extraArgs);
+        doTransition(upper, current, match, longGapY, eP, sM5->TRANSITION_GAP_LONG_OPEN_Y, extraArgs);
+        doTransition(upper, current, longGapY, longGapY, eP, sM5->TRANSITION_GAP_LONG_EXTEND_Y, extraArgs);
+        //doTransition(upper, current, longGapX, longGapY, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_Y, extraArgs);
+    }
+}
+
 StateMachine *stateMachine5_NEW_construct(StateMachineType type,
                                           int64_t (*elementIndexFcn)(void *),
-                                          void (*setMatchDefaultsFcn)(double *), void (setGapDefaultsFcn)(double *),
-                                          double* (*gapProbFcn)(int64_t), double* (*matchProbFcn)(int64_t)) {
+                                          void (*setMatchDefaultsFcn)(double *),
+                                          void (*setGapDefaultsFcn)(double *),
+                                          double (*gapProbFcn)(const double*, int64_t),
+                                          double (*matchProbFcn)(const double*, int64_t, int64_t)) {
+    /*
+     * New stateMachine construct function.  Allows for one stateMachine struct
+     * to be used for kmer/kmer and base/base alignments.
+     */
     StateMachine5 *sM5 = st_malloc(sizeof(StateMachine5));
     sM5->TRANSITION_MATCH_CONTINUE = -0.030064059121770816; //0.9703833696510062f
     sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X = -1.272871422049609; //1.0 - gapExtend - gapSwitch = 0.280026392297485
@@ -844,8 +854,8 @@ StateMachine *stateMachine5_NEW_construct(StateMachineType type,
     sM5->model.endStateProb = stateMachine5_endStateProb;
     sM5->model.raggedStartStateProb = stateMachine5_raggedStartStateProb;
     sM5->model.raggedEndStateProb = stateMachine5_raggedEndStateProb;
-    sM5->model.getMatchProbFcn = matchProbFcn;
     sM5->model.getGapProbFcn = gapProbFcn;
+    sM5->model.getMatchProbFcn = matchProbFcn;
     sM5->model.getElementIndexFcn = elementIndexFcn;
     sM5->model.cellCalculate = stateMachine5_NEW_cellCalculate;
 

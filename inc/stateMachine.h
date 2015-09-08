@@ -9,7 +9,7 @@
 #define STATEMACHINE_H_
 
 #include "sonLib.h"
-#include "../impl/stateMachine.c"
+#include "../../sonLib/lib/sonLib.h"
 
 #define SYMBOL_NUMBER 5
 #define SYMBOL_NUMBER_NO_N 4
@@ -54,9 +54,9 @@ struct _stateMachine {
 
     void (*setGabDefaultsFcn)(double* emissionGapProbs);
 
-    double* (*getGapProbFcn)(int64_t);
+    double (*getGapProbFcn)(const double* emissionGapProbs, int64_t i);
 
-    double* (*getMatchProbFcn)(int64_t);
+    double (*getMatchProbFcn)(const double* emissionMatchProbs, int64_t x, int64_t y);
 
     //Cells (states at a given coordinate)
     void (*cellCalculate)(StateMachine *sM, double *current, double *lower, double *middle, double *upper,
@@ -117,14 +117,28 @@ void hmm_normalise(Hmm *hmm);
 
 void hmm_kmer_normalise(Hmm *hmm);
 
+void emissions_setMatchProbsToDefaults(double *emissionMatchProbs);
+
+void emissions_setGapProbsToDefaults(double *emissionGapProbs);
+
+double emission_getGapProb(const double *emissionGapProbs, int64_t i);
+
+double emission_kmer_getGapProb(const double *emissionGapProbs, int64_t i);
+
+double emission_getMatchProb(const double *emissionMatchProbs, int64_t x, int64_t y);
+
+double emission_kmer_getMatchProb(const double *emissionMatchProbs, int64_t x, int64_t y);
+
 StateMachine *hmm_getStateMachine(Hmm *hmm);
 
 StateMachine *hmm_kmer_getStateMachine(Hmm *hmm);
 
 StateMachine *stateMachine5_NEW_construct(StateMachineType type,
                                           int64_t (*elementIndexFcn)(void *),
-                                          void (*setMatchDefaultsFcn)(double *), void (setGapDefaultsFcn)(double *),
-                                          double* (*gapProbFcn)(int64_t), double* (*matchProbFcn)(int64_t));
+                                          void (*setMatchDefaultsFcn)(double *),
+                                          void (setGapDefaultsFcn)(double *),
+                                          double (*gapProbFcn)(const double*, int64_t),
+                                          double (*matchProbFcn)(const double*, int64_t, int64_t));
 
 StateMachine *stateMachine5_construct(StateMachineType type);
 

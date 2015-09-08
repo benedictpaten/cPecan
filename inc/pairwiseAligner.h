@@ -18,7 +18,7 @@
 #include "sonLib.h"
 #include "../../sonLib/lib/pairwiseAlignment.h"
 #include "stateMachine.h"
-//#include "shim.h"
+
 
 //The exception string
 extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
@@ -53,9 +53,9 @@ void* getKmer(void *elements, int64_t index);
 
 int64_t correctSeqLength(int64_t stringLength, sequenceType type);
 
-int64_t getBaseIndex(char base);
+int64_t getBaseIndex(void* base);
 
-int64_t getKmerIndex(char* kmer);
+int64_t getKmerIndex(void* kmer);
 
 typedef struct _pairwiseAlignmentBandingParameters {
     double threshold; //Minimum posterior probability of a match to be added to the output

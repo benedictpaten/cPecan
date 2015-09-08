@@ -4,11 +4,7 @@
  * Released under the MIT license, see LICENSE.txt
  */
 
-#include "CuTest.h"
-#include "sonLib.h"
-#include "pairwiseAligner.h"
-#include "multipleAligner.h"
-#include "emissionMatrix.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -16,8 +12,15 @@
 #include <stdbool.h>
 #include <assert.h>
 #include "randomSequences.h"
+#include "stateMachine.h"
+#include "CuTest.h"
+#include "sonLib.h"
+#include "pairwiseAligner.h"
+#include "multipleAligner.h"
+#include "emissionMatrix.h"
 
 #include "../inc/pairwiseAligner.h"
+#include "../inc/stateMachine.h"
 #include "../../sonLib/lib/sonLibCommon.h"
 #include "../../sonLib/lib/sonLibRandom.h"
 #include "../../sonLib/lib/CuTest.h"
@@ -154,16 +157,6 @@ static void test_logAdd(CuTest *testCase) {
         CuAssertTrue(testCase, l > k - 0.001);
     }
 }
-/*
-static void test_symbol(CuTest *testCase) {
-    Symbol cA[9] = { a, c, g, t, n, t, n, c, g };
-    Symbol *cA2 = symbol_convertStringToSymbols("AcGTntNCG", 9);
-    for (int64_t i = 0; i < 9; i++) {
-        CuAssertTrue(testCase, cA[i] == cA2[i]);
-    }
-    free(cA2);
-}
-*/
 
 static void test_sequenceConstruct(CuTest* testCase) {
     char *tS = getRandomSequence(100);
@@ -183,6 +176,95 @@ static void test_getKmerIndex(CuTest* testCase) {
         int64_t kmer_index_result = getKmerIndex(kmer2Set[i]);
         CuAssertIntEquals(testCase, kmer_index_result, i);
     }
+}
+
+
+static void test_NEW_cell(CuTest* testCase) {
+    /*
+     * Tests NEW stateMachine stuff, nucleotide/nucleotide
+     */
+    StateMachine *sM = stateMachine5_NEW_construct(fiveState,
+                                                   getBaseIndex,
+                                                   emissions_setMatchProbsToDefaults,
+                                                   emissions_setGapProbsToDefaults,
+                                                   emission_getGapProb,
+                                                   emission_getMatchProb);
+    double lowerF[sM->stateNumber], middleF[sM->stateNumber], upperF[sM->stateNumber], currentF[sM->stateNumber];
+    double lowerB[sM->stateNumber], middleB[sM->stateNumber], upperB[sM->stateNumber], currentB[sM->stateNumber];
+    for (int64_t i = 0; i < sM->stateNumber; i++) {
+        middleF[i] = sM->startStateProb(sM, i);
+        middleB[i] = LOG_ZERO;
+        lowerF[i] = LOG_ZERO;
+        lowerB[i] = LOG_ZERO;
+        upperF[i] = LOG_ZERO;
+        upperB[i] = LOG_ZERO;
+        currentF[i] = LOG_ZERO;
+        currentB[i] = sM->endStateProb(sM, i);
+    }
+
+    const char *charXseq = "AGCG";
+    const char *charYseq = "AGTTCG";
+    Sequence* SsX = sequenceConstruct(4, charXseq, getBase);
+    Sequence* SsY = sequenceConstruct(6, charYseq, getBase);
+    void* cX = SsX->get(SsX->elements, 2);
+    void* cY = SsY->get(SsY->elements, 2);
+
+    //Do forward
+    cell_calculateForward(sM, lowerF, NULL, NULL, middleF, cX, cY, NULL);
+    cell_calculateForward(sM, upperF, middleF, NULL, NULL, cX, cY, NULL);
+    cell_calculateForward(sM, currentF, lowerF, middleF, upperF, cX, cY, NULL);
+    //Do backward
+    cell_calculateBackward(sM, currentB, lowerB, middleB, upperB, cX, cY, NULL);
+    cell_calculateBackward(sM, upperB, middleB, NULL, NULL, cX, cY, NULL);
+    cell_calculateBackward(sM, lowerB, NULL, NULL, middleB, cX, cY, NULL);
+    double totalProbForward = cell_dotProduct2(currentF, sM, sM->endStateProb);
+    double totalProbBackward = cell_dotProduct2(middleB, sM, sM->startStateProb);
+    st_logInfo("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
+    CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.00001); //Check the forward and back probabilities are about equal
+}
+
+static void test_NEW_kmer_cell(CuTest* testCase) {
+    /*
+     * Tests NEW stateMachine stuff
+     */
+    StateMachine *sM = stateMachine5_NEW_construct(fiveState,
+                                                   getKmerIndex,
+                                                   emissions_kmers_setMatchProbsToDefaults,
+                                                   emissions_kmers_setGapProbsToDefaults,
+                                                   emission_kmer_getGapProb,
+                                                   emission_kmer_getMatchProb);
+    double lowerF[sM->stateNumber], middleF[sM->stateNumber], upperF[sM->stateNumber], currentF[sM->stateNumber];
+    double lowerB[sM->stateNumber], middleB[sM->stateNumber], upperB[sM->stateNumber], currentB[sM->stateNumber];
+    for (int64_t i = 0; i < sM->stateNumber; i++) {
+        middleF[i] = sM->startStateProb(sM, i);
+        middleB[i] = LOG_ZERO;
+        lowerF[i] = LOG_ZERO;
+        lowerB[i] = LOG_ZERO;
+        upperF[i] = LOG_ZERO;
+        upperB[i] = LOG_ZERO;
+        currentF[i] = LOG_ZERO;
+        currentB[i] = sM->endStateProb(sM, i);
+    }
+
+    const char *charXseq = "AGCG";
+    const char *charYseq = "AGTTCG";
+    Sequence* SsX = sequenceConstruct(4, charXseq, getKmer);
+    Sequence* SsY = sequenceConstruct(6, charYseq, getKmer);
+    void* cX = SsX->get(SsX->elements, 2);
+    void* cY = SsY->get(SsY->elements, 2);
+
+    //Do forward
+    cell_calculateForward(sM, lowerF, NULL, NULL, middleF, cX, cY, NULL);
+    cell_calculateForward(sM, upperF, middleF, NULL, NULL, cX, cY, NULL);
+    cell_calculateForward(sM, currentF, lowerF, middleF, upperF, cX, cY, NULL);
+    //Do backward
+    cell_calculateBackward(sM, currentB, lowerB, middleB, upperB, cX, cY, NULL);
+    cell_calculateBackward(sM, upperB, middleB, NULL, NULL, cX, cY, NULL);
+    cell_calculateBackward(sM, lowerB, NULL, NULL, middleB, cX, cY, NULL);
+    double totalProbForward = cell_dotProduct2(currentF, sM, sM->endStateProb);
+    double totalProbBackward = cell_dotProduct2(middleB, sM, sM->startStateProb);
+    st_logInfo("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
+    CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.00001); //Check the forward and back probabilities are about equal
 }
 
 static void test_cell(CuTest *testCase) {
@@ -312,6 +394,46 @@ static void test_dpDiagonal(CuTest *testCase) {
     dpDiagonal_destruct(dpDiagonal2);
 }
 
+static void test_NEW_dpDiagonal(CuTest *testCase) {
+    StateMachine *sM = stateMachine5_NEW_construct(fiveState,
+                                                   getBaseIndex,
+                                                   emissions_setMatchProbsToDefaults,
+                                                   emissions_setGapProbsToDefaults,
+                                                   emission_getGapProb,
+                                                   emission_getMatchProb);
+    Diagonal diagonal = diagonal_construct(3, -1, 1);
+
+    DpDiagonal *dpDiagonal = dpDiagonal_construct(diagonal, sM->stateNumber);
+
+    //Get cell
+    double *c1 = dpDiagonal_getCell(dpDiagonal, -1);
+    CuAssertTrue(testCase, c1 != NULL);
+
+    double *c2 = dpDiagonal_getCell(dpDiagonal, 1);
+    CuAssertTrue(testCase, c2 != NULL);
+
+    CuAssertTrue(testCase, dpDiagonal_getCell(dpDiagonal, 3) == NULL);
+    CuAssertTrue(testCase, dpDiagonal_getCell(dpDiagonal, -3) == NULL);
+
+    dpDiagonal_initialiseValues(dpDiagonal, sM, sM->endStateProb); //Test initialise values
+    double totalProb = LOG_ZERO;
+    for (int64_t i = 0; i < sM->stateNumber; i++) {
+        CuAssertDblEquals(testCase, c1[i], sM->endStateProb(sM, i), 0.0);
+        CuAssertDblEquals(testCase, c2[i], sM->endStateProb(sM, i), 0.0);
+        totalProb = logAdd(totalProb, 2 * c1[i]);
+        totalProb = logAdd(totalProb, 2 * c2[i]);
+    }
+
+    DpDiagonal *dpDiagonal2 = dpDiagonal_clone(dpDiagonal);
+    CuAssertTrue(testCase, dpDiagonal_equals(dpDiagonal, dpDiagonal2));
+
+    //Check it runs
+    CuAssertDblEquals(testCase, totalProb, dpDiagonal_dotProduct(dpDiagonal, dpDiagonal2), 0.001);
+
+    dpDiagonal_destruct(dpDiagonal);
+    dpDiagonal_destruct(dpDiagonal2);
+}
+
 static void test_dpMatrix(CuTest *testCase) {
     int64_t lX = 3, lY = 2;
     DpMatrix *dpMatrix = dpMatrix_construct(lX + lY, 5);
@@ -343,6 +465,106 @@ static void test_dpMatrix(CuTest *testCase) {
     CuAssertIntEquals(testCase, dpMatrix_getActiveDiagonalNumber(dpMatrix), 0);
 
     dpMatrix_destruct(dpMatrix);
+}
+
+static void test_NEW_diagonalDPCalculations(CuTest *testCase) {
+    // make some simple DNA sequences
+    const char *sX = "AGCG";
+    const char *sY = "AGTTCG";
+    // set lX and lY to the lengths of those sequences
+    int64_t lX = strlen(sX);
+    int64_t lY = strlen(sY);
+
+    // construct a sequence from those sequences
+    Sequence* sX2 = sequenceConstruct(lX, sX, getBase);
+    Sequence* sY2 = sequenceConstruct(lY, sY, getBase);
+
+    // construct a 5-state state machine, the forward and reverse DP Matrices, the band, the band
+    // iterators and the anchor pairs
+    StateMachine *sM = stateMachine5_NEW_construct(fiveState,
+                                                   getBaseIndex,
+                                                   emissions_setMatchProbsToDefaults,
+                                                   emissions_setGapProbsToDefaults,
+                                                   emission_getGapProb,
+                                                   emission_getMatchProb);
+    DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
+    DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
+    stList *anchorPairs = stList_construct();
+    Band *band = band_construct(anchorPairs, sX2->length, sY2->length, 2);
+    BandIterator *bandIt = bandIterator_construct(band);
+
+    //Initialise matrices
+    for (int64_t i = 0; i <= lX + lY; i++) {
+        Diagonal d = bandIterator_getNext(bandIt);
+        //initialisation
+        dpDiagonal_zeroValues(dpMatrix_createDiagonal(dpMatrixBackward, d));
+        dpDiagonal_zeroValues(dpMatrix_createDiagonal(dpMatrixForward, d));
+    }
+    dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixForward, 0), sM, sM->startStateProb);
+    dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixBackward, lX + lY), sM, sM->endStateProb);
+
+    //Forward algorithm
+    for (int64_t i = 1; i <= lX + lY; i++) {
+        //Do the forward calculation
+        diagonalCalculationForward(sM, i, dpMatrixForward, sX2, sY2);
+    }
+    //Backward algorithm
+    for (int64_t i = lX + lY; i > 0; i--) {
+        //Do the backward calculation
+        diagonalCalculationBackward(sM, i, dpMatrixBackward, sX2, sY2);
+    }
+
+    //Calculate total probabilities
+    double totalProbForward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY), sM, sM->endStateProb);
+    double totalProbBackward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
+    st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
+    //st_uglyf("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
+    //Check the forward and back probabilities are about equal
+    CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);
+
+    // Test calculating the posterior probabilities along the diagonals of the matrix.
+    //st_uglyf("\n-->Calculating posterior probabilities\n");
+    for (int64_t i = 0; i <= lX + lY; i++) {
+        //Calculate the total probs
+        double totalDiagonalProb = diagonalCalculationTotalProbability(sM, i,
+                                                                       dpMatrixForward,
+                                                                       dpMatrixBackward,
+                                                                       sX2, sY2);
+        //Check the forward and back probabilities are about equal
+        CuAssertDblEquals(testCase, totalProbForward, totalDiagonalProb, 0.01);
+    }
+
+    //Now do the posterior probabilities
+    stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
+    // aligned pairs has length 0 here, just constructed
+    void *extraArgs[1] = { alignedPairs };
+    for (int64_t i = 1; i <= lX + lY; i++) {
+        PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+        p->threshold = 0.2;
+        diagonalCalculationPosteriorMatchProbs(sM, i, dpMatrixForward, dpMatrixBackward, sX2, sY2,
+                                               totalProbForward, p, extraArgs);
+        pairwiseAlignmentBandingParameters_destruct(p);
+    }
+
+    // Make a list of the correct anchor points
+    stSortedSet *alignedPairsSet = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
+                                                          (void (*)(void *)) stIntTuple_destruct);
+
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(0, 0));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(1, 1));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 4));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 5));
+
+    for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
+        stIntTuple *pair = stList_get(alignedPairs, i);
+        int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
+        st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
+        //printf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
+        CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
+    }
+
+    CuAssertIntEquals(testCase, 4, (int) stList_length(alignedPairs));
+
 }
 
 static void test_diagonalDPCalculations(CuTest *testCase) {
@@ -593,6 +815,9 @@ static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, 
 }
 
 static void checkAlignedPairs_kmer(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY) {
+    /*
+     * why is this here?
+     */
     st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
     stSortedSet *pairs = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
                                                 (void (*)(void *)) stIntTuple_destruct
@@ -608,7 +833,7 @@ static void checkAlignedPairs_kmer(CuTest *testCase, stList *blastPairs, int64_t
         CuAssertTrue(testCase, score <= PAIR_ALIGNMENT_PROB_1);
 
         CuAssertTrue(testCase, x >= 0);
-        CuAssertTrue(testCase, y >= 0);
+        CuAssertTrue(testCase, y >= 0);   // TODO check this out:
         CuAssertTrue(testCase, x < lX+1); // remove offset for aligned kmers
         CuAssertTrue(testCase, y < lY+1); // at the end of the sequences
 
@@ -1397,16 +1622,23 @@ static void test_em_3State(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-/*
+
     SUITE_ADD_TEST(suite, test_diagonal);
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_logAdd);
-    //SUITE_ADD_TEST(suite, test_symbol);
     SUITE_ADD_TEST(suite, test_sequenceConstruct);
     SUITE_ADD_TEST(suite, test_getKmerIndex);
-    SUITE_ADD_TEST(suite, test_cell);
-    SUITE_ADD_TEST(suite, test_kmer_cell);
-    SUITE_ADD_TEST(suite, test_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_NEW_dpDiagonal); // still uses old stateMachine
+    SUITE_ADD_TEST(suite, test_NEW_cell);
+    SUITE_ADD_TEST(suite, test_NEW_kmer_cell);
+    SUITE_ADD_TEST(suite, test_NEW_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_NEW_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_cell);
+    //SUITE_ADD_TEST(suite, test_kmer_cell);
+
+    /*
+    //SUITE_ADD_TEST(suite, test_dpDiagonal); // still uses old stateMachine
+    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_dpMatrix);
     SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_kmer_diagonalDPCalculations);
@@ -1429,6 +1661,6 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     //SUITE_ADD_TEST(suite, test_em_3StateAsymmetric);
     SUITE_ADD_TEST(suite, test_em_5State);
     SUITE_ADD_TEST(suite, test_kmer_em_5State);
-*/
+    */
     return suite;
 }

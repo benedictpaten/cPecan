@@ -257,7 +257,6 @@ static inline double lookup(double x) {
 }
 
 double logAdd(double x, double y) {
-    //printf("Running logAdd! x=%f y=%f\n", x, y);
     if (x < y)
         return (x == LOG_ZERO || y - x >= logUnderflowThreshold) ? y : lookup(y - x) + x;
     return (y == LOG_ZERO || x - y >= logUnderflowThreshold) ? x : lookup(x - y) + y;
@@ -292,11 +291,10 @@ Sequence* sequence_getSubSequence(Sequence* wholeSequence,
                                   int64_t start, int64_t length,
                                   void (*getFcn)) {
     /*
-     * Function to retrieve a sub sequence of a sequence object. Could also be used
-     * to convert between Sequence types by specifying a different type with argument t
+     * Function to retrieve a sub sequence of a sequence object.
+     * TODO refactor so that this can be part of the sequence object
+     *
      */
-    // TODO //maybe here you can cast all of the elements in the whole sequence to char or something
-    // TODO //and then chop it up into a sub-sequence
     char* wS_string = wholeSequence->repr;
     char* subString = stString_getSubString(wS_string, start, length);
     Sequence* subSequence = sequenceConstruct(length, subString, getFcn);
@@ -308,7 +306,7 @@ void sequenceDestroy(Sequence* seq) {
     free(seq);
 }
 
-char* getBase(void *elements, int64_t index) {
+void* getBase(void *elements, int64_t index) {
     /*
      * Returns a single base from a sequence object. This will likely be depreciated in favor of
      * using only indexes for elements
@@ -360,25 +358,33 @@ int64_t correctSeqLength(int64_t length, sequenceType type) {
 /*
  * Indexing functions, each base and kmer has an index in the emissions and EM matrices
  */
-int64_t getBaseIndex(char base) {
+int64_t getBaseIndex(void* base) {
     /*
      * Returns the index for a base, for use with matrices and getKmerIndex
      */
-    switch (base) {
+    //st_uglyf("getBaseIndex: start - base:");
+    char b = *(char*) base; // this is where we cast from the void for nucleotides
+    //st_uglyf("%c - ", b);
+    switch (b) {
         case 'A':
+            //st_uglyf("returning 0\n");
             return 0;
         case 'C':
+            //st_uglyf("returning 1\n");
             return 1;
         case 'G':
+            //st_uglyf("returning 2\n");
             return 2;
         case 'T':
+            //st_uglyf("returning 3\n");
             return 3;
         default:
+            //st_uglyf("returning 4 - default\n");
             return 4;
     }
 }
 
-int64_t getKmerIndex(char* kmer) {
+int64_t getKmerIndex(void* kmer) {
     /*
      * Returns the index for a kmer
      */
@@ -389,12 +395,12 @@ int64_t getKmerIndex(char* kmer) {
     int64_t i = 0;
     int64_t x = 0;
     while(l > 1) {
-        x += l*getBaseIndex(kmer[i]);
+        x += l*getBaseIndex(kmer+i);
         i += 1;
         l = l/5;
     }
     int64_t last = strlen(kmer)-1;
-    x += getBaseIndex(kmer[last]);
+    x += getBaseIndex(kmer+last);
     return x;
 }
 ///////////////////////////////////
@@ -407,8 +413,10 @@ int64_t getKmerIndex(char* kmer) {
 ///////////////////////////////////
 ///////////////////////////////////
 
-static inline void doTransitionForward(double *fromCells, double *toCells, int64_t from, int64_t to,
-                                       double eP, double tP, void *extraArgs) {
+static inline void doTransitionForward(double *fromCells, double *toCells,
+                                       int64_t from, int64_t to,
+                                       double eP, double tP,
+                                       void *extraArgs) {
     toCells[to] = logAdd(toCells[to], fromCells[from] + (eP + tP));
 }
 
@@ -418,8 +426,10 @@ void cell_calculateForward(StateMachine *sM,
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, doTransitionForward, extraArgs);
 }
 
-static inline void doTransitionBackward(double *fromCells, double *toCells, int64_t from, int64_t to,
-                                        double eP, double tP, void *extraArgs) {
+static inline void doTransitionBackward(double *fromCells, double *toCells,
+                                        int64_t from, int64_t to,
+                                        double eP, double tP,
+                                        void *extraArgs) {
     fromCells[from] = logAdd(fromCells[from], toCells[to] + (eP + tP));
 }
 
@@ -717,19 +727,14 @@ static void diagonalCalculation(StateMachine *sM,
         // it could be anything (base, kmer, event, etc.)
         void* x = sX->get(sX->elements, indexX);
         void* y = sY->get(sY->elements, indexY);
-
-        // get the index of the element for use with the state machine. The logic here is that the state machine has
-        // the associated matrices that need to be used with the index, and thus the elementIndexFcn is specific to
-        // the state machine, not the sequence.
-        int64_t iX = sM->getElementIndexFcn(x);
-        int64_t iY = sM->getElementIndexFcn(y);
+        //st_uglyf("got X:%s, Y:%s\n",  (char*) x, (char*) y);
 
         // do the calculations
         double *current = dpDiagonal_getCell(dpDiagonal, xmy);
         double *lower = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy - 1);
         double *middle = dpDiagonalM2 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM2, xmy);
         double *upper = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy + 1);
-        cellCalculation(sM, current, lower, middle, upper, iX, iY, extraArgs);
+        cellCalculation(sM, current, lower, middle, upper, x, y, extraArgs);
         xmy += 2;
     }
 }
@@ -1507,7 +1512,7 @@ void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
 
     // TODO when do you decide on the alignment type?
 
-    getExpectationsUsingAnchors(sM, hmmExpectations, SsX, SsY,
+    getExpectationsUsingAnchors(sM, hmmExpectations, sX, sY,
                                 anchorPairs, p,
                                 alignmentHasRaggedLeftEnd,
                                 alignmentHasRaggedRightEnd);
