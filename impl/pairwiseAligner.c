@@ -22,9 +22,6 @@
 #include "stateMachine.h"
 #include "emissionMatrix.h"
 
-#include "../inc/pairwiseAligner.h"
-#include "../inc/emissionMatrix.h"
-#include "../../sonLib/C/inc/bioioC.h"
 
 
 ///////////////////////////////////
@@ -266,7 +263,6 @@ double logAdd(double x, double y) {
 ///////////////////////////////////
 ///////////////////////////////////
 //Sequence Object
-//
 //Emissions probs/functions to convert to symbol sequence
 ///////////////////////////////////
 ///////////////////////////////////
@@ -293,12 +289,22 @@ Sequence* sequence_getSubSequence(Sequence* wholeSequence,
     /*
      * Function to retrieve a sub sequence of a sequence object.
      * TODO refactor so that this can be part of the sequence object
-     *
      */
     char* wS_string = wholeSequence->repr;
     char* subString = stString_getSubString(wS_string, start, length);
     Sequence* subSequence = sequenceConstruct(length, subString, getFcn);
     return subSequence;
+}
+
+Sequence* sequence_NEW_getSubSequence(Sequence* inputSequence, int64_t start, int64_t sliceLength, void (*getFcn)) {
+    /*
+     * slice a sequence object
+     */
+    //size_t elementSize = sizeof(inputSequence->elements)/inputSequence->length;
+    void *elementSlice; // = malloc(elementSize* sliceLength);
+    elementSlice = &inputSequence->elements[start];
+    Sequence* newSequence = sequenceConstruct(sliceLength, elementSlice, getFcn);
+    return newSequence;
 }
 
 void sequenceDestroy(Sequence* seq) {
@@ -355,54 +361,7 @@ int64_t correctSeqLength(int64_t length, sequenceType type) {
     }
 }
 
-/*
- * Indexing functions, each base and kmer has an index in the emissions and EM matrices
- */
-int64_t getBaseIndex(void* base) {
-    /*
-     * Returns the index for a base, for use with matrices and getKmerIndex
-     */
-    //st_uglyf("getBaseIndex: start - base:");
-    char b = *(char*) base; // this is where we cast from the void for nucleotides
-    //st_uglyf("%c - ", b);
-    switch (b) {
-        case 'A':
-            //st_uglyf("returning 0\n");
-            return 0;
-        case 'C':
-            //st_uglyf("returning 1\n");
-            return 1;
-        case 'G':
-            //st_uglyf("returning 2\n");
-            return 2;
-        case 'T':
-            //st_uglyf("returning 3\n");
-            return 3;
-        default:
-            //st_uglyf("returning 4 - default\n");
-            return 4;
-    }
-}
 
-int64_t getKmerIndex(void* kmer) {
-    /*
-     * Returns the index for a kmer
-     */
-    int64_t kmerLen = strlen(kmer);
-    assert(kmerLen == KMER_LENGTH);
-    int64_t axisLength = 25; // for 2-mers
-    int64_t l = axisLength/5;
-    int64_t i = 0;
-    int64_t x = 0;
-    while(l > 1) {
-        x += l*getBaseIndex(kmer+i);
-        i += 1;
-        l = l/5;
-    }
-    int64_t last = strlen(kmer)-1;
-    x += getBaseIndex(kmer+last);
-    return x;
-}
 ///////////////////////////////////
 ///////////////////////////////////
 //Cell calculations
@@ -455,12 +414,13 @@ double cell_dotProduct2(double *cell, StateMachine *sM, double (*getStateValue)(
     return totalProb;
 }
 
-static inline void updateExpectations(double *fromCells, double *toCells,
+void updateExpectations(double *fromCells, double *toCells,
                                       int64_t from, int64_t to,
                                       double eP, double tP,
                                       void *extraArgs) {
     /*
      * Update hmm expectations for nucleotide/nucleotide alignment
+     *
      */
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
@@ -476,7 +436,7 @@ static inline void updateExpectations(double *fromCells, double *toCells,
     }
 }
 
-static inline void updateExpectations_kmer(double *fromCells, double *toCells,
+void updateExpectations_kmer(double *fromCells, double *toCells,
                                            int64_t from, int64_t to,
                                            double eP, double tP,
                                            void *extraArgs) {
@@ -506,15 +466,7 @@ static void cell_calculateExpectation(StateMachine *sM,
                                       void *extraArgs) {
 
     void *extraArgs2[4] = { ((void **)extraArgs)[0], ((void **)extraArgs)[1], &cX, &cY };
-    sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, updateExpectations, extraArgs2);
-}
-
-static void cell_calculateExpectation_kmer(StateMachine *sM,
-                                           double *current, double *lower, double *middle, double *upper,
-                                           char* cX, char* cY,
-                                           void *extraArgs) {
-    void *extraArgs2[4] = { ((void **)extraArgs)[0], ((void **)extraArgs)[1], &cX, &cY };
-    sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, updateExpectations_kmer, extraArgs2);
+    sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, sM->updateExpectationsFcn, extraArgs2);
 }
 
 ///////////////////////////////////
@@ -831,10 +783,14 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
  * This function now takes Sequence objects and determines if the alignment is between nucleotides
  * or kmers and calls the appropriate functions
  */
-static void diagonalCalculationExpectations(
-        StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
-        DpMatrix *backwardDpMatrix, const Sequence* sX, const Sequence* sY,
-        double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs) {
+static void diagonalCalculationExpectations(StateMachine *sM,
+                                            int64_t xay,
+                                            DpMatrix *forwardDpMatrix,
+                                            DpMatrix *backwardDpMatrix,
+                                            const Sequence* sX, const Sequence* sY,
+                                            double totalProbability,
+                                            PairwiseAlignmentParameters *p,
+                                            void *extraArgs) {
     /*
      * Updates the expectations of the transitions/emissions for the given diagonal.
      */
@@ -844,22 +800,12 @@ static void diagonalCalculationExpectations(
     // We do this once per diagonal, which is a hack, rather than for the
     // whole matrix. The correction factor is approximately 1/number of
     // diagonals.
-    int64_t alignmentType = sX->type + sY->type;
-    if (alignmentType == 0) { //for nucleotide/nucleotide alignments
-        diagonalCalculation(sM,
-                            dpMatrix_getDiagonal(backwardDpMatrix, xay),
-                            dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
-                            dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
-                            sX, sY, cell_calculateExpectation, extraArgs2);
-    }
-    if (alignmentType > 0) { //For kmer/kmer and eventually event/kmer alignments
-        diagonalCalculation(sM,
-                            dpMatrix_getDiagonal(backwardDpMatrix, xay),
-                            dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
-                            dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
-                            sX, sY, cell_calculateExpectation_kmer,
-                            extraArgs2);
-    }
+
+    diagonalCalculation(sM,
+                        dpMatrix_getDiagonal(backwardDpMatrix, xay),
+                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
+                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 2), //TODO: this cellCalc neends to
+                        sX, sY, cell_calculateExpectation, extraArgs2); //TODO: be generalized
 }
 
 ///////////////////////////////////
@@ -871,14 +817,17 @@ static void diagonalCalculationExpectations(
  * Now works with Sequence objects when calling diagonal DP calculation functions, otherwise largely
  * left unchanged
  */
-void getPosteriorProbsWithBanding(
-        StateMachine *sM, stList *anchorPairs, const Sequence* sX, const Sequence* sY,
-        PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
-        void (*diagonalPosteriorProbFn)(
-              StateMachine *, int64_t, DpMatrix *, DpMatrix *, const Sequence*, const Sequence*,
-              double, PairwiseAlignmentParameters *, void *
-             ),
-        void *extraArgs) {
+void getPosteriorProbsWithBanding(StateMachine *sM,
+                                  stList *anchorPairs,
+                                  const Sequence* sX, const Sequence* sY,
+                                  PairwiseAlignmentParameters *p,
+                                  bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
+                                  void (*diagonalPosteriorProbFn)(StateMachine *,
+                                                                  int64_t,
+                                                                  DpMatrix *, DpMatrix *,
+                                                                  const Sequence*, const Sequence*,
+                                                                  double, PairwiseAlignmentParameters *, void *),
+                                  void *extraArgs) {
     //Prerequisites
     assert(p->traceBackDiagonals >= 1);
     assert(p->diagonalExpansion >= 0);
@@ -895,8 +844,8 @@ void getPosteriorProbsWithBanding(
     Band *band = band_construct(anchorPairs, sX->length, sY->length, p->diagonalExpansion);
     BandIterator *forwardBandIterator = bandIterator_construct(band);
     DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
-    dpDiagonal_initialiseValues(dpMatrix_createDiagonal(forwardDpMatrix, bandIterator_getNext(forwardBandIterator)), sM,
-            alignmentHasRaggedLeftEnd ? sM->raggedStartStateProb : sM->startStateProb); //Initialise forward matrix.
+    dpDiagonal_initialiseValues(dpMatrix_createDiagonal(forwardDpMatrix, bandIterator_getNext(forwardBandIterator)),
+                                sM, alignmentHasRaggedLeftEnd ? sM->raggedStartStateProb : sM->startStateProb); //Initialise forward matrix.
 
     //Backward matrix.
     DpMatrix *backwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
@@ -1093,12 +1042,12 @@ stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatM
         // change the path here to local lastz folder
         command =
                 stString_print(
-                        "/Users/Rand/projects/marginAlign/cPecan/sonLib/bin/lastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s %s",
+                        "/Users/Rand/projects/marginAlign/cPecan/sonLib-LASTONLY/bin/lastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s %s",
                         tempFile1, tempFile2);
     } else {
         command =
                 stString_print(
-                        "echo '>b\n%s\n' | /Users/Rand/projects/marginAlign/cPecan/sonLib/bin/lastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s",
+                        "echo '>b\n%s\n' | /Users/Rand/projects/marginAlign/cPecan/sonLib-LASTONLY/bin/lastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s",
                         sY, tempFile1);
     }
     FILE *fileHandle = popen(command, "r");
@@ -1346,7 +1295,6 @@ static void convertAlignedPairs(stList *alignedPairs2, int64_t offsetX, int64_t 
  */
 void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         StateMachine *sM, stList *anchorPairs, Sequence *SsX, Sequence *SsY,
-        //sequenceType t, // todo remove this
         PairwiseAlignmentParameters *p,
         bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
         void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *,
@@ -1354,8 +1302,11 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
                                         const Sequence*, double,
                                         PairwiseAlignmentParameters *, void *),
         void (*coordinateCorrectionFn)(), void *extraArgs) {
+    /*
+     * TODO pretty major changes need to happen here
+     */
 
-    int64_t lX = strlen(SsX->repr);
+    int64_t lX = strlen(SsX->repr); // so here you want the total number of elements
     int64_t lY = strlen(SsY->repr);
     stList *splitPoints = getSplitPoints(anchorPairs, lX, lY,
                                          p->splitMatrixBiggerThanThis,
@@ -1371,8 +1322,8 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         int64_t x2 = stIntTuple_get(subRegion, 2);
         int64_t y2 = stIntTuple_get(subRegion, 3);
 
-        Sequence* sX3 = sequence_getSubSequence(SsX, x1, x2 - x1, SsX->type);
-        Sequence* sY3 = sequence_getSubSequence(SsY, y1, y2 - y1, SsY->type);
+        Sequence* sX3 = sequence_NEW_getSubSequence(SsX, x1, x2 - x1, SsX->get);
+        Sequence* sY3 = sequence_NEW_getSubSequence(SsY, y1, y2 - y1, SsY->get);
 
         //List of anchor pairs
         stList *subListOfAnchorPoints = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
@@ -1491,26 +1442,26 @@ void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                  PairwiseAlignmentParameters *p,
                                  bool alignmentHasRaggedLeftEnd,
                                  bool alignmentHasRaggedRightEnd) {
-    getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
-            sM, anchorPairs, SsX, SsY,
-            p,
-            alignmentHasRaggedLeftEnd, alignmentHasRaggedRightEnd,
-            diagonalCalculationExpectations, NULL, hmmExpectations);
+    getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(sM, anchorPairs,
+                                                               SsX, SsY,
+                                                               p,
+                                                               alignmentHasRaggedLeftEnd,
+                                                               alignmentHasRaggedRightEnd,
+                                                               diagonalCalculationExpectations,
+                                                               NULL, hmmExpectations);
 }
 
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
-                     char *sX, char *sY,
+                     void *sX, void *sY,
                      PairwiseAlignmentParameters *p,
                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
-
-    // TODO make this function take char arrays then make into sequence object before get expectations
-
     stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(sX, sY, p);
 
     int64_t lX = strlen(sX);
     int64_t lY = strlen(sY);
 
-    // TODO when do you decide on the alignment type?
+    // When do you decide on the alignment type?
+    // The stateMachine decides? YES
 
     getExpectationsUsingAnchors(sM, hmmExpectations, sX, sY,
                                 anchorPairs, p,

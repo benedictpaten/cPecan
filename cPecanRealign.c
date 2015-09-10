@@ -13,10 +13,6 @@
 #include "pairwiseAligner.h"
 #include "multipleAligner.h"
 #include "commonC.h"
-//#include "inc/shim.h"
-#include "inc/pairwiseAligner.h"
-#include "inc/multipleAligner.h"
-#include "../sonLib/C/inc/bioioC.h"
 
 void usage() {
     fprintf(stderr, "cPecanRelign [options] seq1[fasta] seq2[fasta], version 0.2\n");
@@ -512,7 +508,13 @@ int main(int argc, char *argv[]) {
         hmm_destruct(hmm);
     }
     else {
-        sM = stateMachine5_construct(fiveState);
+        sM = stateMachine5_construct(fiveState,
+                                     emissions_symbol_setMatchProbsToDefaults,
+                                     emissions_symbol_setGapProbsToDefaults,
+                                     emissions_symbol_setGapProbsToDefaults,
+                                     emissions_symbol_getGapProb,
+                                     emissions_symbol_getGapProb,
+                                     emissions_symbol_getMatchProb);
     }
 
     //Make the expectations object, if needed

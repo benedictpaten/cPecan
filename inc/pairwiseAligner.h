@@ -16,7 +16,6 @@
 
 #include "bioioC.h"
 #include "sonLib.h"
-#include "../../sonLib/lib/pairwiseAlignment.h"
 #include "stateMachine.h"
 
 
@@ -45,17 +44,15 @@ Sequence* sequenceConstruct(int64_t length, void *elements, void (*getFcn));
 
 Sequence* sequence_getSubSequence(Sequence* wholeSequence, int64_t start, int64_t length, void (*getFcn));
 
+Sequence* sequence_NEW_getSubSequence(Sequence* inputSequence, int64_t start, int64_t sliceLength, void (*getFcn));
+
 void sequenceDestroy(Sequence* seq);
 
 void* getBase(void *elements, int64_t index);
 
 void* getKmer(void *elements, int64_t index);
 
-int64_t correctSeqLength(int64_t stringLength, sequenceType type);
-
-int64_t getBaseIndex(void* base);
-
-int64_t getKmerIndex(void* kmer);
+int64_t correctSeqLength(int64_t length, sequenceType type);
 
 typedef struct _pairwiseAlignmentBandingParameters {
     double threshold; //Minimum posterior probability of a match to be added to the output
@@ -91,6 +88,10 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM, Sequence *SsX, Sequence *S
 /*
  * Expectation calculation functions for EM algorithms.
  */
+
+void updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP, void *extraArgs);
+
+void updateExpectations_kmer(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP, void *extraArgs);
 
 void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                  Sequence *sX, Sequence *sY, //sequenceType t,

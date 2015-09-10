@@ -11,14 +11,12 @@
 #include <stdlib.h>
 #include <math.h>
 #include "stGraph.h"
-#include "../../sonLib/lib/sonLibTypes.h"
-#include "../../sonLib/lib/sonLibSortedSet.h"
-#include "../../sonLib/lib/sonLibTuples.h"
-#include "../../sonLib/lib/sonLibList.h"
-#include "../../sonLib/lib/sonLibSet.h"
-#include "../inc/multipleAligner.h"
+
 #include <inttypes.h>
 #include <assert.h>
+
+
+
 
 ///////////////////////////////
 ///////////////////////////////
