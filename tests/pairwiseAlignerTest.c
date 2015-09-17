@@ -18,6 +18,18 @@
 #include "pairwiseAligner.h"
 #include "multipleAligner.h"
 #include "emissionMatrix.h"
+#include "../../sonLib/lib/CuTest.h"
+#include "../inc/pairwiseAligner.h"
+#include "../../sonLib/lib/sonLibExcept.h"
+#include "../../sonLib/lib/sonLibCommon.h"
+#include "../../sonLib/lib/sonLibList.h"
+#include "../../sonLib/lib/sonLibTuples.h"
+#include "../../sonLib/lib/sonLibRandom.h"
+#include "../inc/emissionMatrix.h"
+#include "../../sonLib/lib/sonLibString.h"
+#include "../../sonLib/lib/sonLibFile.h"
+#include "../../sonLib/lib/sonLibSortedSet.h"
+#include "../inc/multipleAligner.h"
 
 
 static void test_diagonal(CuTest *testCase) {
@@ -151,7 +163,7 @@ static void test_logAdd(CuTest *testCase) {
 
 static void test_sequenceConstruct(CuTest* testCase) {
     char *tS = getRandomSequence(100);
-    Sequence* testSequence = sequenceConstruct(100, tS, nucleotide);
+    Sequence* testSequence = sequenceConstruct(100, tS, getBase);
     CuAssertIntEquals(testCase, 100, testSequence->length);
     CuAssertStrEquals(testCase, tS, testSequence->repr);
     free(tS);
@@ -1330,8 +1342,9 @@ static void test_em(CuTest *testCase, StateMachineType stateMachineType) {
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
 
-        Sequence* SsX = sequenceConstruct(lX, sX, getBase);
-        Sequence* SsY = sequenceConstruct(lY, sY, getBase);
+        // maybe don't turn these into Sequences yet??
+        Sequence *SsX = sequenceConstruct(lX, sX, getBase);
+        Sequence *SsY = sequenceConstruct(lY, sY, getBase);
 
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -1345,7 +1358,7 @@ static void test_em(CuTest *testCase, StateMachineType stateMachineType) {
 
         for (int64_t iteration = 0; iteration < 10; iteration++) {
             hmm = hmm_constructEmpty(0.000000000001, stateMachineType); //The tiny pseudo count prevents overflow
-            getExpectations(sM, hmm, SsX, SsY, p, 0, 0);
+            getExpectations(sM, hmm, sX, sY, p, 0, 0); // E-step
             hmm_normalise(hmm);
             //Log stuff
             for (int64_t from = 0; from < sM->stateNumber; from++) {
@@ -1368,7 +1381,7 @@ static void test_em(CuTest *testCase, StateMachineType stateMachineType) {
             CuAssertTrue(testCase, pLikelihood <= hmm->likelihood * 0.95);
             pLikelihood = hmm->likelihood;
             stateMachine_destruct(sM);
-            sM = hmm_getStateMachine(hmm);
+            sM = hmm_getStateMachine(hmm); // M-step
             hmm_destruct(hmm);
         }
 

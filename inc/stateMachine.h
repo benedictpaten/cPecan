@@ -26,6 +26,19 @@ typedef enum {
 
 typedef struct _stateMachine StateMachine;
 
+/*
+ * Hmm for loading/unloading HMMs and storing expectations.
+ * Maybe move these definitions to stateMachine.c to clean this up?
+ */
+
+typedef struct _hmm {
+    StateMachineType type;
+    double *transitions;
+    double *emissions;
+    double likelihood;
+    int64_t stateNumber;
+} Hmm;
+
 struct _stateMachine {
     StateMachineType type; // TODO get rid of this
     int64_t stateNumber;
@@ -51,8 +64,7 @@ struct _stateMachine {
 
     double (*getMatchProbFcn)(const double* emissionMatchProbs, void *x, void *y);
 
-    void (*updateExpectationsFcn)(double *fromCells, double *toCells, int64_t from, int64_t to,
-                                  double eP, double tP, void *extraArgs);
+    //void (*updateExpectationsFcn)(Hmm *hmmExpectations, int64_t from, int64_t to, double p);
 
     //Cells (states at a given coordinate)
     void (*cellCalculate)(StateMachine *sM, double *current, double *lower, double *middle, double *upper,
@@ -60,59 +72,8 @@ struct _stateMachine {
                           void(*doTransition)(double *, double *, int64_t, int64_t, double, double, void *),
                           void *extraArgs);
 };
-
-/*
- * Hmm for loading/unloading HMMs and storing expectations.
- */
-
-typedef struct _stateMachineFunctions {
-    void (*setMatchDefaultsFcn)(double* emissionMatchProbs);
-    void (*setXGapDefaultsFcn)(double* emissionXGapProbs);
-    void (*setYGapDefaultsFcn)(double* emissionYGapProbs);
-    double (*getXGapProbFcn)(const double* emissionGapProbs, void *i);
-    double (*getYGapProbFcn)(const double* emissionGapProbs, void *i);
-    double (*getMatchProbFcn)(const double* emissionMatchProbs, void *x, void *y);
-    void (*updateExpectationsFcn)(double *fromCells, double *toCells, int64_t from, int64_t to,
-                                  double eP, double tP, void *extraArgs);
-} StateMachineFunctions;
-
-typedef struct _hmm {
-    StateMachineType type;
-    double likelihood;
-    int64_t stateNumber;
-    StateMachineFunctions sM_functions;
-
-    void (*randomizeFcn)(struct hmm);
-    void (*normalizeFcn)(struct hmm);
-
-    void (*writeFcn)(struct hmm, FILE *fileHandle);
-
-    void (*addToTransitionExpectation)(struct hmm, int64_t from, int64_t to, double p);
-    double (*getTransitions)(struct hmmExpectations, int64_t from, int64_t to);
-    void (*setTransition)(struct hmm, int64_t from, int64_t to, double p);
-
-    void (*addToEmissionExpectation);
-    double (*getEmissionExpectation);
-    void (*setEmissionExpectation);
-
-    void (*loadSymmetric)(struct stateMachine, struct hmm);
-    void (*loadAsymmetric)(struct stateMachine, struct hmm);
-
-} Hmm;
-
-typedef struct _hmm_discrete {
-    Hmm baseHMM;
-    int64_t matrixSize;
-    double *transitions;
-    double *emissions;
-} Hmm_discrete;
-
-
 // constructers
-Hmm *hmm_constructEmpty(double pseudoExpectation, StateMachineType type,
-                        void (*setEmissionsToZero)(Hmm*, int64_t, double*, double));
-
-void hmm_symbol_setEmissionsToZero(Hmm *hmm, int64_t matrixSize, double* emissions, double pseudoExpectation);
+Hmm *hmm_constructEmpty(double pseudoExpectation, StateMachineType type);
 
 // randomizers
 void hmm_randomise(Hmm *hmm); //Creates normalised HMM with parameters set to small random values.
@@ -177,8 +138,7 @@ StateMachine *stateMachine5_construct(StateMachineType type,
                                       void (*setYGapDefaultsFcn)(double *),
                                       double (*gapXProbFcn)(const double *, void *),
                                       double (*gapYProbFcn)(const double *, void *),
-                                      double (*matchProbFcn)(const double *, void *, void *),
-                                      void (*updateExpectations)(double*, double*, int64_t, int64_t, double, double, void*));
+                                      double (*matchProbFcn)(const double *, void *, void *));
 
 StateMachine *stateMachine3_construct(StateMachineType type); //the type is to specify symmetric/asymmetric
 

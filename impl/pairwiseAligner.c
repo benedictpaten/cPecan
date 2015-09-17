@@ -21,6 +21,12 @@
 #include "pairwiseAlignment.h"
 #include "stateMachine.h"
 #include "emissionMatrix.h"
+#include "../inc/pairwiseAligner.h"
+#include "../../sonLib/lib/sonLib.h"
+#include "../../sonLib/lib/pairwiseAlignment.h"
+#include "../../sonLib/lib/sonLibString.h"
+#include "../../sonLib/lib/sonLibCommon.h"
+#include "../inc/emissionMatrix.h"
 
 
 
@@ -283,19 +289,6 @@ Sequence* sequenceConstruct(int64_t length, void *elements, void (*getFcn)) {
     return self;
 }
 
-Sequence* sequence_getSubSequence(Sequence* wholeSequence,
-                                  int64_t start, int64_t length,
-                                  void (*getFcn)) {
-    /*
-     * Function to retrieve a sub sequence of a sequence object.
-     * TODO refactor so that this can be part of the sequence object
-     */
-    char* wS_string = wholeSequence->repr;
-    char* subString = stString_getSubString(wS_string, start, length);
-    Sequence* subSequence = sequenceConstruct(length, subString, getFcn);
-    return subSequence;
-}
-
 Sequence* sequence_NEW_getSubSequence(Sequence* inputSequence, int64_t start, int64_t sliceLength, void (*getFcn)) {
     /*
      * slice a sequence object
@@ -436,6 +429,30 @@ void updateExpectations(double *fromCells, double *toCells,
     }
 }
 
+void updateExpectations_NEW(double *fromCells, double *toCells,
+                           int64_t from, int64_t to,
+                           double eP, double tP,
+                           void *extraArgs) {
+    /*
+     * Update hmm expectations for nucleotide/nucleotide alignment
+     * TODO use hmm or stateMachine to get addTransition/Expectation functions
+     */
+    //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
+    double totalProbability = *((double *) ((void **) extraArgs)[0]);
+    Hmm *hmmExpectations = ((void **) extraArgs)[1];
+    int64_t x = *((int64_t *)((void **) extraArgs)[2]);
+    int64_t y = *((int64_t *)((void **) extraArgs)[3]);
+    //Calculate posterior probability of the transition/emission pair
+    double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
+    hmmExpectations->addToTransitionExpectation(hmmExpectations->transitions,
+                                                hmmExpectations->stateNumber,
+                                                from, to, p);
+    //Add in the expectation of the transition
+    addToTransitionExpectation(hmmExpectations, from, to, p);
+    addToEmissionsExpectation(hmmExpectations, to, x, y, p); // no more check for Ns
+
+}
+
 void updateExpectations_kmer(double *fromCells, double *toCells,
                                            int64_t from, int64_t to,
                                            double eP, double tP,
@@ -464,9 +481,10 @@ static void cell_calculateExpectation(StateMachine *sM,
                                       double *current, double *lower, double *middle, double *upper,
                                       void* cX, void* cY,
                                       void *extraArgs) {
-
-    void *extraArgs2[4] = { ((void **)extraArgs)[0], ((void **)extraArgs)[1], &cX, &cY };
-    sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, sM->updateExpectationsFcn, extraArgs2);
+    void *extraArgs2[4] = { ((void **)extraArgs)[0], // hmmExpectations
+                            ((void **)extraArgs)[1], // &totalProbabability
+                            &cX, &cY };
+    sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, updateExpectations_NEW, extraArgs2);
 }
 
 ///////////////////////////////////
@@ -794,8 +812,8 @@ static void diagonalCalculationExpectations(StateMachine *sM,
     /*
      * Updates the expectations of the transitions/emissions for the given diagonal.
      */
-    Hmm *hmmExpectations = extraArgs;
-    void *extraArgs2[2] = { &totalProbability, hmmExpectations };
+    Hmm *hmmExpectations = extraArgs; // maybe change around hmm here?
+    void *extraArgs2[2] = { &totalProbability, hmmExpectations }; // this is where you pack in totalprob
     hmmExpectations->likelihood += totalProbability;
     // We do this once per diagonal, which is a hack, rather than for the
     // whole matrix. The correction factor is approximately 1/number of
@@ -1306,8 +1324,14 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
      * TODO pretty major changes need to happen here
      */
 
-    int64_t lX = strlen(SsX->repr); // so here you want the total number of elements
-    int64_t lY = strlen(SsY->repr);
+    //int64_t lX = strlen(SsX->repr); // so here you want the total number of elements
+    //int64_t lY = strlen(SsY->repr);
+
+    // you are going to cut the sequences into subSequences anyways, so not having the correct
+    // number of elements in length, ie having it reflect the number of nucleotides might be ok?
+    int64_t lX = SsX->length; // so here you want the total number of elements
+    int64_t lY = SsY->length;
+
     stList *splitPoints = getSplitPoints(anchorPairs, lX, lY,
                                          p->splitMatrixBiggerThanThis,
                                          alignmentHasRaggedLeftEnd,
@@ -1442,6 +1466,9 @@ void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                  PairwiseAlignmentParameters *p,
                                  bool alignmentHasRaggedLeftEnd,
                                  bool alignmentHasRaggedRightEnd) {
+    /*
+     * TODO documentation
+     */
     getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(sM, anchorPairs,
                                                                SsX, SsY,
                                                                p,
@@ -1452,18 +1479,29 @@ void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
 }
 
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
-                     void *sX, void *sY,
+                     void *sX, void *sY, // maybe make this char*?
                      PairwiseAlignmentParameters *p,
                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
+    /*
+     * TODO DOCUMENTATION!
+     */
+    // this function should take anything and return the anchor pairs, probably going
+    // to keep using a basic aligner like lastz.
     stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(sX, sY, p);
 
+    // You might have to adjust the lenth here depending on the type of alignment.
     int64_t lX = strlen(sX);
     int64_t lY = strlen(sY);
-
+    // Make Sequence objects
+    Sequence *SsX = sequenceConstruct(lX, sX, getBase);
+    Sequence *SsY = sequenceConstruct(lY, sY, getBase);
+    //
     // When do you decide on the alignment type?
-    // The stateMachine decides? YES
+    // The stateMachine decides?
+    // Going in the stateMachine has the previous expectations and the hmmExpectations
+    // is empty,
 
-    getExpectationsUsingAnchors(sM, hmmExpectations, sX, sY,
+    getExpectationsUsingAnchors(sM, hmmExpectations, SsX, SsY,
                                 anchorPairs, p,
                                 alignmentHasRaggedLeftEnd,
                                 alignmentHasRaggedRightEnd);

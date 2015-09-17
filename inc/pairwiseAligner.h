@@ -17,6 +17,7 @@
 #include "bioioC.h"
 #include "sonLib.h"
 #include "stateMachine.h"
+#include "../../sonLib/lib/sonLibTypes.h"
 
 
 //The exception string
@@ -101,7 +102,7 @@ void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                  bool alignmentHasRaggedRightEnd);
 
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
-                     char* sX, char* sY,
+                     void* sX, void* sY,
                      PairwiseAlignmentParameters *p,
                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 

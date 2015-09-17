@@ -9,11 +9,21 @@
 #include <stdio.h>
 #include <math.h>
 #include <ctype.h>
+#include <assert.h>
 
 #include "bioioC.h"
 #include "sonLib.h"
 #include "pairwiseAligner.h"
 #include "stateMachine.h"
+
+#include "../inc/emissionMatrix.h"
+#include "../inc/stateMachine.h"
+#include "../../sonLib/lib/sonLibCommon.h"
+#include "../../sonLib/lib/sonLibList.h"
+#include "../../sonLib/lib/sonLibString.h"
+#include "../../sonLib/lib/sonLibFile.h"
+#include "../inc/pairwiseAligner.h"
+#include "../../sonLib/lib/sonLibRandom.h"
 
 ///////////////////////////////////
 ///////////////////////////////////
@@ -24,39 +34,27 @@
  * Most of the original functions were left unchanged, there are additional functions for use with the kmer/kmer model
  * that are basically the same but use the larger emissions matrix
  */
-Hmm *hmm_constructEmpty(double pseudoExpectation, StateMachineType type,
-                        void (*setEmissionsToZero)(Hmm*, int64_t, double*, double)) {
-    Hmm_discrete *hmmD = st_malloc(sizeof(Hmm_discrete));
-    hmmD->baseHMM.type = type;
+Hmm *hmm_constructEmpty(double pseudoExpectation, StateMachineType type) {
+    Hmm *hmm = st_malloc(sizeof(Hmm));
+    hmm->type = type;
     switch (type) {
     case fiveState:
     case fiveStateAsymmetric:
-        hmmD->baseHMM.stateNumber = 5;
+        hmm->stateNumber = 5;
         break;
     case threeState:
     case threeStateAsymmetric:
-        hmmD->baseHMM.stateNumber = 3;
+        hmm->stateNumber = 3;
         break;
     default:
         st_errAbort("Unrecognised state type: %i\n", type);
     }
-    hmmD->transitions = st_malloc(hmmD->baseHMM.stateNumber * hmmD->baseHMM.stateNumber * sizeof(double));
-    for (int64_t i = 0; i < hmmD->baseHMM.stateNumber * hmmD->baseHMM.stateNumber; i++) {
-        hmmD->transitions[i] = pseudoExpectation;
+    hmm->transitions = st_malloc(hmm->stateNumber * hmm->stateNumber * sizeof(double));
+    for (int64_t i = 0; i < hmm->.stateNumber * hmm->stateNumber; i++) {
+        hmm->transitions[i] = pseudoExpectation;
     }
-    setEmissionsToZero((Hmm*) hmmD, hmmD->matrixSize, hmmD->emissions, pseudoExpectation);
-
-    hmmD->baseHMM.likelihood = 0.0;
-    return (Hmm *) hmmD;
-}
-
-void hmm_symbol_setEmissionsToZero(Hmm *hmm, int64_t matrixSize,
-                                   double* emissions, double pseudoExpectation) {
-    Hmm_discrete* hmmD = (Hmm_discrete*) hmm;
-    hmmD->emissions = st_malloc(hmmD->baseHMM.stateNumber * matrixSize * sizeof(double));
-    for (int64_t i = 0; i < hmmD->baseHMM.stateNumber * matrixSize; i++) {
-        hmmD->emissions[i] = pseudoExpectation;
-    }
+    hmm->likelihood = 0.0;
+    return hmm;
 }
 
 Hmm *hmm_kmer_constructEmpty(double pseudoExpectation, StateMachineType type) {
@@ -105,6 +103,11 @@ double hmm_getTransition(Hmm *hmm, int64_t from, int64_t to) {
 
 void hmm_addToTransitionExpectation(Hmm *hmm, int64_t from, int64_t to, double p) {
     *hmm_getTransition2(hmm, from, to) += p;
+}
+//NEW function
+void hmm_NEW_addToTransitionExpectation(double *transitions, int64_t stateNumber,
+                                        int64_t from, int64_t to, double p) {
+    transitions[from * stateNumber + to] += p;
 }
 
 void hmm_setTransition(Hmm *hmm, int64_t from, int64_t to, double p) {
@@ -751,9 +754,7 @@ StateMachine *stateMachine5_construct(StateMachineType type,                    
                                       void (*setYGapDefaultsFcn)(double *),        // set Y gap defaults
                                       double (*gapXProbFcn)(const double *, void *), // gapX prob fcn
                                       double (*gapYProbFcn)(const double *, void *), // gapY prob fcn
-                                      double (*matchProbFcn)(const double *, void *, void *),
-                                      void (*updateExpectations)(double*, double*, int64_t, int64_t,
-                                                                 double, double, void*)) {
+                                      double (*matchProbFcn)(const double *, void *, void *)) {
     /*
      * New stateMachine construct function.  Allows for one stateMachine struct
      * to be used for kmer/kmer and base/base alignments.

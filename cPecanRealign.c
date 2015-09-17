@@ -13,6 +13,10 @@
 #include "pairwiseAligner.h"
 #include "multipleAligner.h"
 #include "commonC.h"
+#include "../sonLib/lib/sonLibTypes.h"
+#include "../sonLib/lib/commonC.h"
+#include "../sonLib/lib/pairwiseAlignment.h"
+#include "inc/multipleAligner.h"
 
 void usage() {
     fprintf(stderr, "cPecanRelign [options] seq1[fasta] seq2[fasta], version 0.2\n");
