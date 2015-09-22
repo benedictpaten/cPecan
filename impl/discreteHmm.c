@@ -21,20 +21,21 @@
 #include "../inc/discreteHmm.h"
 
 // Construct
-HmmDiscrete *hmmDiscrete_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symbolSetSize,
-                                        void (*addToTransitionExpFcn)(double *transitions, int64_t stateNumber, int64_t from, int64_t to, double p),
-                                        void (*setTransitionFcn)(double *transitions, int64_t stateNumber, int64_t from, int64_t to, double p),
-                                        double (*getTransitionsExpFcn)(double *transitions, int64_t stateNumber, int64_t from, int64_t to),
-                                        void (*addEmissionsExpFcn)(double *emissions, int64_t symbolSetSize, int64_t matrixSize, int64_t state, int64_t x, int64_t y, double p),
-                                        void (*setEmissionExpFcn)(double *emissions, int64_t symbolSetSize, int64_t matrixSize, int64_t state, int64_t x, int64_t y, double p),
-                                        double (*getEmissionExpFcn)(double *emissions, int64_t symbolSetSize, int64_t matrixSize, int64_t state, int64_t x, int64_t y)) {
+Hmm *hmmDiscrete_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
+                                        void (*addToTransitionExpFcn)(double *transitions, int64_t nStates, int64_t from, int64_t to, double p),
+                                        void (*setTransitionFcn)(double *transitions, int64_t nStates, int64_t from, int64_t to, double p),
+                                        double (*getTransitionsExpFcn)(double *transitions, int64_t nStates, int64_t from, int64_t to),
+                                        void (*addEmissionsExpFcn)(double *emissions, int64_t nSymbols, int64_t matrixSize, int64_t state, int64_t x, int64_t y, double p),
+                                        void (*setEmissionExpFcn)(double *emissions, int64_t nSymbols, int64_t matrixSize, int64_t state, int64_t x, int64_t y, double p),
+                                        double (*getEmissionExpFcn)(double *emissions, int64_t nSymbols, int64_t matrixSize, int64_t state, int64_t x, int64_t y)) {
     // malloc
-    HmmDiscrete *hmmD = st_malloc(sizeof(HmmDiscrete));
+    Hmm *hmmD = st_malloc(sizeof(Hmm));
 
     // Set up constants
     hmmD->stateNumber = stateNumber;
     hmmD->symbolSetSize = symbolSetSize;
     hmmD->matrixSize = symbolSetSize*symbolSetSize; // working with symmetric matrices
+    hmmD->type = type;
 
     // Set up transitions matrix
     hmmD->transitions = st_malloc(hmmD->stateNumber * hmmD->stateNumber * sizeof(double));
@@ -50,6 +51,16 @@ HmmDiscrete *hmmDiscrete_constructEmpty(double pseudocount, int64_t stateNumber,
 
     // Initialize likelihood
     hmmD->likelihood = 0.0;
+
+    // Set up functions
+    // transitions
+    hmmD->addToTransitionExpectationFcn = addToTransitionExpFcn; //add
+    hmmD->setTransitionFcn = setTransitionFcn; // set
+    hmmD->getTransitionsExpFcn = getTransitionsExpFcn; // get
+    // emissions
+    hmmD->addToEmissionExpectationFcn = addEmissionsExpFcn; // add
+    hmmD->setEmissionExpectationFcn = setEmissionExpFcn; // set
+    hmmD->getEmissionExpFcn = getEmissionExpFcn; // get
 
     return hmmD;
 }
@@ -86,7 +97,8 @@ double hmmDiscrete_getEmissionExpectation(double *emissions, int64_t symbolSetSi
     return emissions[(state * matrixSize) + tableIndex];
 }
 
-void hmmDiscrete_randomize(HmmDiscrete *hmmD) {
+// Randomize/Normalize
+void hmmDiscrete_randomize(Hmm *hmmD) {
     // Transitions
     for (int64_t from = 0; from < hmmD->stateNumber; from++) {
         for (int64_t to = 0; to < hmmD->stateNumber; to++) {
@@ -105,7 +117,7 @@ void hmmDiscrete_randomize(HmmDiscrete *hmmD) {
     hmmDiscrete_normalize(hmmD);
 }
 
-void hmmDiscrete_normalize(HmmDiscrete *hmmD) {
+void hmmDiscrete_normalize(Hmm *hmmD) {
     // Transitions
     for (int64_t from = 0; from < hmmD->stateNumber; from++) {
         double total = 0.0;
@@ -136,3 +148,28 @@ void hmmDiscrete_normalize(HmmDiscrete *hmmD) {
         }
     }
 }
+
+// Loaders
+//static void hmmDiscrete_loadSymmetric()
+
+// Housekeeping
+void hmmDiscrete_destruct(HmmDiscrete *hmmD) {
+    free(hmmD->transitions);
+    free(hmmD->emissions);
+    free(hmmD);
+}
+
+// stateMachine interface
+StateMachineFunctions *stateMachineFunctions_construct(double (*gapXProbFcn)(const double *, void *),
+                                                       double (*gapYProbFcn)(const double *, void *),
+                                                       double (*matchProbFcn)(const double *, void *, void *)) {
+    StateMachineFunctions *sMfs = malloc(sizeof(StateMachineFunctions));
+    sMfs->gapXProbFcn = gapXProbFcn;
+    sMfs->gapYProbFcn = gapYProbFcn;
+    sMfs->matchProbFcn = matchProbFcn;
+    return sMfs;
+}
+
+//StateMachineFunctions *stateMachineFunctions_constructFromType(int64_t stateMachineType) {
+//
+//}

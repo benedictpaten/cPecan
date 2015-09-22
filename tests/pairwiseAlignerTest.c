@@ -1045,7 +1045,7 @@ static void test_kmer_NEW_getAlignedPairs(CuTest *testCase) {
 }
 
 static void test_NEW_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
-    for (int64_t test = 0; test < 100; test++) {
+    for (int64_t test = 0; test < 1000; test++) {
         //Make a pair of sequences
         int64_t coreLength = 100, randomPortionLength = 100;
         char *sX = getRandomSequence(coreLength);
@@ -1108,7 +1108,7 @@ static void test_NEW_kmer_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         int64_t lY = strlen(sY);
         int64_t slX = correctSeqLength(lX, kmer);
         int64_t slY = correctSeqLength(lY, kmer);
-
+        int64_t coreLengthInKmers = correctSeqLength(coreLength, kmer);
         Sequence* SsX = sequenceConstruct(slX, sX, getKmer);
         Sequence* SsY = sequenceConstruct(slY, sY, getKmer);
 
@@ -1133,7 +1133,8 @@ static void test_NEW_kmer_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
 
         // Check the aligned pairs.
         checkAlignedPairs_kmer(testCase, alignedPairs, SsX->length, SsY->length);
-        CuAssertIntEquals(testCase, stList_length(alignedPairs), coreLength);
+        //CuAssertIntEquals(testCase, stList_length(alignedPairs), coreLength);
+        CuAssertIntEquals(testCase, stList_length(alignedPairs), coreLengthInKmers);
         for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
             stIntTuple *j = stList_get(alignedPairs, i);
             CuAssertTrue(testCase, stIntTuple_length(j) == 3);
@@ -1479,6 +1480,7 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_getSubSequence);
     SUITE_ADD_TEST(suite, test_NEW_dpDiagonal);
     SUITE_ADD_TEST(suite, test_NEW_cell);
+
     SUITE_ADD_TEST(suite, test_NEW_kmer_cell);
     SUITE_ADD_TEST(suite, test_NEW_dpDiagonal);
     SUITE_ADD_TEST(suite, test_dpMatrix);

@@ -14,6 +14,15 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <inttypes.h>
+#include <stdint.h>
+
+
+#include "../../sonLib/lib/sonLib.h"
+#include "../../sonLib/lib/pairwiseAlignment.h"
+#include "../../sonLib/lib/sonLibString.h"
+#include "../../sonLib/lib/sonLibCommon.h"
+#include "../inc/emissionMatrix.h"
+#include "../inc/pairwiseAligner.h"
 
 #include "sonLib.h"
 #include "bioioC.h"
@@ -21,12 +30,6 @@
 #include "pairwiseAlignment.h"
 #include "stateMachine.h"
 #include "emissionMatrix.h"
-#include "../inc/pairwiseAligner.h"
-#include "../../sonLib/lib/sonLib.h"
-#include "../../sonLib/lib/pairwiseAlignment.h"
-#include "../../sonLib/lib/sonLibString.h"
-#include "../../sonLib/lib/sonLibCommon.h"
-#include "../inc/emissionMatrix.h"
 
 
 
@@ -428,15 +431,15 @@ void updateExpectations(double *fromCells, double *toCells,
         hmm_addToEmissionsExpectation(hmmExpectations, to, x, y, p);
     }
 }
-
+/*
 void updateExpectations_NEW(double *fromCells, double *toCells,
                            int64_t from, int64_t to,
                            double eP, double tP,
                            void *extraArgs) {
-    /*
-     * Update hmm expectations for nucleotide/nucleotide alignment
-     * TODO use hmm or stateMachine to get addTransition/Expectation functions
-     */
+
+     // Update hmm expectations for nucleotide/nucleotide alignment
+     //TODO use hmm or stateMachine to get addTransition/Expectation functions
+
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
     Hmm *hmmExpectations = ((void **) extraArgs)[1];
@@ -452,6 +455,8 @@ void updateExpectations_NEW(double *fromCells, double *toCells,
     addToEmissionsExpectation(hmmExpectations, to, x, y, p); // no more check for Ns
 
 }
+
+*/
 
 void updateExpectations_kmer(double *fromCells, double *toCells,
                                            int64_t from, int64_t to,
@@ -484,7 +489,7 @@ static void cell_calculateExpectation(StateMachine *sM,
     void *extraArgs2[4] = { ((void **)extraArgs)[0], // hmmExpectations
                             ((void **)extraArgs)[1], // &totalProbabability
                             &cX, &cY };
-    sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, updateExpectations_NEW, extraArgs2);
+    sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, updateExpectations, extraArgs2);
 }
 
 ///////////////////////////////////
@@ -1021,6 +1026,7 @@ stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignm
     assert(k == pA->end2);
     return alignedPairs;
 }
+
 /*
  * the Blast functions were left with char arrays because lastz uses strings, also ignore how I put the path
  * to last on my machine in the command

@@ -10,6 +10,7 @@
 #include <math.h>
 #include <ctype.h>
 #include <assert.h>
+#include <stdint.h>
 
 #include "bioioC.h"
 #include "sonLib.h"
@@ -24,6 +25,7 @@
 #include "../../sonLib/lib/sonLibFile.h"
 #include "../inc/pairwiseAligner.h"
 #include "../../sonLib/lib/sonLibRandom.h"
+#include "../inc/discreteHmm.h"
 
 ///////////////////////////////////
 ///////////////////////////////////
@@ -50,7 +52,7 @@ Hmm *hmm_constructEmpty(double pseudoExpectation, StateMachineType type) {
         st_errAbort("Unrecognised state type: %i\n", type);
     }
     hmm->transitions = st_malloc(hmm->stateNumber * hmm->stateNumber * sizeof(double));
-    for (int64_t i = 0; i < hmm->.stateNumber * hmm->stateNumber; i++) {
+    for (int64_t i = 0; i < hmm->stateNumber * hmm->stateNumber; i++) {
         hmm->transitions[i] = pseudoExpectation;
     }
     hmm->likelihood = 0.0;
@@ -396,7 +398,7 @@ static void state_check(StateMachine *sM, State s) {
     assert(s >= 0 && s < sM->stateNumber);
 }
 
-void emissions_symbol_setMatchProbsToDefaults(double *emissionMatchProbs) {
+void emissions_symbol_setMatchProbsToDefaults(double *emissionMatchProbs, int64_t symbolSetSize) {
     /*
      * This is used to set the emissions to reasonable values. For nucleotide/nucleotide alignment
      * TODO figure out how to make realloc work
@@ -416,13 +418,23 @@ void emissions_symbol_setMatchProbsToDefaults(double *emissionMatchProbs) {
     memcpy(emissionMatchProbs, i, sizeof(double)*SYMBOL_NUMBER_NO_N*SYMBOL_NUMBER_NO_N);
 }
 
-void emissions_symbol_setGapProbsToDefaults(double *emissionGapProbs) {
+void emissions_symbol_setGapProbsToDefaults(double *emissionGapProbs, int64_t symbolSetSize) {
     /*
      * This is used to set the emissions to reasonable values.
      */
     const double EMISSION_GAP = -1.6094379124341003; //log(0.2)
     const double i[4] = { EMISSION_GAP, EMISSION_GAP, EMISSION_GAP, EMISSION_GAP };
     memcpy(emissionGapProbs, i, sizeof(double)*SYMBOL_NUMBER_NO_N);
+}
+
+void emissions_initMatchProbsToZero(double *emissionMatchProbs, int64_t symbolSetSize) {
+    const double i[symbolSetSize * symbolSetSize] = {0};
+    memcpy(emissionMatchProbs, i, sizeof(double)*symbolSetSize*symbolSetSize);
+}
+
+void emissions_initGapProbsToZero(double *emissionGapProbs, int64_t symbolSetSize) {
+    const double i[symbolSetSize] = {0};
+    memcpy(emissionGapProbs, i, sizeof(double)*symbolSetSize);
 }
 
 
@@ -748,12 +760,12 @@ static void stateMachine5_cellCalculate(StateMachine *sM,
     }
 }
 
-StateMachine *stateMachine5_construct(StateMachineType type,                       // type
-                                      void (*setMatchDefaultsFcn)(double *),       // set match defaults
-                                      void (*setXGapDefaultsFcn)(double *),        // set X gap defaults
-                                      void (*setYGapDefaultsFcn)(double *),        // set Y gap defaults
-                                      double (*gapXProbFcn)(const double *, void *), // gapX prob fcn
-                                      double (*gapYProbFcn)(const double *, void *), // gapY prob fcn
+StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSetSize,
+                                      void (*setXGapDefaultsFcn)(double *, int64_t symbolSetSize),
+                                      void (*setYGapDefaultsFcn)(double *, int64_t symbolSetSize),
+                                      void (*setMatchDefaultsFcn)(double *, int64_t symbolSetSize),
+                                      double (*gapXProbFcn)(const double *, void *),
+                                      double (*gapYProbFcn)(const double *, void *),
                                       double (*matchProbFcn)(const double *, void *, void *)) {
     /*
      * New stateMachine construct function.  Allows for one stateMachine struct
@@ -780,9 +792,9 @@ StateMachine *stateMachine5_construct(StateMachineType type,                    
     sM5->TRANSITION_GAP_LONG_SWITCH_TO_Y = sM5->TRANSITION_GAP_LONG_SWITCH_TO_X;
 
     // now using argument functions to make stateMachine more general
-    setMatchDefaultsFcn(sM5->EMISSION_MATCH_PROBS);
-    setXGapDefaultsFcn(sM5->EMISSION_GAP_X_PROBS);
-    setYGapDefaultsFcn(sM5->EMISSION_GAP_Y_PROBS);
+    setMatchDefaultsFcn(sM5->EMISSION_MATCH_PROBS, parameterSetSize);
+    setXGapDefaultsFcn(sM5->EMISSION_GAP_X_PROBS, parameterSetSize);
+    setYGapDefaultsFcn(sM5->EMISSION_GAP_Y_PROBS, parameterSetSize);
     if(type != fiveState && type != fiveStateAsymmetric) {
         st_errAbort("Wrong type for five state %i", type);
     }
@@ -904,6 +916,55 @@ static void stateMachine5_loadSymmetric(StateMachine5 *sM5, Hmm *hmm) {
     emissions_loadGapProbs(sM5->EMISSION_GAP_X_PROBS, hmm, xGapStates, 2, yGapStates, 2);
     emissions_loadGapProbs(sM5->EMISSION_GAP_Y_PROBS, hmm, xGapStates, 2, yGapStates, 2);
 }
+
+static void stateMachine5_NEW_loadSymmetric(StateMachine5 *sM5, Hmm *hmm) {
+    if (hmm->type != fiveState) {
+        printf("Wrong hmm type");
+        st_errAbort("Wrong hmm type");
+    }
+
+    sM5->TRANSITION_MATCH_CONTINUE = log(hmmDiscrete_getTransitionExpectation(, match, match)); //0.9703833696510062f
+    sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X = log(
+            (hmm_getTransition(hmm, shortGapX, match) + hmm_getTransition(hmm, shortGapY, match)) / 2); //1.0 - gapExtend - gapSwitch = 0.280026392297485
+    sM5->TRANSITION_MATCH_FROM_LONG_GAP_X = log(
+            (hmm_getTransition(hmm, longGapX, match) + hmm_getTransition(hmm, longGapY, match)) / 2); //1.0 - gapExtend = 0.00343657420938
+    sM5->TRANSITION_GAP_SHORT_OPEN_X = log(
+            (hmm_getTransition(hmm, match, shortGapX) + hmm_getTransition(hmm, match, shortGapY)) / 2); //0.0129868352330243
+    sM5->TRANSITION_GAP_SHORT_EXTEND_X = log(
+            (hmm_getTransition(hmm, shortGapX, shortGapX) + hmm_getTransition(hmm, shortGapY, shortGapY)) / 2); //0.7126062401851738f;
+    sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X = log(
+            (hmm_getTransition(hmm, shortGapX, shortGapY) + hmm_getTransition(hmm, shortGapY, shortGapX)) / 2); //0.0073673675173412815f;
+    sM5->TRANSITION_GAP_LONG_OPEN_X = log(
+            (hmm_getTransition(hmm, match, longGapX) + hmm_getTransition(hmm, match, longGapY)) / 2); //(1.0 - match - 2*gapOpenShort)/2 = 0.001821479941473
+    sM5->TRANSITION_GAP_LONG_EXTEND_X = log(
+            (hmm_getTransition(hmm, longGapX, longGapX) + hmm_getTransition(hmm, longGapY, longGapY)) / 2);
+    sM5->TRANSITION_GAP_LONG_SWITCH_TO_X = log(
+            (hmm_getTransition(hmm, longGapX, longGapY) + hmm_getTransition(hmm, longGapY, longGapX)) / 2); //0.0073673675173412815f;
+
+    if(sM5->TRANSITION_GAP_SHORT_EXTEND_X > sM5->TRANSITION_GAP_LONG_EXTEND_X) {
+        //Switch the long and short gap parameters if one the "long states" have a smaller extend probability than the "short states", as can randomly happen during EM training.
+        switchDoubles(&(sM5->TRANSITION_GAP_SHORT_EXTEND_X), &(sM5->TRANSITION_GAP_LONG_EXTEND_X));
+        switchDoubles(&(sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X), &(sM5->TRANSITION_MATCH_FROM_LONG_GAP_X));
+        switchDoubles(&(sM5->TRANSITION_GAP_SHORT_OPEN_X), &(sM5->TRANSITION_GAP_LONG_OPEN_X));
+        switchDoubles(&(sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X), &(sM5->TRANSITION_GAP_LONG_SWITCH_TO_X));
+    }
+
+    sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y = sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X;
+    sM5->TRANSITION_MATCH_FROM_LONG_GAP_Y = sM5->TRANSITION_MATCH_FROM_LONG_GAP_X;
+    sM5->TRANSITION_GAP_SHORT_OPEN_Y = sM5->TRANSITION_GAP_SHORT_OPEN_X;
+    sM5->TRANSITION_GAP_SHORT_EXTEND_Y = sM5->TRANSITION_GAP_SHORT_EXTEND_X;
+    sM5->TRANSITION_GAP_SHORT_SWITCH_TO_Y = sM5->TRANSITION_GAP_SHORT_SWITCH_TO_X;
+    sM5->TRANSITION_GAP_LONG_OPEN_Y = sM5->TRANSITION_GAP_LONG_OPEN_X;
+    sM5->TRANSITION_GAP_LONG_EXTEND_Y = sM5->TRANSITION_GAP_LONG_EXTEND_X;
+    sM5->TRANSITION_GAP_LONG_SWITCH_TO_Y = sM5->TRANSITION_GAP_LONG_SWITCH_TO_X;
+
+    emissions_loadMatchProbsSymmetrically(sM5->EMISSION_MATCH_PROBS, hmm, match);
+    int64_t xGapStates[2] = { shortGapX, longGapX };
+    int64_t yGapStates[2] = { shortGapY, longGapY };
+    emissions_loadGapProbs(sM5->EMISSION_GAP_X_PROBS, hmm, xGapStates, 2, yGapStates, 2);
+    emissions_loadGapProbs(sM5->EMISSION_GAP_Y_PROBS, hmm, xGapStates, 2, yGapStates, 2);
+}
+
 
 static void stateMachine5_Kmer_loadSymmetric(StateMachine5 *sM5, Hmm *hmm) {
     /*
@@ -1131,29 +1192,46 @@ static void stateMachine3_loadSymmetric(StateMachine3 *sM3, Hmm *hmm) {
 ///////////////////////////////////
 ///////////////////////////////////
 
+StateMachine *hmmDiscrete_getStateMachine(Hmm *hmmD, StateMachineFunctions *sMfs) {
+    /*
+     * This function needs to do the following:
+     * 1. construct a stateMachine with the correct functionality
+     * 2. load the transitions/emission matrices from the hmm
+     */
+    // construct stateMachine with functions from stateMachineFunctions
+    if (hmmD->type == fiveState) {
+        StateMachine5 *sM5 = (StateMachine5 *) stateMachine5_construct(fiveState, hmmD->symbolSetSize,
+                                                                       emissions_initGapProbsToZero,
+                                                                       emissions_initGapProbsToZero,
+                                                                       emissions_initMatchProbsToZero,
+                                                                       sMfs->gapXProbFcn,
+                                                                       sMfs->gapYProbFcn,
+                                                                       sMfs->matchProbFcn);
+
+
+}
+
 StateMachine *hmm_getStateMachine(Hmm *hmm) {
     if (hmm->type == fiveState) {
-        StateMachine5 *sM5 = (StateMachine5 *) stateMachine5_construct(fiveState,
-                                                                       hmm->sM_functions.setMatchDefaultsFcn,
-                                                                       hmm->sM_functions.setXGapDefaultsFcn,
-                                                                       hmm->sM_functions.setYGapDefaultsFcn,
-                                                                       hmm->sM_functions.getXGapProbFcn,
-                                                                       hmm->sM_functions.getYGapProbFcn,
-                                                                       hmm->sM_functions.getMatchProbFcn,
-                                                                       hmm->sM_functions.updateExpectationsFcn);
-        hmm->loadSymmetric(sM5, hmm);
+        StateMachine5 *sM5 = (StateMachine5 *) stateMachine5_construct(fiveState,                               // type
+                                                                       emissions_symbol_setMatchProbsToDefaults, // set match defaults
+                                                                       emissions_symbol_setGapProbsToDefaults,   // set X gap defaults
+                                                                       emissions_symbol_setGapProbsToDefaults,   // set Y gap defaults
+                                                                       emissions_symbol_getGapProb,              // gapX prob fcn
+                                                                       emissions_symbol_getGapProb,              // gapY prob fcn
+                                                                       emissions_symbol_getMatchProb);
+        stateMachine5_loadSymmetric(sM5, hmm);
         return (StateMachine *) sM5;
     }
     if (hmm->type == fiveStateAsymmetric) {
-        StateMachine5 *sM5 = (StateMachine5 *) stateMachine5_construct(fiveState,
-                                                                       hmm->sM_functions.setMatchDefaultsFcn,
-                                                                       hmm->sM_functions.setXGapDefaultsFcn,
-                                                                       hmm->sM_functions.setYGapDefaultsFcn,
-                                                                       hmm->sM_functions.getXGapProbFcn,
-                                                                       hmm->sM_functions.getYGapProbFcn,
-                                                                       hmm->sM_functions.getMatchProbFcn,
-                                                                       hmm->sM_functions.updateExpectationsFcn);
-        hmm->loadAsymmetric(sM5, hmm);
+        StateMachine5 *sM5 = (StateMachine5 *) stateMachine5_construct(fiveState,                               // type
+                                                                       emissions_symbol_setMatchProbsToDefaults, // set match defaults
+                                                                       emissions_symbol_setGapProbsToDefaults,   // set X gap defaults
+                                                                       emissions_symbol_setGapProbsToDefaults,   // set Y gap defaults
+                                                                       emissions_symbol_getGapProb,              // gapX prob fcn
+                                                                       emissions_symbol_getGapProb,              // gapY prob fcn
+                                                                       emissions_symbol_getMatchProb);
+        stateMachine5_loadAsymmetric(sM5, hmm);
         return (StateMachine *) sM5;
     }
     /*

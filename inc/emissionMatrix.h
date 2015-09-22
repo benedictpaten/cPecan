@@ -6,8 +6,8 @@
 #define MATRIX_SIZE 625 // assuming 25 kmers, 25*25
                         // may also want to make this file code-generated.
 
-void emissions_kmer_setMatchProbsToDefaults(double *emissionMatchProbs);
+void emissions_kmer_setMatchProbsToDefaults(double *emissionMatchProbs, int64_t symbolSetSize);
 
-void emissions_kmer_setGapProbsToDefaults(double *emissionGapProbs);
+void emissions_kmer_setGapProbsToDefaults(double *emissionGapProbs, int64_t symbolSetSize);
 
 #endif
