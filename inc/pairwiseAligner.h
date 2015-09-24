@@ -75,9 +75,9 @@ void pairwiseAlignmentBandingParameters_destruct(PairwiseAlignmentParameters *p)
 /*
  * Gets the set of posterior match probabilities under a simple HMM model of alignment for two DNA sequences.
  */
-stList *getAlignedPairs(StateMachine *sM, Sequence *string1, Sequence *string2,
-                        //sequenceType t,
-                        PairwiseAlignmentParameters *p,
+stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,
+                        void *(*getFcn)(void *, int64_t),
+                        stList *(*getAnchorPairFcn)(void *, void *, PairwiseAlignmentParameters *),
                         bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignment *pA, int64_t trim);
@@ -238,7 +238,7 @@ void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const S
 
 stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatMask);
 
-stList *getBlastPairsForPairwiseAlignmentParameters(char *sX, char *sY, PairwiseAlignmentParameters *p);
+stList *getBlastPairsForPairwiseAlignmentParameters(void *sX, void *sY, PairwiseAlignmentParameters *p);
 
 stList *filterToRemoveOverlap(stList *overlappingPairs);
 

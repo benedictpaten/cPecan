@@ -19,6 +19,7 @@
 #include "../sonLib/lib/pairwiseAlignment.h"
 #include "inc/multipleAligner.h"
 #include "inc/stateMachine.h"
+#include "inc/discreteHmm.h"
 
 void usage() {
     fprintf(stderr, "cPecanRelign [options] seq1[fasta] seq2[fasta], version 0.2\n");
@@ -509,15 +510,16 @@ int main(int argc, char *argv[]) {
     if(hmmFile != NULL) {
         st_logInfo("Loading the hmm from file %s\n", hmmFile);
         Hmm *hmm = hmm_loadFromFile(hmmFile);
-        sM = hmm_getStateMachine(hmm);
+        StateMachineFunctions *sMfs = stateMachineFunctions_construct(emissions_symbol_getGapProb, emissions_symbol_getGapProb, emissions_symbol_getMatchProb);
+        sM = hmmDiscrete_getStateMachine(hmm, sMfs);
         //hmm_normalise(hmm);
         hmm_destruct(hmm);
     }
-    else {
-        sM = stateMachine5_construct(fiveState,
+    else { //TODO probably need a switch statement here to decide on which defaults to set
+        sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
+                                     emissions_symbol_setGapProbsToDefaults,
+                                     emissions_symbol_setGapProbsToDefaults,
                                      emissions_symbol_setMatchProbsToDefaults,
-                                     emissions_symbol_setGapProbsToDefaults,
-                                     emissions_symbol_setGapProbsToDefaults,
                                      emissions_symbol_getGapProb,
                                      emissions_symbol_getGapProb,
                                      emissions_symbol_getMatchProb);

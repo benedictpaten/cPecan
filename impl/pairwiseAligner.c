@@ -30,6 +30,7 @@
 #include "pairwiseAlignment.h"
 #include "stateMachine.h"
 #include "emissionMatrix.h"
+#include "../../sonLib/lib/bioioC.h"
 
 
 
@@ -325,7 +326,7 @@ void* getKmer(void *elements, int64_t index) {
      * if we decide to only use indicies for kmers/events/nucleotides. That would also make it easy to
      * remove the malloc...
      */
-    // TODO add check to make sure index is within bounds
+    //
     char* n;
     n = "NN"; // hardwired null kmer
     int64_t i = index;
@@ -1199,17 +1200,19 @@ static void getBlastPairsForPairwiseAlignmentParametersP(
 /*
  * This function take Sequence objects but then umpacks them into char strings for use with lastz
  */
-stList *getBlastPairsForPairwiseAlignmentParameters(char *sX, char *sY, PairwiseAlignmentParameters *p) {
+stList *getBlastPairsForPairwiseAlignmentParameters(void *sX, void *sY, PairwiseAlignmentParameters *p) {
 
-    // Unpack Sequence Object
-    int64_t lX = strlen(sX);
-    int64_t lY = strlen(sY);
+    // cast to char arrays for lastz
+    char *cX = (char *) sX;
+    char *cY = (char *) sY;
+    int64_t lX = strlen(cX);
+    int64_t lY = strlen(cY);
 
     if ((int64_t) lX * lY <= p->anchorMatrixBiggerThanThis) {
         return stList_construct();
     }
     //Anchor pairs
-    stList *unfilteredTopLevelAnchorPairs = getBlastPairs(sX, sY, p->constraintDiagonalTrim, 1);
+    stList *unfilteredTopLevelAnchorPairs = getBlastPairs(cX, cY, p->constraintDiagonalTrim, 1);
     stList_sort(unfilteredTopLevelAnchorPairs, (int (*)(const void *, const void *)) stIntTuple_cmpFn);
     stList *topLevelAnchorPairs = filterToRemoveOverlap(unfilteredTopLevelAnchorPairs);
     st_logDebug("Got %" PRIi64 " top level anchor pairs, which reduced to %" PRIi64 " after filtering \n",
@@ -1227,12 +1230,12 @@ stList *getBlastPairsForPairwiseAlignmentParameters(char *sX, char *sY, Pairwise
         assert(y >= 0 && y < lY);
         assert(x >= pX);
         assert(y >= pY);
-        getBlastPairsForPairwiseAlignmentParametersP(sX, sY, pX, pY, x, y, p, combinedAnchorPairs);
+        getBlastPairsForPairwiseAlignmentParametersP(cX, cY, pX, pY, x, y, p, combinedAnchorPairs);
         stList_append(combinedAnchorPairs, anchorPair);
         pX = x + 1;
         pY = y + 1;
     }
-    getBlastPairsForPairwiseAlignmentParametersP(sX, sY, pX, pY, lX, lY, p, combinedAnchorPairs);
+    getBlastPairsForPairwiseAlignmentParametersP(cX, cY, pX, pY, lX, lY, p, combinedAnchorPairs);
     stList_setDestructor(topLevelAnchorPairs, NULL);
     stList_destruct(topLevelAnchorPairs);
     st_logDebug("Got %" PRIi64 " combined anchor pairs\n", stList_length(combinedAnchorPairs));
@@ -1452,12 +1455,17 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM,
     return alignedPairs;
 }
 
-stList *getAlignedPairs(StateMachine *sM, Sequence *SsX, Sequence *SsY,
-                        PairwiseAlignmentParameters *p,
-                        bool alignmentHasRaggedLeftEnd,
-                        bool alignmentHasRaggedRightEnd) {
+stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,
+                        void *(*getFcn)(void *, int64_t),
+                        stList *(*getAnchorPairFcn)(void *, void *, PairwiseAlignmentParameters *),
+                        bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
 
-    stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(SsX, SsY, p);
+
+    //stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(cX, cY, p);
+    stList *anchorPairs = getAnchorPairFcn(cX, cY, p);
+
+    Sequence *SsX = sequenceConstruct(lX, cX, getFcn);
+    Sequence *SsY = sequenceConstruct(lY, cY, getFcn);
 
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, SsX, SsY,
                                                        anchorPairs, p, alignmentHasRaggedLeftEnd,

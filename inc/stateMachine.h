@@ -26,6 +26,7 @@ typedef enum {
 } StateMachineType;
 
 typedef struct _stateMachine StateMachine;
+typedef struct _hmm Hmm;
 
 /*
  * Hmm for loading/unloading HMMs and storing expectations.
@@ -43,26 +44,21 @@ typedef struct _hmm {
 
     //void (*writeFcn)(struct hmm, FILE *fileHandle); TODO figure out how this is going to work
 
-    void (*addToTransitionExpectationFcn)(double *transitions, int64_t stateNumber,
-                                          int64_t from, int64_t to, double p);
+    void (*addToTransitionExpectationFcn)(Hmm *hmm, int64_t from, int64_t to, double p);
 
-    void (*setTransitionFcn)(double *transitions, int64_t nStates, int64_t from, int64_t to, double p);
+    void (*setTransitionFcn)(Hmm *hmm, int64_t from, int64_t to, double p);
 
-    double (*getTransitionsExpFcn)(double *transitions, int64_t stateNumber, int64_t from, int64_t to);
+    double (*getTransitionsExpFcn)(Hmm *hmm, int64_t from, int64_t to);
 
-    void (*addToEmissionExpectationFcn)(double *emissions, int64_t symbolSetSize, int64_t matrixSize,
-                                        int64_t state, int64_t x, int64_t y, double p);
+    void (*addToEmissionExpectationFcn)(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p);
 
-    void (*setEmissionExpectationFcn)(double *emissions, int64_t symbolSetSize, int64_t matrixSize,
-                                      int64_t state, int64_t x, int64_t y, double p);
+    void (*setEmissionExpectationFcn)(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p);
 
-    double (*getEmissionExpFcn)(double *emissions, int64_t symbolSetSize, int64_t matrixSize,
-                                int64_t state, int64_t x, int64_t y);
+    double (*getEmissionExpFcn)(Hmm *hmm, int64_t state, int64_t x, int64_t y);
 
-    //void (*loadSymmetric)(struct stateMachine, struct hmm);
+    //void (*loadSymmetric)(StateMachine sM, Hmm hmm);
     //void (*loadAsymmetric)(struct stateMachine, struct hmm);
-
-} Hmm;
+};
 
 struct _stateMachine {
     StateMachineType type; // TODO get rid of this
@@ -103,8 +99,8 @@ typedef struct _stateMachineFunctions {
     double (*gapYProbFcn)(const double *, void *);
     double (*matchProbFcn)(const double *, void *, void *);
 } StateMachineFunctions;
-/*
- * Refactor these out
+
+
 // constructers
 Hmm *hmm_constructEmpty(double pseudoExpectation, StateMachineType type);
 Hmm *hmm_kmer_constructEmpty(double pseudoExpectation, StateMachineType type);
@@ -142,7 +138,6 @@ Hmm *hmm_kmer_loadFromFile(const char *fileName);
 // normalizers
 void hmm_normalise(Hmm *hmm);
 void hmm_kmer_normalise(Hmm *hmm);
-*/
 
 //////////////////
 // stateMachine //
@@ -175,6 +170,8 @@ double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, vo
 StateMachine *hmmDiscrete_getStateMachine(Hmm *hmmD, StateMachineFunctions *sMfs);
 
 StateMachine *hmm_getStateMachine(Hmm *hmm);
+
+StateMachine *hmmDiscrete_getStateMachine(Hmm *hmmD, StateMachineFunctions *sMfs);
 
 StateMachine *hmm_kmer_getStateMachine(Hmm *hmm);
 

@@ -672,9 +672,9 @@ static int64_t addMultipleAlignedPairs(StateMachine *sM, int64_t sequence1, int6
      */
     SeqFrag *seqFrag1 = stList_get(seqFrags, sequence1);
     SeqFrag *seqFrag2 = stList_get(seqFrags, sequence2);
-    stList *alignedPairs = getAlignedPairs(sM, seqFrag1->seq, seqFrag2->seq,
-                                           //nucleotide,
+    stList *alignedPairs = getAlignedPairs(sM, seqFrag1->seq, seqFrag2->seq, strlen(seqFrag1->seq), strlen(seqFrag2->seq),
                                            pairwiseAlignmentBandingParameters,
+                                           getBase, getBlastPairsForPairwiseAlignmentParameters,
                                            seqFrag1->leftEndId != seqFrag2->leftEndId,
                                            seqFrag1->rightEndId != seqFrag2->rightEndId);
     alignedPairs = reweightAlignedPairs2(alignedPairs, seqFrag1->length, seqFrag2->length, pairwiseAlignmentBandingParameters->gapGamma);

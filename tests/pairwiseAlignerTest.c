@@ -201,13 +201,13 @@ static void test_NEW_cell(CuTest* testCase) {
     /*
      * Tests NEW stateMachine stuff, nucleotide/nucleotide
      */
-    StateMachine *sM = stateMachine5_construct(fiveState,                               // type
-                                               emissions_symbol_setMatchProbsToDefaults, // set match defaults
-                                               emissions_symbol_setGapProbsToDefaults,   // set X gap defaults
-                                               emissions_symbol_setGapProbsToDefaults,   // set Y gap defaults
-                                               emissions_symbol_getGapProb,              // gapX prob fcn
-                                               emissions_symbol_getGapProb,              // gapY prob fcn
-                                               emissions_symbol_getMatchProb);           // match prob fcn
+    StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
+                                               emissions_symbol_setGapProbsToDefaults,
+                                               emissions_symbol_setGapProbsToDefaults,
+                                               emissions_symbol_setMatchProbsToDefaults,
+                                               emissions_symbol_getGapProb,
+                                               emissions_symbol_getGapProb,
+                                               emissions_symbol_getMatchProb);
 
     double lowerF[sM->stateNumber], middleF[sM->stateNumber], upperF[sM->stateNumber], currentF[sM->stateNumber];
     double lowerB[sM->stateNumber], middleB[sM->stateNumber], upperB[sM->stateNumber], currentB[sM->stateNumber];
@@ -222,12 +222,12 @@ static void test_NEW_cell(CuTest* testCase) {
         currentB[i] = sM->endStateProb(sM, i);
     }
 
-    const char *charXseq = "AGCG";
-    const char *charYseq = "AGTTCG";
+    char *charXseq = "AGCG";
+    char *charYseq = "AGTTCG";
     Sequence* SsX = sequenceConstruct(4, charXseq, getBase);
     Sequence* SsY = sequenceConstruct(6, charYseq, getBase);
-    void* cX = SsX->get(SsX->elements, 2);
-    void* cY = SsY->get(SsY->elements, 2);
+    void* cX = SsX->get(SsX->elements, 0);
+    void* cY = SsY->get(SsY->elements, 0);
 
     //Do forward
     cell_calculateForward(sM, lowerF, NULL, NULL, middleF, cX, cY, NULL);
@@ -247,13 +247,13 @@ static void test_NEW_kmer_cell(CuTest* testCase) {
     /*
      * Tests NEW stateMachine stuff
      */
-    StateMachine *sM = stateMachine5_construct(fiveState,                                // type
-                                               emissions_kmer_setMatchProbsToDefaults,   // set match defaults
-                                               emissions_kmer_setGapProbsToDefaults,     // set X gap defaults
-                                               emissions_kmer_setGapProbsToDefaults,     // set Y gap defaults
-                                               emissions_kmer_getGapProb,                // gapX fcn
-                                               emissions_kmer_getGapProb,                // gapY fcn
-                                               emissions_kmer_getMatchProb);             // match prob fcn
+    StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
+                                               emissions_symbol_setGapProbsToDefaults,
+                                               emissions_symbol_setGapProbsToDefaults,
+                                               emissions_symbol_setMatchProbsToDefaults,
+                                               emissions_symbol_getGapProb,
+                                               emissions_symbol_getGapProb,
+                                               emissions_symbol_getMatchProb);
 
     double lowerF[sM->stateNumber], middleF[sM->stateNumber], upperF[sM->stateNumber], currentF[sM->stateNumber];
     double lowerB[sM->stateNumber], middleB[sM->stateNumber], upperB[sM->stateNumber], currentB[sM->stateNumber];
@@ -268,8 +268,8 @@ static void test_NEW_kmer_cell(CuTest* testCase) {
         currentB[i] = sM->endStateProb(sM, i);
     }
 
-    const char *charXseq = "AGCG";
-    const char *charYseq = "AGTTCG";
+    char *charXseq = "AGCG";
+    char *charYseq = "AGTTCG";
     Sequence* SsX = sequenceConstruct(4, charXseq, getKmer);
     Sequence* SsY = sequenceConstruct(6, charYseq, getKmer);
     void* cX = SsX->get(SsX->elements, 2);
@@ -293,12 +293,12 @@ static void test_NEW_kmer_cell(CuTest* testCase) {
 }
 
 static void test_NEW_dpDiagonal(CuTest *testCase) {
-    StateMachine *sM = stateMachine5_construct(fiveState,                               // type
-                                               emissions_symbol_setMatchProbsToDefaults, // set match defaults
-                                               emissions_symbol_setGapProbsToDefaults,   // set X gap defaults
-                                               emissions_symbol_setGapProbsToDefaults,   // set Y gap defaults
-                                               emissions_symbol_getGapProb,              // gapX prob fcn
-                                               emissions_symbol_getGapProb,              // gapY prob fcn
+    StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
+                                               emissions_symbol_setGapProbsToDefaults,
+                                               emissions_symbol_setGapProbsToDefaults,
+                                               emissions_symbol_setMatchProbsToDefaults,
+                                               emissions_symbol_getGapProb,
+                                               emissions_symbol_getGapProb,
                                                emissions_symbol_getMatchProb);           // match prob fcn
 
     Diagonal diagonal = diagonal_construct(3, -1, 1);
@@ -381,13 +381,13 @@ static void test_NEW_diagonalDPCalculations(CuTest *testCase) {
 
     // construct a 5-state state machine, the forward and reverse DP Matrices, the band, the band
     // iterators and the anchor pairs
-    StateMachine *sM = stateMachine5_construct(fiveState,                               // type
-                                               emissions_symbol_setMatchProbsToDefaults, // set match defaults
-                                               emissions_symbol_setGapProbsToDefaults,   // set X gap defaults
-                                               emissions_symbol_setGapProbsToDefaults,   // set Y gap defaults
-                                               emissions_symbol_getGapProb,              // gapX prob fcn
-                                               emissions_symbol_getGapProb,              // gapY prob fcn
-                                               emissions_symbol_getMatchProb);           // match prob fcn
+    StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
+                                               emissions_symbol_setGapProbsToDefaults,
+                                               emissions_symbol_setGapProbsToDefaults,
+                                               emissions_symbol_setMatchProbsToDefaults,
+                                               emissions_symbol_getGapProb,
+                                               emissions_symbol_getGapProb,
+                                               emissions_symbol_getMatchProb);
 
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
@@ -490,13 +490,13 @@ static void test_NEW_kmer_diagonalDPCalculations(CuTest *testCase) {
 
     // construct a 5-state Kmer state machine, the forward and reverse DP Matrices, the band, the band
     // iterators and the anchor pairs
-    StateMachine *sM = stateMachine5_construct(fiveState,                                // type
-                                               emissions_kmer_setMatchProbsToDefaults,   // set match defaults
-                                               emissions_kmer_setGapProbsToDefaults,     // set X gap defaults
-                                               emissions_kmer_setGapProbsToDefaults,     // set Y gap defaults
-                                               emissions_kmer_getGapProb,                // gapX fcn
-                                               emissions_kmer_getGapProb,                // gapY fcn
-                                               emissions_kmer_getMatchProb);             // match prob fcn
+    StateMachine *sM = stateMachine5_construct(fiveState, NUM_OF_KMERS,
+                                               emissions_kmer_setGapProbsToDefaults,
+                                               emissions_kmer_setGapProbsToDefaults,
+                                               emissions_kmer_setMatchProbsToDefaults,
+                                               emissions_kmer_getGapProb,
+                                               emissions_kmer_getGapProb,
+                                               emissions_kmer_getMatchProb);
 
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
@@ -673,10 +673,10 @@ static void test_NEW_getAlignedPairsWithBanding(CuTest *testCase) {
         p->minDiagsBetweenTraceBack = p->traceBackDiagonals + st_randomInt(2, 10);
         p->diagonalExpansion = st_randomInt(0, 10) * 2;
 
-        StateMachine *sM = stateMachine5_construct(fiveState,                               // type
-                                                   emissions_symbol_setMatchProbsToDefaults, // set match defaults
+        StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
                                                    emissions_symbol_setGapProbsToDefaults,   // set X gap defaults
                                                    emissions_symbol_setGapProbsToDefaults,   // set Y gap defaults
+                                                   emissions_symbol_setMatchProbsToDefaults, // set match defaults
                                                    emissions_symbol_getGapProb,              // gapX prob fcn
                                                    emissions_symbol_getGapProb,              // gapY prob fcn
                                                    emissions_symbol_getMatchProb);           // match prob fcn
@@ -727,10 +727,10 @@ static void test_NEW_kmer_getAlignedPairsWithBanding(CuTest *testCase) {
         p->minDiagsBetweenTraceBack = p->traceBackDiagonals + st_randomInt(2, 10);
         p->diagonalExpansion = st_randomInt(0, 10) * 2;
 
-        StateMachine *sM = stateMachine5_construct(fiveState,                                // type
-                                                   emissions_kmer_setMatchProbsToDefaults,   // set match defaults
+        StateMachine *sM = stateMachine5_construct(fiveState, NUM_OF_KMERS,
                                                    emissions_kmer_setGapProbsToDefaults,     // set X gap defaults
                                                    emissions_kmer_setGapProbsToDefaults,     // set Y gap defaults
+                                                   emissions_kmer_setMatchProbsToDefaults,   // set match defaults
                                                    emissions_kmer_getGapProb,                // gapX fcn
                                                    emissions_kmer_getGapProb,                // gapY fcn
                                                    emissions_kmer_getMatchProb);             // match prob fcn
@@ -738,6 +738,7 @@ static void test_NEW_kmer_getAlignedPairsWithBanding(CuTest *testCase) {
         stList *anchorPairs = getRandomAnchorPairs(lX, lY);
         stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
         void *extraArgs[1] = { alignedPairs };
+        st_uglyf("sequence and stateMachine constructed...\n");
         getPosteriorProbsWithBanding(sM,                                     //state machine
                                      anchorPairs,                            //(random) anchor pairs
                                      sX2, sY2,                               //sequence objects
@@ -745,7 +746,7 @@ static void test_NEW_kmer_getAlignedPairsWithBanding(CuTest *testCase) {
                                      0, 0,                                   //ragged left and right end booleans
                                      diagonalCalculationPosteriorMatchProbs, //posterior probability function
                                      extraArgs);                             //bin for aligned pairs
-
+        st_uglyf("posteriorProbs gotten\n");
         //Check the aligned pairs.
         checkAlignedPairs_kmer(testCase, alignedPairs, lX, lY);
 
@@ -974,27 +975,29 @@ static void test_NEW_getAlignedPairs(CuTest *testCase) {
         char *sY = evolveSequence(sX); //stString_copy(seqX);
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
-        Sequence* SsX = sequenceConstruct(lX, sX, getBase);
-        Sequence* SsY = sequenceConstruct(lY, sY, getBase);
+
+        //Sequence* SsX = sequenceConstruct(lX, sX, getBase);
+        //Sequence* SsY = sequenceConstruct(lY, sY, getBase);
         //st_logInfo("Sequence X to align: %s END\n", SsX->repr);
         //st_logInfo("Sequence Y to align: %s END\n", SsY->repr);
 
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 
-        StateMachine *sM = stateMachine5_construct(fiveState,                                // type
-                                                   emissions_symbol_setMatchProbsToDefaults, // set match defaults
+        StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,                                // type
                                                    emissions_symbol_setGapProbsToDefaults,   // set X gap defaults
                                                    emissions_symbol_setGapProbsToDefaults,   // set Y gap defaults
+                                                   emissions_symbol_setMatchProbsToDefaults, // set match defaults
                                                    emissions_symbol_getGapProb,              // gapX prob fcn
                                                    emissions_symbol_getGapProb,              // gapY prob fcn
                                                    emissions_symbol_getMatchProb);           // match prob fcn
 
-        stList *alignedPairs = getAlignedPairs(sM, SsX, SsY,
-                                               p, 0, 0);
+        stList *alignedPairs = getAlignedPairs(sM, sX, sY, lX, lY, p,
+                                               getBase, getBlastPairsForPairwiseAlignmentParameters,
+                                               0, 0);
 
         //Check the aligned pairs.
-        checkAlignedPairs(testCase, alignedPairs, SsX->length, SsY->length);
+        checkAlignedPairs(testCase, alignedPairs, lX, lY);
 
         //Cleanup
         stateMachine_destruct(sM);
@@ -1011,35 +1014,34 @@ static void test_kmer_NEW_getAlignedPairs(CuTest *testCase) {
         char *sY = evolveSequence(sX); //stString_copy(seqX);
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
-        int64_t slX = correctSeqLength(lX, kmer);
-        int64_t slY = correctSeqLength(lY, kmer);
-        Sequence* SsX = sequenceConstruct(slX, sX, getKmer);
-        Sequence* SsY = sequenceConstruct(slY, sY, getKmer);
+        int64_t lX2 = correctSeqLength(lX, kmer);
+        int64_t lY2 = correctSeqLength(lY, kmer);
+        //Sequence* SsX = sequenceConstruct(slX, sX, getKmer);
+        //Sequence* SsY = sequenceConstruct(slY, sY, getKmer);
         //st_logInfo("Sequence X to align: %s END\n", sX);
         //st_logInfo("Sequence Y to align: %s END\n", sY);
 
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
         p->threshold=0.02;
-        StateMachine *sM = stateMachine5_construct(fiveState,                                // type
-                                                   emissions_kmer_setMatchProbsToDefaults,   // set match defaults
+        StateMachine *sM = stateMachine5_construct(fiveState, NUM_OF_KMERS,
                                                    emissions_kmer_setGapProbsToDefaults,     // set X gap defaults
                                                    emissions_kmer_setGapProbsToDefaults,     // set Y gap defaults
+                                                   emissions_kmer_setMatchProbsToDefaults,   // set match defaults
                                                    emissions_kmer_getGapProb,                // gapX fcn
                                                    emissions_kmer_getGapProb,                // gapY fcn
                                                    emissions_kmer_getMatchProb);             // match prob fcn
-
-        stList *alignedPairs = getAlignedPairs(sM, SsX, SsY,
-                                               p, 0, 0); // this is where the magic happens
+        st_uglyf("stateMachine constructed\n");
+        stList *alignedPairs = getAlignedPairs(sM, sX, sY, lX2, lY2, p,
+                                               getBase, getBlastPairsForPairwiseAlignmentParameters,
+                                               0, 0); // this is where the magic happens
         //Check the aligned pairs.
-        checkAlignedPairs_kmer(testCase, alignedPairs, SsX->length, SsY->length);
+        checkAlignedPairs_kmer(testCase, alignedPairs, lX2, lY2);
 
         //Cleanup
         stateMachine_destruct(sM);
         free(sX);
         free(sY);
-        sequenceDestroy(SsX);
-        sequenceDestroy(SsY);
         stList_destruct(alignedPairs);
     }
 }
@@ -1055,30 +1057,33 @@ static void test_NEW_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
 
-        Sequence* SsX = sequenceConstruct(lX, sX, getBase);
-        Sequence* SsY = sequenceConstruct(lY, sY, getBase);
+        //Sequence* SsX = sequenceConstruct(lX, sX, getBase);
+        //Sequence* SsY = sequenceConstruct(lY, sY, getBase);
 
         //st_logInfo("Sequence X to align: %s END\n", SsX->repr);
         //st_logInfo("Sequence Y to align: %s END\n", SsY->repr);
 
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-        StateMachine *sM = stateMachine5_construct(fiveState,                               // type
-                                                   emissions_symbol_setMatchProbsToDefaults, // set match defaults
-                                                   emissions_symbol_setGapProbsToDefaults,   // set X gap defaults
-                                                   emissions_symbol_setGapProbsToDefaults,   // set Y gap defaults
-                                                   emissions_symbol_getGapProb,              // gapX prob fcn
-                                                   emissions_symbol_getGapProb,              // gapY prob fcn
-                                                   emissions_symbol_getMatchProb);           // match prob fcn
-        stList *alignedPairs = getAlignedPairs(sM, SsX, SsY,
-                                               p, 1, 1);
+
+        StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
+                                                   emissions_symbol_setGapProbsToDefaults,
+                                                   emissions_symbol_setGapProbsToDefaults,
+                                                   emissions_symbol_setMatchProbsToDefaults,
+                                                   emissions_symbol_getGapProb,
+                                                   emissions_symbol_getGapProb,
+                                                   emissions_symbol_getMatchProb);
+
+        stList *alignedPairs = getAlignedPairs(sM, sX, sY, lX, lY, p,
+                                               getBase, getBlastPairsForPairwiseAlignmentParameters,
+                                               1, 1);
 
         //printf("Before filtering alignedPairs Length: %lld\n", (int64_t) stList_length(alignedPairs));
-        alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, SsX->repr, SsY->repr, 0.2);
+        alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, sX, sY, 0.2);
         //printf("After filtering alignedPairs Length: %lld\n", (int64_t) stList_length(alignedPairs));
 
         //Check the aligned pairs.
-        checkAlignedPairs(testCase, alignedPairs, SsX->length, SsY->length);
+        checkAlignedPairs(testCase, alignedPairs, lX, lY);
         CuAssertIntEquals(testCase, stList_length(alignedPairs), coreLength);
         for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
             stIntTuple *j = stList_get(alignedPairs, i);
@@ -1106,11 +1111,11 @@ static void test_NEW_kmer_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
                                   getRandomSequence(randomPortionLength)); //x with an extra bit at the end.
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
-        int64_t slX = correctSeqLength(lX, kmer);
-        int64_t slY = correctSeqLength(lY, kmer);
+        int64_t lX2 = correctSeqLength(lX, kmer);
+        int64_t lY2 = correctSeqLength(lY, kmer);
         int64_t coreLengthInKmers = correctSeqLength(coreLength, kmer);
-        Sequence* SsX = sequenceConstruct(slX, sX, getKmer);
-        Sequence* SsY = sequenceConstruct(slY, sY, getKmer);
+        //Sequence* SsX = sequenceConstruct(slX, sX, getKmer);
+        //Sequence* SsY = sequenceConstruct(slY, sY, getKmer);
 
         st_logInfo("Sequence X to align: %s END\n", sX);
         st_logInfo("Sequence Y to align: %s END\n", sY);
@@ -1118,21 +1123,23 @@ static void test_NEW_kmer_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         // Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 
-        StateMachine *sM = stateMachine5_construct(fiveState,                                // type
-                                                   emissions_kmer_setMatchProbsToDefaults,   // set match defaults
+        StateMachine *sM = stateMachine5_construct(fiveState, NUM_OF_KMERS,
                                                    emissions_kmer_setGapProbsToDefaults,     // set X gap defaults
                                                    emissions_kmer_setGapProbsToDefaults,     // set Y gap defaults
+                                                   emissions_kmer_setMatchProbsToDefaults,   // set match defaults
                                                    emissions_kmer_getGapProb,                // gapX fcn
                                                    emissions_kmer_getGapProb,                // gapY fcn
                                                    emissions_kmer_getMatchProb);             // match prob fcn
 
-        stList *alignedPairs = getAlignedPairs(sM, SsX, SsY, p, 1, 1);
+        stList *alignedPairs = getAlignedPairs(sM, sX, sY, lX2, lY2, p,
+                                               getKmer, getBlastPairsForPairwiseAlignmentParameters,
+                                               1, 1);
 
         // TODO figure out how to deal with this
-        alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, SsX->repr, SsY->repr, 0.2);
+        alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, sX, sY, 0.2);
 
         // Check the aligned pairs.
-        checkAlignedPairs_kmer(testCase, alignedPairs, SsX->length, SsY->length);
+        checkAlignedPairs_kmer(testCase, alignedPairs, lX2, lY2);
         //CuAssertIntEquals(testCase, stList_length(alignedPairs), coreLength);
         CuAssertIntEquals(testCase, stList_length(alignedPairs), coreLengthInKmers);
         for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
@@ -1148,8 +1155,6 @@ static void test_NEW_kmer_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         stateMachine_destruct(sM);
         free(sX);
         free(sY);
-        sequenceDestroy(SsX);
-        sequenceDestroy(SsY);
         stList_destruct(alignedPairs);
     }
 }
@@ -1471,33 +1476,34 @@ static void test_em_3State(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-
+    // older tests
     SUITE_ADD_TEST(suite, test_diagonal);
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_logAdd);
     SUITE_ADD_TEST(suite, test_sequenceConstruct);
     SUITE_ADD_TEST(suite, test_getKmerIndex);
     SUITE_ADD_TEST(suite, test_getSubSequence);
-    SUITE_ADD_TEST(suite, test_NEW_dpDiagonal);
-    SUITE_ADD_TEST(suite, test_NEW_cell);
-
-    SUITE_ADD_TEST(suite, test_NEW_kmer_cell);
-    SUITE_ADD_TEST(suite, test_NEW_dpDiagonal);
     SUITE_ADD_TEST(suite, test_dpMatrix);
-    SUITE_ADD_TEST(suite, test_NEW_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_NEW_kmer_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_NEW_getAlignedPairsWithBanding);
-    SUITE_ADD_TEST(suite, test_NEW_kmer_getAlignedPairsWithBanding);
-    //SUITE_ADD_TEST(suite, test_getBlastPairs);
-    //SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
     SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
     SUITE_ADD_TEST(suite, test_getSplitPoints);
+    //SUITE_ADD_TEST(suite, test_getBlastPairs);
+    //SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
+    // new functionality tests
+    SUITE_ADD_TEST(suite, test_NEW_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_NEW_cell);
+    SUITE_ADD_TEST(suite, test_NEW_kmer_cell);
+    SUITE_ADD_TEST(suite, test_NEW_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_NEW_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_NEW_kmer_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_NEW_getAlignedPairs);
-    SUITE_ADD_TEST(suite, test_kmer_NEW_getAlignedPairs);
+    SUITE_ADD_TEST(suite, test_NEW_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_NEW_getAlignedPairsWithRaggedEnds);
+
+    SUITE_ADD_TEST(suite, test_kmer_NEW_getAlignedPairs);
+    SUITE_ADD_TEST(suite, test_NEW_kmer_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_NEW_kmer_getAlignedPairsWithRaggedEnds);
-    /*
-    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+
+     /*
     SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_kmer_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
