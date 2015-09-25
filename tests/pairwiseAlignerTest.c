@@ -4,7 +4,6 @@
  * Released under the MIT license, see LICENSE.txt
  */
 
-
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -18,20 +17,7 @@
 #include "pairwiseAligner.h"
 #include "multipleAligner.h"
 #include "emissionMatrix.h"
-#include "../../sonLib/lib/CuTest.h"
-#include "../inc/pairwiseAligner.h"
-#include "../../sonLib/lib/sonLibExcept.h"
-#include "../../sonLib/lib/sonLibCommon.h"
-#include "../../sonLib/lib/sonLibList.h"
-#include "../../sonLib/lib/sonLibTuples.h"
-#include "../../sonLib/lib/sonLibRandom.h"
-#include "../inc/emissionMatrix.h"
-#include "../../sonLib/lib/sonLibString.h"
-#include "../../sonLib/lib/sonLibFile.h"
-#include "../../sonLib/lib/sonLibSortedSet.h"
-#include "../inc/multipleAligner.h"
-#include "../inc/discreteHmm.h"
-
+#include "discreteHmm.h"
 
 static void test_diagonal(CuTest *testCase) {
     //Construct an example diagonal.
@@ -166,7 +152,7 @@ static void test_sequenceConstruct(CuTest* testCase) {
     char *tS = getRandomSequence(100);
     Sequence* testSequence = sequenceConstruct(100, tS, getBase);
     CuAssertIntEquals(testCase, 100, testSequence->length);
-    CuAssertStrEquals(testCase, tS, testSequence->repr);
+    CuAssertStrEquals(testCase, tS, testSequence->elements);
     free(tS);
     sequenceDestroy(testSequence);
 }
@@ -198,7 +184,7 @@ static void test_getKmerIndex(CuTest* testCase) {
     }
 }
 
-static void test_NEW_cell(CuTest* testCase) {
+static void test_cell(CuTest *testCase) {
     /*
      * Tests NEW stateMachine stuff, nucleotide/nucleotide
      */
@@ -244,7 +230,7 @@ static void test_NEW_cell(CuTest* testCase) {
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.00001); //Check the forward and back probabilities are about equal
 }
 
-static void test_NEW_kmer_cell(CuTest* testCase) {
+static void test_kmer_cell(CuTest *testCase) {
     /*
      * Tests NEW stateMachine stuff
      */
@@ -293,7 +279,7 @@ static void test_NEW_kmer_cell(CuTest* testCase) {
     sequenceDestroy(SsY);
 }
 
-static void test_NEW_dpDiagonal(CuTest *testCase) {
+static void test_dpDiagonal(CuTest *testCase) {
 
     StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
                                                emissions_symbol_setGapProbsToDefaults,
@@ -369,7 +355,7 @@ static void test_dpMatrix(CuTest *testCase) {
     dpMatrix_destruct(dpMatrix);
 }
 
-static void test_NEW_diagonalDPCalculations(CuTest *testCase) {
+static void test_diagonalDPCalculations(CuTest *testCase) {
     // make some simple DNA sequences
     const char *sX = "AGCG";
     const char *sY = "AGTTCG";
@@ -471,7 +457,7 @@ static void test_NEW_diagonalDPCalculations(CuTest *testCase) {
 
 }
 
-static void test_NEW_kmer_diagonalDPCalculations(CuTest *testCase) {
+static void test_kmer_diagonalDPCalculations(CuTest *testCase) {
     // These are the originals:
     const char *sX = "AGCG";
     const char *sY = "AGTTCG";
@@ -656,7 +642,7 @@ static void checkAlignedPairs_kmer(CuTest *testCase, stList *blastPairs, int64_t
     stSortedSet_destruct(pairs);
 }
 
-static void test_NEW_getAlignedPairsWithBanding(CuTest *testCase) {
+static void test_getAlignedPairsWithBanding(CuTest *testCase) {
     for (int64_t test = 0; test < 100; test++) {
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(0, 100));
@@ -706,7 +692,7 @@ static void test_NEW_getAlignedPairsWithBanding(CuTest *testCase) {
     }
 }
 
-static void test_NEW_kmer_getAlignedPairsWithBanding(CuTest *testCase) {
+static void test_kmer_getAlignedPairsWithBanding(CuTest *testCase) {
     for (int64_t test = 0; test < 3; test++) {
         // Get two random sequences
         char *sX = getRandomSequence(st_randomInt(0, 100));
@@ -970,7 +956,7 @@ static void test_getSplitPoints(CuTest *testCase) {
     stList_destruct(anchorPairs);
 }
 
-static void test_NEW_getAlignedPairs(CuTest *testCase) {
+static void test_getAlignedPairs(CuTest *testCase) {
     for (int64_t test = 0; test < 100; test++) {
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(0, 100));
@@ -1009,7 +995,7 @@ static void test_NEW_getAlignedPairs(CuTest *testCase) {
     }
 }
 
-static void test_NEW_kmer_getAlignedPairs(CuTest *testCase) {
+static void test_kmer_getAlignedPairs(CuTest *testCase) {
     for (int64_t test = 0; test < 100; test++) {
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(1, 100));
@@ -1048,7 +1034,7 @@ static void test_NEW_kmer_getAlignedPairs(CuTest *testCase) {
     }
 }
 
-static void test_NEW_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
+static void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
     for (int64_t test = 0; test < 1000; test++) {
         //Make a pair of sequences
         int64_t coreLength = 100, randomPortionLength = 100;
@@ -1104,7 +1090,7 @@ static void test_NEW_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
     }
 }
 
-static void test_NEW_kmer_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
+static void test_kmer_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
     for (int64_t test = 0; test < 1000; test++) {
         //Make a core sequence and then add a random portion to either end of it
         int64_t coreLength = 100, randomPortionLength = 100;
@@ -1279,7 +1265,8 @@ static void test_hmmDiscrete_5StateAsymmetric_kmers(CuTest *testCase) {
 }
 
 static void test_HmmDiscrete_em(CuTest *testCase, StateMachineType sMType, int64_t symbolSetSize) {
-    for (int64_t test = 0; test < 100; test++) { // change back to 100
+    //Todo add switch for kmer/nucleotide/event test
+    for (int64_t test = 0; test < 100; test++) {
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(10, 100));
         char *sY = evolveSequence(sX); //stString_copy(seqX);
@@ -1302,6 +1289,7 @@ static void test_HmmDiscrete_em(CuTest *testCase, StateMachineType sMType, int64
                                                hmmDiscrete_setEmissionExpectation,
                                                hmmDiscrete_getEmissionExpectation);
         hmmDiscrete_randomize(hmmD);
+
         // construct stateMachineFunctions
         // load a stateMachine from an hmmD and stateMachineFunctions
         StateMachineFunctions *sMfs = stateMachineFunctions_construct(emissions_symbol_getGapProb,
@@ -1310,10 +1298,11 @@ static void test_HmmDiscrete_em(CuTest *testCase, StateMachineType sMType, int64
 
         StateMachine *sM = getStateMachine5(hmmD, sMfs);
 
-        hmm_destruct(hmmD);
+        hmmDiscrete_destruct(hmmD);
 
         for (int64_t iteration = 0; iteration < 10; iteration++) {
-            hmmD = hmmDiscrete_constructEmpty(0.000000000001, 5, SYMBOL_NUMBER, fiveState,
+
+            hmmD = hmmDiscrete_constructEmpty(0.000000000001, 5, symbolSetSize, sMType,
                                               hmmDiscrete_addToTransitionExpectation,
                                               hmmDiscrete_setTransitionExpectation,
                                               hmmDiscrete_getTransitionExpectation,
@@ -1322,7 +1311,6 @@ static void test_HmmDiscrete_em(CuTest *testCase, StateMachineType sMType, int64
                                               hmmDiscrete_getEmissionExpectation);
 
             // E-step
-
             getExpectations(sM, hmmD, sX, sY, lX, lY, p, getBase, getBlastPairsForPairwiseAlignmentParameters, 0, 0);
 
             hmmDiscrete_normalize(hmmD);
@@ -1347,7 +1335,7 @@ static void test_HmmDiscrete_em(CuTest *testCase, StateMachineType sMType, int64
             pLikelihood = hmmD->likelihood;
             stateMachine_destruct(sM);
             sM = getStateMachine5(hmmD, sMfs); // M-step
-            hmm_destruct(hmmD);
+            hmmDiscrete_destruct(hmmD);
         }
         //Cleanup
         pairwiseAlignmentBandingParameters_destruct(p);
@@ -1360,14 +1348,15 @@ static void test_hmmDiscrete_EM_5State_symbols(CuTest *testCase) {
     test_HmmDiscrete_em(testCase, fiveState, SYMBOL_NUMBER);
 }
 
-static void test_hmmDiscrete_EM_5State_kmers(CuTest *testCase) {
-    test_HmmDiscrete_em(testCase, fiveState, NUM_OF_KMERS);
-}
+//static void test_hmmDiscrete_EM_5State_kmers(CuTest *testCase) {
+//    test_HmmDiscrete_em(testCase, fiveState, NUM_OF_KMERS);
+//}
 
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
     // older tests
+
     SUITE_ADD_TEST(suite, test_diagonal);
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_logAdd);
@@ -1379,24 +1368,23 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_getSplitPoints);
     SUITE_ADD_TEST(suite, test_getBlastPairs);
     SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
-    SUITE_ADD_TEST(suite, test_NEW_dpDiagonal);
-    SUITE_ADD_TEST(suite, test_NEW_cell);
-    SUITE_ADD_TEST(suite, test_NEW_kmer_cell);
-    SUITE_ADD_TEST(suite, test_NEW_dpDiagonal);
-    SUITE_ADD_TEST(suite, test_NEW_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_NEW_kmer_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_NEW_getAlignedPairs);
-    SUITE_ADD_TEST(suite, test_NEW_getAlignedPairsWithBanding);
-    SUITE_ADD_TEST(suite, test_NEW_getAlignedPairsWithRaggedEnds);
-    SUITE_ADD_TEST(suite, test_NEW_kmer_getAlignedPairs);
-    SUITE_ADD_TEST(suite, test_NEW_kmer_getAlignedPairsWithBanding);
-    SUITE_ADD_TEST(suite, test_NEW_kmer_getAlignedPairsWithRaggedEnds);
+    SUITE_ADD_TEST(suite, test_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_cell);
+    SUITE_ADD_TEST(suite, test_kmer_cell);
+    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_kmer_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_getAlignedPairs);
+    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
+    SUITE_ADD_TEST(suite, test_kmer_getAlignedPairs);
+    SUITE_ADD_TEST(suite, test_kmer_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_kmer_getAlignedPairsWithRaggedEnds);
     SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_symbols);
     SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_kmers);
     SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_symbols);
     SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_kmers);
     SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
-    SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_kmers);
+    //SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_kmers);
 
     return suite;
 }

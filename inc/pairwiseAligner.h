@@ -17,7 +17,7 @@
 #include "bioioC.h"
 #include "sonLib.h"
 #include "stateMachine.h"
-#include "../../sonLib/lib/sonLibTypes.h"
+
 
 
 //The exception string
@@ -36,7 +36,6 @@ typedef enum {
 typedef struct sequence {
     int64_t length;
     void *elements;
-    char* repr;
     sequenceType type;
     void* (*get)(void *elements, int64_t index);
 } Sequence;
@@ -51,7 +50,11 @@ void *getBase(void *elements, int64_t index);
 
 void *getKmer(void *elements, int64_t index);
 
-// void *getEvent(void *elements, int64_t index);
+void *getEvent(void *elements, int64_t index);
+
+int64_t getXposition(Sequence *sX, int64_t xay, int64_t xmy);
+
+int64_t getYposition(Sequence *sY, int64_t xay, int64_t xmy);
 
 int64_t correctSeqLength(int64_t length, sequenceType type);
 
@@ -91,8 +94,6 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM, Sequence *SsX, Sequence *S
  */
 
 void updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP, void *extraArgs);
-
-void updateExpectations_kmer(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP, void *extraArgs);
 
 void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                  Sequence *sX, Sequence *sY, //sequenceType t,
@@ -269,11 +270,5 @@ stList *reweightAlignedPairs(stList *alignedPairs,
         int64_t *indelProbsX, int64_t *indelProbsY, double gapGamma);
 
 stList *reweightAlignedPairs2(stList *alignedPairs, int64_t seqLengthX, int64_t seqLengthY, double gapGamma);
-
-// additions from Art
-int64_t getXposition(Sequence *sX, int64_t xay, int64_t xmy);
-
-int64_t getYposition(Sequence *sY, int64_t xay, int64_t xmy);
-
 
 #endif /* PAIRWISEALIGNER_H_ */

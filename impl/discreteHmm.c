@@ -10,16 +10,6 @@
 #include "stateMachine.h"
 #include "discreteHmm.h"
 
-#include "../inc/emissionMatrix.h"
-#include "../inc/stateMachine.h"
-#include "../../sonLib/lib/sonLibCommon.h"
-#include "../../sonLib/lib/sonLibList.h"
-#include "../../sonLib/lib/sonLibString.h"
-#include "../../sonLib/lib/sonLibFile.h"
-#include "../inc/pairwiseAligner.h"
-#include "../../sonLib/lib/sonLibRandom.h"
-#include "../inc/discreteHmm.h"
-
 // Construct
 Hmm *hmmDiscrete_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
                                 void (*addToTransitionExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
@@ -79,7 +69,9 @@ double hmmDiscrete_getTransitionExpectation(Hmm *hmm, int64_t from, int64_t to) 
 
 // Emissions
 void hmmDiscrete_addToEmissionExpectation(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p) {
+
     int64_t tableIndex = x * hmm->symbolSetSize + y;
+
     hmm->emissions[(state * hmm->matrixSize) + tableIndex] += p;
 }
 

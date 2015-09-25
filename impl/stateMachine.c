@@ -11,21 +11,11 @@
 #include <ctype.h>
 #include <assert.h>
 #include <stdint.h>
-
 #include "bioioC.h"
 #include "sonLib.h"
 #include "pairwiseAligner.h"
 #include "stateMachine.h"
-
-#include "../inc/emissionMatrix.h"
-#include "../inc/stateMachine.h"
-#include "../../sonLib/lib/sonLibCommon.h"
-#include "../../sonLib/lib/sonLibList.h"
-#include "../../sonLib/lib/sonLibString.h"
-#include "../../sonLib/lib/sonLibFile.h"
-#include "../inc/pairwiseAligner.h"
-#include "../../sonLib/lib/sonLibRandom.h"
-#include "../inc/discreteHmm.h"
+#include "discreteHmm.h"
 
 ///////////////////////////////////
 ///////////////////////////////////
@@ -57,6 +47,32 @@ void hmm_write(Hmm *hmm, FILE *fileHandle) {
         fprintf(fileHandle, "%f\t", hmm->emissions[i]);
     }
     fprintf(fileHandle, "\n");
+}
+
+Hmm *hmm_constructEmpty(double pseudoExpectation, StateMachineType type) {
+    /*
+     * Only here until new loadFromFile function is made
+     */
+    Hmm *hmm = st_malloc(sizeof(Hmm));
+    hmm->type = type;
+    switch (type) {
+        case fiveState:
+        case fiveStateAsymmetric:
+            hmm->stateNumber = 5;
+            break;
+        case threeState:
+        case threeStateAsymmetric:
+            hmm->stateNumber = 3;
+            break;
+        default:
+            st_errAbort("Unrecognised state type: %i\n", type);
+    }
+    hmm->transitions = st_malloc(hmm->stateNumber * hmm->stateNumber * sizeof(double));
+    for (int64_t i = 0; i < hmm->stateNumber * hmm->stateNumber; i++) {
+        hmm->transitions[i] = pseudoExpectation;
+    }
+    hmm->likelihood = 0.0;
+    return hmm;
 }
 
 Hmm *hmm_loadFromFile(const char *fileName) {
@@ -184,19 +200,14 @@ int64_t emissions_getBaseIndex(void *base) {
     //st_uglyf("%c - ", b);
     switch (b) {
         case 'A':
-            //st_uglyf("returning 0\n");
             return 0;
         case 'C':
-            //st_uglyf("returning 1\n");
             return 1;
         case 'G':
-            //st_uglyf("returning 2\n");
             return 2;
         case 'T':
-            //st_uglyf("returning 3\n");
             return 3;
-        default:
-            //st_uglyf("returning 4 - default\n");
+        default: // N
             return 4;
     }
 }
@@ -253,6 +264,28 @@ double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, vo
     int64_t tableIndex = iX * NUM_OF_KMERS + iY;
     return emissionMatchProbs[tableIndex];
 }
+
+static inline double calc_zValue(double measurement, double u, double sigma) {
+    return (measurement - u) / sigma;
+}
+
+double emissions_signal_getMatchProb(const double *eventModel, void *event, void *kmer) {
+    double eventMean = *(int64_t *) event;
+    int64_t kmerIndex = emissions_getKmerIndex(kmer);
+    double modelMean = eventModel[kmerIndex];
+    double modelStdDev = eventModel[kmerIndex+1];
+    return calc_zValue(eventMean, modelMean, modelStdDev);
+}
+
+//double emissions_signal_getKmerGapProb(const double *eventGapModel, void *kmer) {
+//    do something... like
+//    return probOfSkippedKmer(kmer)
+//
+//}
+
+//double emissions_signal_getEventGapProb(const double *levelGapModel, void *event) {
+//    do something...
+//}
 
 ////////////////////////////
 // EM emissions functions //

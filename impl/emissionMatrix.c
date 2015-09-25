@@ -1,10 +1,8 @@
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
 #include "emissionMatrix.h"
-#include "../inc/emissionMatrix.h"
 
 /*
  * Code-generated emissions matrix for 2-mers

@@ -13,13 +13,8 @@
 #include "pairwiseAligner.h"
 #include "multipleAligner.h"
 #include "commonC.h"
-#include "../sonLib/lib/sonLibTypes.h"
-#include "../sonLib/lib/bioioC.h"
-#include "../sonLib/lib/commonC.h"
-#include "../sonLib/lib/pairwiseAlignment.h"
-#include "inc/multipleAligner.h"
-#include "inc/stateMachine.h"
-#include "inc/discreteHmm.h"
+#include "discreteHmm.h"
+
 
 void usage() {
     fprintf(stderr, "cPecanRelign [options] seq1[fasta] seq2[fasta], version 0.2\n");
@@ -525,9 +520,15 @@ int main(int argc, char *argv[]) {
                                      emissions_symbol_getMatchProb);
     }
 
-    //Make the expectations object, if needed
+    //Make the expectations object, if needed 0.000000000001
     if(expectationsFile != NULL) {
-        hmmExpectations = hmm_constructEmpty(0.000000000001, sM->type); //The tiny pseudo count prevents overflow
+        hmmExpectations = hmmDiscrete_constructEmpty(0.000000000001, 5, 5, fiveState,
+                                                     hmmDiscrete_addToTransitionExpectation,
+                                                     hmmDiscrete_setTransitionExpectation,
+                                                     hmmDiscrete_getTransitionExpectation,
+                                                     hmmDiscrete_addToEmissionExpectation,
+                                                     hmmDiscrete_setEmissionExpectation,
+                                                     hmmDiscrete_getEmissionExpectation);
     }
 
     //Read in input sequences

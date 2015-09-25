@@ -10,11 +10,6 @@
 #include <string.h>
 #include "sonLib.h"
 
-
-#include "../../sonLib/lib/CuTest.h"
-#include "../../sonLib/lib/sonLibCommon.h"
-
-
 CuSuite* pairwiseAlignmentTestSuite(void);
 //CuSuite* multipleAlignerTestSuite(void);
 //CuSuite* pairwiseAlignmentLongTestSuite(void);

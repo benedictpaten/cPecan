@@ -15,23 +15,12 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <stdint.h>
-
-
-#include "../../sonLib/lib/sonLib.h"
-#include "../../sonLib/lib/pairwiseAlignment.h"
-#include "../../sonLib/lib/sonLibString.h"
-#include "../../sonLib/lib/sonLibCommon.h"
-#include "../inc/emissionMatrix.h"
-#include "../inc/pairwiseAligner.h"
-
 #include "sonLib.h"
 #include "bioioC.h"
 #include "pairwiseAligner.h"
 #include "pairwiseAlignment.h"
 #include "stateMachine.h"
 #include "emissionMatrix.h"
-#include "../../sonLib/lib/bioioC.h"
-
 
 
 ///////////////////////////////////
@@ -288,7 +277,6 @@ Sequence* sequenceConstruct(int64_t length, void *elements, void (*getFcn)) {
     // correct the sequence length for kmers/events
     self->length = length;
     self->elements = elements;
-    self->repr = (char*) elements; // TODO get rid of this
     self->get = getFcn;
     return self;
 }
@@ -309,7 +297,7 @@ void sequenceDestroy(Sequence* seq) {
     free(seq);
 }
 
-void* getBase(void *elements, int64_t index) {
+void *getBase(void *elements, int64_t index) {
     /*
      * Returns a single base from a sequence object. This will likely be depreciated in favor of
      * using only indexes for elements
@@ -320,7 +308,7 @@ void* getBase(void *elements, int64_t index) {
     return index >= 0 ? &(((char *)elements)[index]) : n;
 }
 
-void* getKmer(void *elements, int64_t index) {
+void *getKmer(void *elements, int64_t index) {
     /*
      * Returns a kmer from a sequence object, similarly to getBase, this might be changed to only
      * if we decide to only use indicies for kmers/events/nucleotides. That would also make it easy to
@@ -337,6 +325,12 @@ void* getKmer(void *elements, int64_t index) {
         k_i[x] = *((char *)elements+(i+x));
     }
     return index >= 0 ? k_i : n;
+}
+
+void *getEvent(void *elements, int64_t index) {
+    double *nullEvent;
+    *nullEvent = 0.0;
+    return index >= 0 ? &(((double *)elements)[index]) : nullEvent;
 }
 
 int64_t correctSeqLength(int64_t length, sequenceType type) {
@@ -411,10 +405,9 @@ double cell_dotProduct2(double *cell, StateMachine *sM, double (*getStateValue)(
     return totalProb;
 }
 
-void updateExpectations(double *fromCells, double *toCells,
-                           int64_t from, int64_t to,
-                           double eP, double tP,
-                           void *extraArgs) {
+void updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
+                        void *extraArgs) {
+
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
     Hmm *hmmExpectations = ((void **) extraArgs)[1];
@@ -422,8 +415,14 @@ void updateExpectations(double *fromCells, double *toCells,
     int64_t y = *((int64_t *)((void **) extraArgs)[3]);
     //Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
+
     hmmExpectations->addToTransitionExpectationFcn(hmmExpectations, from, to, p);
-    hmmExpectations->addToEmissionExpectationFcn(hmmExpectations, to, x, y, p); // no more check for Ns
+
+    if(x < hmmExpectations->symbolSetSize && y < hmmExpectations->symbolSetSize) { //Ignore gaps involving Ns.
+        hmmExpectations->addToEmissionExpectationFcn(hmmExpectations, to, x, y, p);
+    }
+
+
 }
 
 static void cell_calculateExpectation(StateMachine *sM,
@@ -754,7 +753,7 @@ static void diagonalCalculationExpectations(StateMachine *sM,
                                             int64_t xay,
                                             DpMatrix *forwardDpMatrix,
                                             DpMatrix *backwardDpMatrix,
-                                            const Sequence* sX, const Sequence* sY,
+                                            Sequence* sX, Sequence* sY,
                                             double totalProbability,
                                             PairwiseAlignmentParameters *p,
                                             void *extraArgs) {
@@ -770,8 +769,8 @@ static void diagonalCalculationExpectations(StateMachine *sM,
     diagonalCalculation(sM,
                         dpMatrix_getDiagonal(backwardDpMatrix, xay),
                         dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
-                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 2), //TODO: this cellCalc neends to
-                        sX, sY, cell_calculateExpectation, extraArgs2); //TODO: be generalized
+                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
+                        sX, sY, cell_calculateExpectation, extraArgs2);
 }
 
 ///////////////////////////////////
@@ -1447,8 +1446,10 @@ void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
     //stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(sX, sY, p);
     stList *anchorPairs = getAnchorPairFcn(sX, sY, p);
     // Make Sequence objects
+
     Sequence *SsX = sequenceConstruct(lX, sX, getFcn);
     Sequence *SsY = sequenceConstruct(lY, sY, getFcn);
+
     getExpectationsUsingAnchors(sM, hmmExpectations, SsX, SsY,
                                 anchorPairs, p,
                                 alignmentHasRaggedLeftEnd,

@@ -100,48 +100,18 @@ typedef struct _stateMachineFunctions {
     double (*matchProbFcn)(const double *, void *, void *);
 } StateMachineFunctions;
 
-
-// constructers
-Hmm *hmm_constructEmpty(double pseudoExpectation, StateMachineType type);
-Hmm *hmm_kmer_constructEmpty(double pseudoExpectation, StateMachineType type);
-
-// randomizers
-void hmm_randomise(Hmm *hmm); //Creates normalised HMM with parameters set to small random values.
-void hmm_kmer_randomise(Hmm *hmm);
-
-// destruct
-void hmm_destruct(Hmm *hmmExpectations);
-
-// writers
-void hmm_write(Hmm *hmmExpectations, FILE *fileHandle);
-void hmm_kmer_write(Hmm *hmm, FILE *fileHandle);
-
-// transitions
-void hmm_addToTransitionExpectation(Hmm *hmmExpectations, int64_t from, int64_t to, double p);
-double hmm_getTransition(Hmm *hmmExpectations, int64_t from, int64_t to);
-void hmm_setTransition(Hmm *hmm, int64_t from, int64_t to, double p);
-
-// emissions
-void hmm_addToEmissionsExpectation(Hmm *hmmExpectations, int64_t state, int64_t x, int64_t y, double p);
-void hmm_kmer_addToEmissionsExpectation(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p); //kmer addition
-
-double hmm_getEmissionsExpectation(Hmm *hmm, int64_t state, int64_t x, int64_t y);
-double hmm_kmer_getEmissionsExpectation(Hmm *hmm, int64_t state, int64_t x, int64_t y); //kmer addition
-
-void hmm_setEmissionsExpectation(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p);
-void hmm_kmer_setEmissionsExpectation(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p);
-
-// loaders
-Hmm *hmm_loadFromFile(const char *fileName);
-Hmm *hmm_kmer_loadFromFile(const char *fileName);
-
-// normalizers
-void hmm_normalise(Hmm *hmm);
-void hmm_kmer_normalise(Hmm *hmm);
-
 //////////////////
 // stateMachine //
 //////////////////
+
+// StateMachine constructor
+StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSetSize,
+                                      void (*setXGapDefaultsFcn)(double *),
+                                      void (*setYGapDefaultsFcn)(double *),
+                                      void (*setMatchDefaultsFcn)(double *),
+                                      double (*gapXProbFcn)(const double *, void *),
+                                      double (*gapYProbFcn)(const double *, void *),
+                                      double (*matchProbFcn)(const double *, void *, void *));
 
 // indexing
 int64_t emissions_getKmerIndex(void *kmer);
@@ -169,12 +139,6 @@ double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, vo
 // EM
 StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs);
 
-StateMachine *hmm_getStateMachine(Hmm *hmm);
-
-StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs);
-
-StateMachine *hmm_kmer_getStateMachine(Hmm *hmm);
-
 StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSetSize,
                                       void (*setXGapDefaultsFcn)(double *),
                                       void (*setYGapDefaultsFcn)(double *),
@@ -183,8 +147,12 @@ StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSe
                                       double (*gapYProbFcn)(const double *, void *),
                                       double (*matchProbFcn)(const double *, void *, void *));
 
-StateMachine *stateMachine3_construct(StateMachineType type); //the type is to specify symmetric/asymmetric
+//StateMachine *stateMachine3_construct(StateMachineType type); //the type is to specify symmetric/asymmetric
 
 void stateMachine_destruct(StateMachine *stateMachine);
+
+// To be depreciated:
+Hmm *hmm_loadFromFile(const char *fileName);
+
 
 #endif /* STATEMACHINE_H_ */
