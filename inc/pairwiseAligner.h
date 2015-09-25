@@ -41,17 +41,17 @@ typedef struct sequence {
     void* (*get)(void *elements, int64_t index);
 } Sequence;
 
-Sequence* sequenceConstruct(int64_t length, void *elements, void (*getFcn));
+Sequence *sequenceConstruct(int64_t length, void *elements, void (*getFcn));
 
-Sequence* sequence_getSubSequence(Sequence* wholeSequence, int64_t start, int64_t length, void (*getFcn));
-
-Sequence* sequence_NEW_getSubSequence(Sequence* inputSequence, int64_t start, int64_t sliceLength, void (*getFcn));
+Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength, void (*getFcn));
 
 void sequenceDestroy(Sequence* seq);
 
-void* getBase(void *elements, int64_t index);
+void *getBase(void *elements, int64_t index);
 
-void* getKmer(void *elements, int64_t index);
+void *getKmer(void *elements, int64_t index);
+
+// void *getEvent(void *elements, int64_t index);
 
 int64_t correctSeqLength(int64_t length, sequenceType type);
 
@@ -102,8 +102,9 @@ void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                  bool alignmentHasRaggedRightEnd);
 
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
-                     void* sX, void* sY,
-                     PairwiseAlignmentParameters *p,
+                     void *sX, void *sY, int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,
+                     void *(getFcn)(void *, int64_t),
+                     stList *(*getAnchorPairFcn)(void *, void *, PairwiseAlignmentParameters *),
                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 /*

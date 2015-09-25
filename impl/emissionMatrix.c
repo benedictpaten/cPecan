@@ -10,7 +10,7 @@
  * Code-generated emissions matrix for 2-mers
  */
 
-void emissions_kmer_setMatchProbsToDefaults(double *emissionMatchProbs, int64_t symbolSetSize) {
+void emissions_kmer_setMatchProbsToDefaults(double *emissionMatchProbs) {
     /*
      * This sets the match probabilities to default values for matching kmers
      * TODO maybe use relloc here so that we can have one stateMachine object?
@@ -55,7 +55,7 @@ void emissions_kmer_setMatchProbsToDefaults(double *emissionMatchProbs, int64_t 
 }
 
 
-void emissions_kmer_setGapProbsToDefaults(double *emissionGapProbs, int64_t symbolSetSize) {
+void emissions_kmer_setGapProbsToDefaults(double *emissionGapProbs) {
     /*
      * This is used to set the emissions to reasonable values.
      */

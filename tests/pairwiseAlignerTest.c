@@ -30,6 +30,7 @@
 #include "../../sonLib/lib/sonLibFile.h"
 #include "../../sonLib/lib/sonLibSortedSet.h"
 #include "../inc/multipleAligner.h"
+#include "../inc/discreteHmm.h"
 
 
 static void test_diagonal(CuTest *testCase) {
@@ -177,7 +178,7 @@ static void test_getSubSequence(CuTest* testCase) {
         int64_t offset = st_randomInt(0, lS);
         int64_t sliceLength = st_randomInt(1, (lS-offset));
         Sequence* wholeSequence = sequenceConstruct(lS, cS, getBase);
-        Sequence* seqSlice = sequence_NEW_getSubSequence(wholeSequence, offset, sliceLength, getBase);
+        Sequence* seqSlice = sequence_getSubSequence(wholeSequence, offset, sliceLength, getBase);
         for (int i = 0; i < seqSlice->length; i++) {
             void* b = seqSlice->get(seqSlice->elements, i);
             void* B = wholeSequence->get(wholeSequence->elements, i+offset);
@@ -293,6 +294,7 @@ static void test_NEW_kmer_cell(CuTest* testCase) {
 }
 
 static void test_NEW_dpDiagonal(CuTest *testCase) {
+
     StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
                                                emissions_symbol_setGapProbsToDefaults,
                                                emissions_symbol_setGapProbsToDefaults,
@@ -738,7 +740,7 @@ static void test_NEW_kmer_getAlignedPairsWithBanding(CuTest *testCase) {
         stList *anchorPairs = getRandomAnchorPairs(lX, lY);
         stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
         void *extraArgs[1] = { alignedPairs };
-        st_uglyf("sequence and stateMachine constructed...\n");
+
         getPosteriorProbsWithBanding(sM,                                     //state machine
                                      anchorPairs,                            //(random) anchor pairs
                                      sX2, sY2,                               //sequence objects
@@ -746,7 +748,7 @@ static void test_NEW_kmer_getAlignedPairsWithBanding(CuTest *testCase) {
                                      0, 0,                                   //ragged left and right end booleans
                                      diagonalCalculationPosteriorMatchProbs, //posterior probability function
                                      extraArgs);                             //bin for aligned pairs
-        st_uglyf("posteriorProbs gotten\n");
+
         //Check the aligned pairs.
         checkAlignedPairs_kmer(testCase, alignedPairs, lX, lY);
 
@@ -1007,7 +1009,7 @@ static void test_NEW_getAlignedPairs(CuTest *testCase) {
     }
 }
 
-static void test_kmer_NEW_getAlignedPairs(CuTest *testCase) {
+static void test_NEW_kmer_getAlignedPairs(CuTest *testCase) {
     for (int64_t test = 0; test < 100; test++) {
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(1, 100));
@@ -1031,7 +1033,7 @@ static void test_kmer_NEW_getAlignedPairs(CuTest *testCase) {
                                                    emissions_kmer_getGapProb,                // gapX fcn
                                                    emissions_kmer_getGapProb,                // gapY fcn
                                                    emissions_kmer_getMatchProb);             // match prob fcn
-        st_uglyf("stateMachine constructed\n");
+
         stList *alignedPairs = getAlignedPairs(sM, sX, sY, lX2, lY2, p,
                                                getBase, getBlastPairsForPairwiseAlignmentParameters,
                                                0, 0); // this is where the magic happens
@@ -1163,181 +1165,120 @@ static void test_NEW_kmer_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
  * EM training tests.
  */
 
-static void test_hmm(CuTest *testCase, StateMachineType stateMachineType) {
+static void test_hmmDiscrete(CuTest *testCase, StateMachineType sMType, int64_t symbolSetSize) {
     //Expectation object
-    Hmm *hmm = hmm_constructEmpty(0.0, stateMachineType);
+    Hmm *hmmD = hmmDiscrete_constructEmpty(0.0, 5, symbolSetSize, sMType,
+                                           hmmDiscrete_addToTransitionExpectation, // add
+                                           hmmDiscrete_setTransitionExpectation,   // set
+                                           hmmDiscrete_getTransitionExpectation,   // get
+                                           hmmDiscrete_addToEmissionExpectation,   // add
+                                           hmmDiscrete_setEmissionExpectation,     // set
+                                           hmmDiscrete_getEmissionExpectation);    // get
+
     //Add some transition expectations
-    for (int64_t from = 0; from < hmm->stateNumber; from++) {
-        for (int64_t to = 0; to < hmm->stateNumber; to++) {
-            hmm_addToTransitionExpectation(hmm, from, to, from * hmm->stateNumber + to);
+    for (int64_t from = 0; from < hmmD->stateNumber; from++) {
+        for (int64_t to = 0; to < hmmD->stateNumber; to++) {
+            double dummy = from * hmmD->stateNumber + to;
+            hmmD->addToTransitionExpectationFcn(hmmD, from, to, dummy);
         }
     }
 
     //Add some emission expectations
-    for (int64_t state = 0; state < hmm->stateNumber; state++) {
-        for (int64_t x = 0; x < SYMBOL_NUMBER_NO_N; x++) {
-            for (int64_t y = 0; y < SYMBOL_NUMBER_NO_N; y++) {
-                hmm_addToEmissionsExpectation(hmm, state, x, y,
-                        state * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N + x * SYMBOL_NUMBER_NO_N + y);
+    for (int64_t state = 0; state < hmmD->stateNumber; state++) {
+        for (int64_t x = 0; x < hmmD->symbolSetSize; x++) {
+            for (int64_t y = 0; y < hmmD->symbolSetSize; y++) {
+                double dummy = state * hmmD->symbolSetSize * hmmD->symbolSetSize + x * hmmD->symbolSetSize + y;
+                hmmD->addToEmissionExpectationFcn(hmmD, state, x, y, dummy);
             }
         }
     }
 
     //Write to a file
+    // TODO implement this
+    /*
     char *tempFile = stString_print("./temp%" PRIi64 ".hmm", st_randomInt(0, INT64_MAX));
     CuAssertTrue(testCase, !stFile_exists(tempFile)); //Quick check that we don't write over anything.
     FILE *fH = fopen(tempFile, "w");
-    hmm_write(hmm, fH);
+    hmm_write(hmmD, fH);
     fclose(fH);
-    hmm_destruct(hmm);
+    hmm_destruct(hmmD);
 
     //Load from a file
-    hmm = hmm_loadFromFile(tempFile);
+    hmmD = hmm_loadFromFile(tempFile);
     stFile_rmrf(tempFile);
+    */
 
     //Check the transition expectations
-    for (int64_t from = 0; from < hmm->stateNumber; from++) {
-        for (int64_t to = 0; to < hmm->stateNumber; to++) {
-            CuAssertTrue(testCase, hmm_getTransition(hmm, from, to) == from * hmm->stateNumber + to);
+    for (int64_t from = 0; from < hmmD->stateNumber; from++) {
+        for (int64_t to = 0; to < hmmD->stateNumber; to++) {
+            double retrievedProb = hmmD->getTransitionsExpFcn(hmmD, from, to);
+            double correctProb = from * hmmD->stateNumber + to;
+            CuAssertTrue(testCase, retrievedProb == correctProb);
+            //CuAssertTrue(testCase, hmm_getTransition(hmmD, from, to) == from * hmmD->stateNumber + to);
         }
     }
 
     //Check the emission expectations
-    for (int64_t state = 0; state < hmm->stateNumber; state++) {
-        for (int64_t x = 0; x < SYMBOL_NUMBER_NO_N; x++) {
-            for (int64_t y = 0; y < SYMBOL_NUMBER_NO_N; y++) {
-                CuAssertTrue(testCase,
-                        hmm_getEmissionsExpectation(hmm, state, x, y) == state * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N + x * SYMBOL_NUMBER_NO_N + y);
+    for (int64_t state = 0; state < hmmD->stateNumber; state++) {
+        for (int64_t x = 0; x < hmmD->symbolSetSize; x++) {
+            for (int64_t y = 0; y < hmmD->symbolSetSize; y++) {
+                double retrievedProb = hmmD->getEmissionExpFcn(hmmD, state, x, y);
+                double correctProb = state * hmmD->symbolSetSize * hmmD->symbolSetSize + x * hmmD->symbolSetSize + y;
+                CuAssertTrue(testCase, retrievedProb == correctProb);
             }
         }
     }
 
     //Normalise
-    hmm_normalise(hmm);
+    hmmDiscrete_normalize(hmmD);
 
     //Recheck transitions
-    for (int64_t from = 0; from < hmm->stateNumber; from++) {
-        for (int64_t to = 0; to < hmm->stateNumber; to++) {
-            double z = from * hmm->stateNumber * hmm->stateNumber + (hmm->stateNumber * (hmm->stateNumber - 1)) / 2;
-            CuAssertDblEquals(testCase, (from * hmm->stateNumber + to) / z, hmm_getTransition(hmm, from, to), 0.0);
+    for (int64_t from = 0; from < hmmD->stateNumber; from++) {
+        for (int64_t to = 0; to < hmmD->stateNumber; to++) {
+            double z = from * hmmD->stateNumber * hmmD->stateNumber + (hmmD->stateNumber * (hmmD->stateNumber - 1)) / 2;
+            double retrievedNormedProb = hmmD->getTransitionsExpFcn(hmmD, from, to);
+            CuAssertDblEquals(testCase, (from * hmmD->stateNumber + to) / z, retrievedNormedProb, 0.0);
+            //CuAssertDblEquals(testCase, (from * hmmD->stateNumber + to) / z, hmm_getTransition(hmmD, from, to), 0.0);
         }
     }
 
     //Recheck the emissions
-    for (int64_t state = 0; state < hmm->stateNumber; state++) {
-        for (int64_t x = 0; x < SYMBOL_NUMBER_NO_N; x++) {
-            for (int64_t y = 0; y < SYMBOL_NUMBER_NO_N; y++) {
-                double z = SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N * state
-                        + ((SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N) * ((SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N) - 1))
-                                / 2;
+    for (int64_t state = 0; state < hmmD->stateNumber; state++) {
+        for (int64_t x = 0; x < hmmD->symbolSetSize; x++) {
+            for (int64_t y = 0; y < hmmD->symbolSetSize; y++) {
+                double stateTotal = hmmD->symbolSetSize * hmmD->symbolSetSize * hmmD->symbolSetSize * hmmD->symbolSetSize * state +
+                                    ((hmmD->symbolSetSize * hmmD->symbolSetSize) * ((hmmD->symbolSetSize * hmmD->symbolSetSize) - 1)) / 2;
+                //double z = SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N * state
+                //           + ((SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N) * ((SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N) - 1))
+                //             / 2;
+                double retrievedNormedProb = hmmD->getEmissionExpFcn(hmmD, state, x, y);
                 CuAssertTrue(testCase,
-                        hmm_getEmissionsExpectation(hmm, state, x, y) == (state * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N + x * SYMBOL_NUMBER_NO_N + y)/z);
-            }
-        }
-    }
-
-    //Clean up
-    hmm_destruct(hmm);
-}
-
-static void test_kmer_hmm(CuTest *testCase, StateMachineType stateMachineType) {
-    //Expectation object
-    Hmm *hmm = hmm_kmer_constructEmpty(0.0, stateMachineType);
-    //Add some transition expectations
-    for (int64_t from = 0; from < hmm->stateNumber; from++) {
-        for (int64_t to = 0; to < hmm->stateNumber; to++) {
-            hmm_addToTransitionExpectation(hmm, from, to, from * hmm->stateNumber + to);
-        }
-    }
-
-    //Add some emission expectations
-    for (int64_t state = 0; state < hmm->stateNumber; state++) {
-        for (int64_t x = 0; x < NUM_OF_KMERS; x++) {
-            for (int64_t y = 0; y < NUM_OF_KMERS; y++) {
-                double dummy = state * SYMBOL_NUMBER * SYMBOL_NUMBER + x * SYMBOL_NUMBER + y;
-                hmm_kmer_addToEmissionsExpectation(hmm, state, x, y, dummy);
-            }
-        }
-    }
-
-    //Write to a file
-    char *tempFile = stString_print("./temp%" PRIi64 ".hmm", st_randomInt(0, INT64_MAX));
-    CuAssertTrue(testCase, !stFile_exists(tempFile)); //Quick check that we don't write over anything.
-    FILE *fH = fopen(tempFile, "w");
-    hmm_kmer_write(hmm, fH);
-    fclose(fH);
-    hmm_destruct(hmm);
-
-    //Load from a file
-    hmm = hmm_kmer_loadFromFile(tempFile);
-    stFile_rmrf(tempFile);
-
-    //Check the transition expectations
-    for (int64_t from = 0; from < hmm->stateNumber; from++) {
-        for (int64_t to = 0; to < hmm->stateNumber; to++) {
-            CuAssertTrue(testCase, hmm_getTransition(hmm, from, to) == from * hmm->stateNumber + to);
-        }
-    }
-
-    //Check the emission expectations
-    for (int64_t state = 0; state < hmm->stateNumber; state++) {
-        for (int64_t x = 0; x < NUM_OF_KMERS; x++) {
-            for (int64_t y = 0; y < NUM_OF_KMERS; y++) {
-                double expected = state * SYMBOL_NUMBER * SYMBOL_NUMBER + x * SYMBOL_NUMBER + y;
-                double actual = hmm_kmer_getEmissionsExpectation(hmm, state, x, y);
-                CuAssertDblEquals(testCase, expected, actual, 0.001);
-                //CuAssertTrue(testCase,
-                //             hmm_Kmer_getEmissionsExpectation(hmm, state, x, y) == state * SYMBOL_NUMBER * SYMBOL_NUMBER + x * SYMBOL_NUMBER + y);
-            }
-        }
-    }
-
-    //Normalise
-    hmm_kmer_normalise(hmm);
-
-    //Recheck transitions
-    for (int64_t from = 0; from < hmm->stateNumber; from++) {
-        for (int64_t to = 0; to < hmm->stateNumber; to++) {
-            double z = from * hmm->stateNumber * hmm->stateNumber + (hmm->stateNumber * (hmm->stateNumber - 1)) / 2;
-            CuAssertDblEquals(testCase, (from * hmm->stateNumber + to) / z, hmm_getTransition(hmm, from, to), 0.0);
-        }
-    }
-
-    //Recheck the emissions
-    double z[5] = {45000, 60625, 76250, 91875, 107500}; // correct totals for each state
-    for (int64_t state = 0; state < hmm->stateNumber; state++) {
-        for (int64_t x = 0; x < NUM_OF_KMERS; x++) {
-            for (int64_t y = 0; y < NUM_OF_KMERS; y++) {
-                CuAssertTrue(testCase,
-                             hmm_kmer_getEmissionsExpectation(hmm, state, x, y) == (state * SYMBOL_NUMBER * SYMBOL_NUMBER + x * SYMBOL_NUMBER + y)/z[state]);
+                             retrievedNormedProb == (state * hmmD->symbolSetSize * hmmD->symbolSetSize +
+                                                     x * hmmD->symbolSetSize + y) / stateTotal);
             }
         }
     }
     //Clean up
-    hmm_destruct(hmm);
+    hmmDiscrete_destruct(hmmD);
 }
 
-static void test_kmer_hmm_5State(CuTest *testCase) {
-    test_kmer_hmm(testCase, fiveState);
+static void test_hmmDiscrete_5State_symbols(CuTest *testCase) {
+    test_hmmDiscrete(testCase, SYMBOL_NUMBER, fiveState);
 }
 
-static void test_hmm_5State(CuTest *testCase) {
-    test_hmm(testCase, fiveState);
+static void test_hmmDiscrete_5State_kmers(CuTest *testCase) {
+    test_hmmDiscrete(testCase, NUM_OF_KMERS, fiveState);
 }
 
-static void test_hmm_5StateAsymmetric(CuTest *testCase) {
-    test_hmm(testCase, fiveStateAsymmetric);
+static void test_hmmDiscrete_5StateAsymmetric_symbols(CuTest *testCase) {
+    test_hmmDiscrete(testCase, SYMBOL_NUMBER, fiveStateAsymmetric);
 }
 
-static void test_hmm_3State(CuTest *testCase) {
-    test_hmm(testCase, threeState);
+static void test_hmmDiscrete_5StateAsymmetric_kmers(CuTest *testCase) {
+    test_hmmDiscrete(testCase, NUM_OF_KMERS, fiveStateAsymmetric);
 }
 
-static void test_hmm_3StateAsymmetric(CuTest *testCase) {
-    test_hmm(testCase, threeStateAsymmetric);
-}
-
-static void test_em(CuTest *testCase, StateMachineType stateMachineType) {
+static void test_HmmDiscrete_em(CuTest *testCase, StateMachineType sMType, int64_t symbolSetSize) {
     for (int64_t test = 0; test < 100; test++) { // change back to 100
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(10, 100));
@@ -1348,49 +1289,66 @@ static void test_em(CuTest *testCase, StateMachineType stateMachineType) {
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
 
-        // maybe don't turn these into Sequences yet??
-        Sequence *SsX = sequenceConstruct(lX, sX, getBase);
-        Sequence *SsY = sequenceConstruct(lY, sY, getBase);
-
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 
         //Currently starts from random model and iterates.
         double pLikelihood = -INFINITY;
-        Hmm *hmm = hmm_constructEmpty(0.0, stateMachineType);
-        hmm_randomise(hmm);
-        StateMachine *sM = hmm_getStateMachine(hmm);
-        hmm_destruct(hmm);
+        Hmm *hmmD = hmmDiscrete_constructEmpty(0.0, 5, symbolSetSize, sMType,
+                                               hmmDiscrete_addToTransitionExpectation,
+                                               hmmDiscrete_setTransitionExpectation,
+                                               hmmDiscrete_getTransitionExpectation,
+                                               hmmDiscrete_addToEmissionExpectation,
+                                               hmmDiscrete_setEmissionExpectation,
+                                               hmmDiscrete_getEmissionExpectation);
+        hmmDiscrete_randomize(hmmD);
+        // construct stateMachineFunctions
+        // load a stateMachine from an hmmD and stateMachineFunctions
+        StateMachineFunctions *sMfs = stateMachineFunctions_construct(emissions_symbol_getGapProb,
+                                                                      emissions_symbol_getGapProb,
+                                                                      emissions_symbol_getMatchProb);
+
+        StateMachine *sM = getStateMachine5(hmmD, sMfs);
+
+        hmm_destruct(hmmD);
 
         for (int64_t iteration = 0; iteration < 10; iteration++) {
-            hmm = hmm_constructEmpty(0.000000000001, stateMachineType); //The tiny pseudo count prevents overflow
-            getExpectations(sM, hmm, sX, sY, p, 0, 0); // E-step
-            hmm_normalise(hmm);
+            hmmD = hmmDiscrete_constructEmpty(0.000000000001, 5, SYMBOL_NUMBER, fiveState,
+                                              hmmDiscrete_addToTransitionExpectation,
+                                              hmmDiscrete_setTransitionExpectation,
+                                              hmmDiscrete_getTransitionExpectation,
+                                              hmmDiscrete_addToEmissionExpectation,
+                                              hmmDiscrete_setEmissionExpectation,
+                                              hmmDiscrete_getEmissionExpectation);
+
+            // E-step
+
+            getExpectations(sM, hmmD, sX, sY, lX, lY, p, getBase, getBlastPairsForPairwiseAlignmentParameters, 0, 0);
+
+            hmmDiscrete_normalize(hmmD);
             //Log stuff
             for (int64_t from = 0; from < sM->stateNumber; from++) {
                 for (int64_t to = 0; to < sM->stateNumber; to++) {
                     st_logInfo("Transition from %" PRIi64 " to %" PRIi64 " has expectation %f\n", from, to,
-                            hmm_getTransition(hmm, from, to));
+                               hmmD->getTransitionsExpFcn(hmmD, from, to));
                 }
             }
-            for (int64_t x = 0; x < SYMBOL_NUMBER_NO_N; x++) {
-                for (int64_t y = 0; y < SYMBOL_NUMBER_NO_N; y++) {
+            for (int64_t x = 0; x < hmmD->symbolSetSize; x++) {
+                for (int64_t y = 0; y < hmmD->symbolSetSize; y++) {
                     st_logInfo("Emission x %" PRIi64 " y %" PRIi64 " has expectation %f\n", x, y,
-                            hmm_getEmissionsExpectation(hmm, sM->matchState, x, y));
+                               hmmD->getEmissionExpFcn(hmmD, sM->matchState, x, y));
                 }
             }
-
             st_logInfo("->->-> Got expected likelihood %f for trial %" PRIi64 " and  iteration %" PRIi64 "\n",
-                    hmm->likelihood, test, iteration);
+                       hmmD->likelihood, test, iteration);
 
-            assert(pLikelihood <= hmm->likelihood * 0.95);
-            CuAssertTrue(testCase, pLikelihood <= hmm->likelihood * 0.95);
-            pLikelihood = hmm->likelihood;
+            assert(pLikelihood <= hmmD->likelihood * 0.95);
+            CuAssertTrue(testCase, pLikelihood <= hmmD->likelihood * 0.95);
+            pLikelihood = hmmD->likelihood;
             stateMachine_destruct(sM);
-            sM = hmm_getStateMachine(hmm); // M-step
-            hmm_destruct(hmm);
+            sM = getStateMachine5(hmmD, sMfs); // M-step
+            hmm_destruct(hmmD);
         }
-
         //Cleanup
         pairwiseAlignmentBandingParameters_destruct(p);
         free(sX);
@@ -1398,81 +1356,14 @@ static void test_em(CuTest *testCase, StateMachineType stateMachineType) {
     }
 }
 
-static void test_kmer_em(CuTest *testCase, StateMachineType stateMachineType) {
-    for (int64_t test = 0; test < 10; test++) {
-        //Make a pair of sequences
-        char *sX = getRandomSequence(st_randomInt(10, 200));
-        char *sY = evolveSequence(sX); //stString_copy(seqX);
-
-        int64_t lX = strlen(sX);
-        int64_t lY = strlen(sY);
-
-        Sequence* SsX = sequenceConstruct(lX, sX, kmer);
-        Sequence* SsY = sequenceConstruct(lY, sY, kmer);
-
-        //Currently starts from random model and iterates.
-        PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-        double pLikelihood = -INFINITY;
-        Hmm *hmm = hmm_kmer_constructEmpty(0.0, stateMachineType);
-        hmm_kmer_randomise(hmm);
-        StateMachine *sM = hmm_kmer_getStateMachine(hmm);
-        hmm_destruct(hmm);
-
-        for (int64_t iteration = 0; iteration < 10; iteration++) {
-            hmm = hmm_kmer_constructEmpty(0.000000000001, stateMachineType); //The tiny pseudo count prevents overflow 0.000000000001
-            getExpectations(sM, hmm, SsX, SsY, p, 0, 0);
-            hmm_kmer_normalise(hmm);
-            //Log stuff
-            // Transitions
-            for (int64_t from = 0; from < sM->stateNumber; from++) {
-                for (int64_t to = 0; to < sM->stateNumber; to++) {
-                    //printf("Transition from %" PRIi64 " to %" PRIi64 " has expectation %f\n", from, to,
-                    //           hmm_getTransition(hmm, from, to));
-                }
-            }
-            // Emissions
-            for (int64_t x = 0; x < NUM_OF_KMERS; x++) {
-                for (int64_t y = 0; y < NUM_OF_KMERS; y++) {
-                    //printf("Emission x %" PRIi64 " y %" PRIi64 " has expectation %f\n", x, y,
-                    //           hmm_Kmer_getEmissionsExpectation(hmm, sM->matchState, x, y));
-                }
-            }
-
-            st_logInfo("->->-> Got expected likelihood %f for trial %" PRIi64 " and  iteration %" PRIi64 "\n",
-                       hmm->likelihood, test, iteration);
-            //printf("->->-> Got expected likelihood %f for trial %" PRIi64 " and  iteration %" PRIi64 "\n",
-            //           hmm->likelihood, test, iteration);
-            assert(pLikelihood <= hmm->likelihood * 0.85); //Used to be 0.95 for nucleotide model
-            CuAssertTrue(testCase, pLikelihood <= hmm->likelihood * 0.85); // same here
-            pLikelihood = hmm->likelihood;
-            stateMachine_destruct(sM);
-            sM = hmm_getStateMachine(hmm);
-            hmm_destruct(hmm);
-        }
-
-        //Cleanup
-        pairwiseAlignmentBandingParameters_destruct(p);
-        sequenceDestroy(SsX);
-        sequenceDestroy(SsY);
-        free(sX);
-        free(sY);
-    }
-}
-static void test_em_5State(CuTest *testCase) {
-    test_em(testCase, fiveState);
+static void test_hmmDiscrete_EM_5State_symbols(CuTest *testCase) {
+    test_HmmDiscrete_em(testCase, fiveState, SYMBOL_NUMBER);
 }
 
-static void test_kmer_em_5State(CuTest *testCase) {
-    test_kmer_em(testCase, fiveState);
+static void test_hmmDiscrete_EM_5State_kmers(CuTest *testCase) {
+    test_HmmDiscrete_em(testCase, fiveState, NUM_OF_KMERS);
 }
 
-static void test_em_3StateAsymmetric(CuTest *testCase) {
-    test_em(testCase, threeStateAsymmetric);
-}
-
-static void test_em_3State(CuTest *testCase) {
-    test_em(testCase, threeState);
-}
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
@@ -1486,9 +1377,8 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_dpMatrix);
     SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
     SUITE_ADD_TEST(suite, test_getSplitPoints);
-    //SUITE_ADD_TEST(suite, test_getBlastPairs);
-    //SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
-    // new functionality tests
+    SUITE_ADD_TEST(suite, test_getBlastPairs);
+    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
     SUITE_ADD_TEST(suite, test_NEW_dpDiagonal);
     SUITE_ADD_TEST(suite, test_NEW_cell);
     SUITE_ADD_TEST(suite, test_NEW_kmer_cell);
@@ -1498,25 +1388,15 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_NEW_getAlignedPairs);
     SUITE_ADD_TEST(suite, test_NEW_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_NEW_getAlignedPairsWithRaggedEnds);
-
-    SUITE_ADD_TEST(suite, test_kmer_NEW_getAlignedPairs);
+    SUITE_ADD_TEST(suite, test_NEW_kmer_getAlignedPairs);
     SUITE_ADD_TEST(suite, test_NEW_kmer_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_NEW_kmer_getAlignedPairsWithRaggedEnds);
+    SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_symbols);
+    SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_kmers);
+    SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_symbols);
+    SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_kmers);
+    SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
+    SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_kmers);
 
-     /*
-    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_kmer_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
-    SUITE_ADD_TEST(suite, test_getAlignedPairs);
-    SUITE_ADD_TEST(suite, test_hmm_5State);
-    SUITE_ADD_TEST(suite, test_hmm_5StateAsymmetric);
-    SUITE_ADD_TEST(suite, test_kmer_hmm_5State);
-    //SUITE_ADD_TEST(suite, test_hmm_3State);
-    //SUITE_ADD_TEST(suite, test_hmm_3StateAsymmetric);
-    //SUITE_ADD_TEST(suite, test_em_3State);
-    //SUITE_ADD_TEST(suite, test_em_3StateAsymmetric);
-    SUITE_ADD_TEST(suite, test_em_5State);
-    SUITE_ADD_TEST(suite, test_kmer_em_5State);
-    */
     return suite;
 }

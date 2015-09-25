@@ -511,7 +511,7 @@ int main(int argc, char *argv[]) {
         st_logInfo("Loading the hmm from file %s\n", hmmFile);
         Hmm *hmm = hmm_loadFromFile(hmmFile);
         StateMachineFunctions *sMfs = stateMachineFunctions_construct(emissions_symbol_getGapProb, emissions_symbol_getGapProb, emissions_symbol_getMatchProb);
-        sM = hmmDiscrete_getStateMachine(hmm, sMfs);
+        sM = getStateMachine5(hmm, sMfs);
         //hmm_normalise(hmm);
         hmm_destruct(hmm);
     }

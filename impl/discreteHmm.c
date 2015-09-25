@@ -164,3 +164,4 @@ StateMachineFunctions *stateMachineFunctions_construct(double (*gapXProbFcn)(con
 //StateMachineFunctions *stateMachineFunctions_constructFromType(int64_t stateMachineType) {
 //
 //}
+

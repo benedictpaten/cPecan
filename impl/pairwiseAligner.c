@@ -293,7 +293,7 @@ Sequence* sequenceConstruct(int64_t length, void *elements, void (*getFcn)) {
     return self;
 }
 
-Sequence* sequence_NEW_getSubSequence(Sequence* inputSequence, int64_t start, int64_t sliceLength, void (*getFcn)) {
+Sequence*sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength, void (*getFcn)) {
     /*
      * slice a sequence object
      */
@@ -412,35 +412,9 @@ double cell_dotProduct2(double *cell, StateMachine *sM, double (*getStateValue)(
 }
 
 void updateExpectations(double *fromCells, double *toCells,
-                                      int64_t from, int64_t to,
-                                      double eP, double tP,
-                                      void *extraArgs) {
-    /*
-     * Update hmm expectations for nucleotide/nucleotide alignment
-     *
-     */
-    //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
-    double totalProbability = *((double *) ((void **) extraArgs)[0]);
-    Hmm *hmmExpectations = ((void **) extraArgs)[1];
-    int64_t x = *((int64_t *)((void **) extraArgs)[2]);
-    int64_t y = *((int64_t *)((void **) extraArgs)[3]);
-    //Calculate posterior probability of the transition/emission pair
-    double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
-    //Add in the expectation of the transition
-    hmm_addToTransitionExpectation(hmmExpectations, from, to, p);
-    if(x < SYMBOL_NUMBER_NO_N && y < SYMBOL_NUMBER_NO_N) { // Not sure if this is working correctly...
-        hmm_addToEmissionsExpectation(hmmExpectations, to, x, y, p);
-    }
-}
-/*
-void updateExpectations_NEW(double *fromCells, double *toCells,
                            int64_t from, int64_t to,
                            double eP, double tP,
                            void *extraArgs) {
-
-     // Update hmm expectations for nucleotide/nucleotide alignment
-     //TODO use hmm or stateMachine to get addTransition/Expectation functions
-
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
     Hmm *hmmExpectations = ((void **) extraArgs)[1];
@@ -448,39 +422,8 @@ void updateExpectations_NEW(double *fromCells, double *toCells,
     int64_t y = *((int64_t *)((void **) extraArgs)[3]);
     //Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
-    hmmExpectations->addToTransitionExpectation(hmmExpectations->transitions,
-                                                hmmExpectations->stateNumber,
-                                                from, to, p);
-    //Add in the expectation of the transition
-    addToTransitionExpectation(hmmExpectations, from, to, p);
-    addToEmissionsExpectation(hmmExpectations, to, x, y, p); // no more check for Ns
-
-}
-
-*/
-
-void updateExpectations_kmer(double *fromCells, double *toCells,
-                                           int64_t from, int64_t to,
-                                           double eP, double tP,
-                                           void *extraArgs) {
-    /*
-     * Identical to updateExpectations except for accounts for larger number of kmers as opposed
-     * to nucleotides
-     */
-    //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
-    double totalProbability = *((double *) ((void **) extraArgs)[0]);
-    Hmm *hmmExpectations = ((void **) extraArgs)[1];
-    int64_t x = *((int64_t *)((void **) extraArgs)[2]);
-    int64_t y = *((int64_t *)((void **) extraArgs)[3]);
-
-    //Calculate posterior probability of the transition/emission pair
-    double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
-
-    //Add in the expectation of the transition
-    hmm_addToTransitionExpectation(hmmExpectations, from, to, p);
-    if(x < NUM_OF_KMERS && y < NUM_OF_KMERS) {
-        hmm_kmer_addToEmissionsExpectation(hmmExpectations, to, x, y, p);
-    }
+    hmmExpectations->addToTransitionExpectationFcn(hmmExpectations, from, to, p);
+    hmmExpectations->addToEmissionExpectationFcn(hmmExpectations, to, x, y, p); // no more check for Ns
 }
 
 static void cell_calculateExpectation(StateMachine *sM,
@@ -824,7 +767,6 @@ static void diagonalCalculationExpectations(StateMachine *sM,
     // We do this once per diagonal, which is a hack, rather than for the
     // whole matrix. The correction factor is approximately 1/number of
     // diagonals.
-
     diagonalCalculation(sM,
                         dpMatrix_getDiagonal(backwardDpMatrix, xay),
                         dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
@@ -1355,8 +1297,8 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         int64_t x2 = stIntTuple_get(subRegion, 2);
         int64_t y2 = stIntTuple_get(subRegion, 3);
 
-        Sequence* sX3 = sequence_NEW_getSubSequence(SsX, x1, x2 - x1, SsX->get);
-        Sequence* sY3 = sequence_NEW_getSubSequence(SsY, y1, y2 - y1, SsY->get);
+        Sequence* sX3 = sequence_getSubSequence(SsX, x1, x2 - x1, SsX->get);
+        Sequence* sY3 = sequence_getSubSequence(SsY, y1, y2 - y1, SsY->get);
 
         //List of anchor pairs
         stList *subListOfAnchorPoints = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
@@ -1470,6 +1412,8 @@ stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, SsX, SsY,
                                                        anchorPairs, p, alignmentHasRaggedLeftEnd,
                                                        alignmentHasRaggedRightEnd);
+    sequenceDestroy(SsX);
+    sequenceDestroy(SsY);
     stList_destruct(anchorPairs);
     return alignedPairs;
 }
@@ -1493,32 +1437,25 @@ void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
 }
 
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
-                     void *sX, void *sY, // maybe make this char*?
-                     PairwiseAlignmentParameters *p,
+                     void *sX, void *sY, int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,
+                     void *(getFcn)(void *, int64_t),
+                     stList *(*getAnchorPairFcn)(void *, void *, PairwiseAlignmentParameters *),
                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
     /*
      * TODO DOCUMENTATION!
      */
-    // this function should take anything and return the anchor pairs, probably going
-    // to keep using a basic aligner like lastz.
-    stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(sX, sY, p);
-
-    // You might have to adjust the lenth here depending on the type of alignment.
-    int64_t lX = strlen(sX);
-    int64_t lY = strlen(sY);
+    //stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(sX, sY, p);
+    stList *anchorPairs = getAnchorPairFcn(sX, sY, p);
     // Make Sequence objects
-    Sequence *SsX = sequenceConstruct(lX, sX, getBase);
-    Sequence *SsY = sequenceConstruct(lY, sY, getBase);
-    //
-    // When do you decide on the alignment type?
-    // The stateMachine decides?
-    // Going in the stateMachine has the previous expectations and the hmmExpectations
-    // is empty,
-
+    Sequence *SsX = sequenceConstruct(lX, sX, getFcn);
+    Sequence *SsY = sequenceConstruct(lY, sY, getFcn);
     getExpectationsUsingAnchors(sM, hmmExpectations, SsX, SsY,
                                 anchorPairs, p,
                                 alignmentHasRaggedLeftEnd,
                                 alignmentHasRaggedRightEnd);
+
+    sequenceDestroy(SsX);
+    sequenceDestroy(SsY);
     stList_destruct(anchorPairs);
 }
 

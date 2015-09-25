@@ -149,9 +149,9 @@ int64_t emissions_getKmerIndex(void *kmer);
 int64_t emissions_getBaseIndex(void *base);
 
 // defaults
-void emissions_symbol_setMatchProbsToDefaults(double *emissionMatchProbs, int64_t symbolSetSize);
+void emissions_symbol_setMatchProbsToDefaults(double *emissionMatchProbs);
 
-void emissions_symbol_setGapProbsToDefaults(double *emissionGapProbs, int64_t symbolSetSize);
+void emissions_symbol_setGapProbsToDefaults(double *emissionGapProbs);
 
 void emissions_initMatchProbsToZero(double *emissionMatchProbs, int64_t symbolSetSize);
 
@@ -167,18 +167,18 @@ double emissions_kmer_getGapProb(const double *emissionGapProbs, void *kmer);
 double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, void *y);
 
 // EM
-StateMachine *hmmDiscrete_getStateMachine(Hmm *hmmD, StateMachineFunctions *sMfs);
+StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs);
 
 StateMachine *hmm_getStateMachine(Hmm *hmm);
 
-StateMachine *hmmDiscrete_getStateMachine(Hmm *hmmD, StateMachineFunctions *sMfs);
+StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs);
 
 StateMachine *hmm_kmer_getStateMachine(Hmm *hmm);
 
 StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSetSize,
-                                      void (*setXGapDefaultsFcn)(double *, int64_t symbolSetSize),
-                                      void (*setYGapDefaultsFcn)(double *, int64_t symbolSetSize),
-                                      void (*setMatchDefaultsFcn)(double *, int64_t symbolSetSize),
+                                      void (*setXGapDefaultsFcn)(double *),
+                                      void (*setYGapDefaultsFcn)(double *),
+                                      void (*setMatchDefaultsFcn)(double *),
                                       double (*gapXProbFcn)(const double *, void *),
                                       double (*gapYProbFcn)(const double *, void *),
                                       double (*matchProbFcn)(const double *, void *, void *));

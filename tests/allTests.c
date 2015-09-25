@@ -14,18 +14,16 @@
 #include "../../sonLib/lib/CuTest.h"
 #include "../../sonLib/lib/sonLibCommon.h"
 
-CuSuite* NEW_pairwiseTestsSuite(void);
+
 CuSuite* pairwiseAlignmentTestSuite(void);
 //CuSuite* multipleAlignerTestSuite(void);
 //CuSuite* pairwiseAlignmentLongTestSuite(void);
-
 
 
 int stBaseAlignerRunAllTests(void) {
     CuString *output = CuStringNew();
     CuSuite* suite = CuSuiteNew();
     CuSuiteAddSuite(suite, pairwiseAlignmentTestSuite());
-    CuSuiteAddSuite(suite, NEW_pairwiseTestsSuite());
     //CuSuiteAddSuite(suite, multipleAlignerTestSuite());
     //CuSuiteAddSuite(suite, pairwiseAlignmentLongTestSuite());
     CuSuiteRun(suite);
