@@ -17,6 +17,7 @@
 #include "bioioC.h"
 #include "sonLib.h"
 #include "stateMachine.h"
+#include "../../sonLib/lib/sonLibTypes.h"
 
 
 
@@ -36,25 +37,24 @@ typedef enum {
 typedef struct sequence {
     int64_t length;
     void *elements;
-    sequenceType type;
     void* (*get)(void *elements, int64_t index);
 } Sequence;
 
-Sequence *sequenceConstruct(int64_t length, void *elements, void (*getFcn));
+Sequence *sequence_sequenceConstruct(int64_t length, void *elements, void (*getFcn));
 
 Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength, void (*getFcn));
 
-void sequenceDestroy(Sequence* seq);
+void sequence_sequenceDestroy(Sequence *seq);
 
-void *getBase(void *elements, int64_t index);
+void *sequence_getBase(void *elements, int64_t index);
 
-void *getKmer(void *elements, int64_t index);
+void *sequence_getKmer(void *elements, int64_t index);
 
-void *getEvent(void *elements, int64_t index);
+void *sequence_getEvent(void *elements, int64_t index);
 
-int64_t getXposition(Sequence *sX, int64_t xay, int64_t xmy);
+//int64_t getXposition(Sequence *sX, int64_t xay, int64_t xmy); // made private
 
-int64_t getYposition(Sequence *sY, int64_t xay, int64_t xmy);
+//int64_t getYposition(Sequence *sY, int64_t xay, int64_t xmy); // made private
 
 int64_t correctSeqLength(int64_t length, sequenceType type);
 

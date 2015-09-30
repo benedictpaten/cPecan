@@ -9,16 +9,20 @@
 #include <stdio.h>
 #include <string.h>
 #include "sonLib.h"
+#include "../../sonLib/lib/CuTest.h"
+#include "../../sonLib/lib/sonLibCommon.h"
 
-CuSuite* pairwiseAlignmentTestSuite(void);
+CuSuite *pairwiseAlignmentTestSuite(void);
+CuSuite *signalPairwiseTestSuite(void);
 //CuSuite* multipleAlignerTestSuite(void);
 //CuSuite* pairwiseAlignmentLongTestSuite(void);
 
 
 int stBaseAlignerRunAllTests(void) {
     CuString *output = CuStringNew();
-    CuSuite* suite = CuSuiteNew();
+    CuSuite *suite = CuSuiteNew();
     CuSuiteAddSuite(suite, pairwiseAlignmentTestSuite());
+    CuSuiteAddSuite(suite, signalPairwiseTestSuite());
     //CuSuiteAddSuite(suite, multipleAlignerTestSuite());
     //CuSuiteAddSuite(suite, pairwiseAlignmentLongTestSuite());
     CuSuiteRun(suite);

@@ -8,13 +8,19 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <ctype.h>
-
 #include "sonLib.h"
 #include "pairwiseAligner.h"
 #include "multipleAligner.h"
 #include "commonC.h"
-#include "discreteHmm.h"
+#include "stateMachine.h"
 
+#include "../sonLib/lib/sonLibTypes.h"
+#include "../sonLib/lib/bioioC.h"
+#include "../sonLib/lib/commonC.h"
+#include "../sonLib/lib/pairwiseAlignment.h"
+#include "inc/multipleAligner.h"
+#include "inc/stateMachine.h"
+#include "inc/discreteHmm.h"
 
 void usage() {
     fprintf(stderr, "cPecanRelign [options] seq1[fasta] seq2[fasta], version 0.2\n");
@@ -504,17 +510,15 @@ int main(int argc, char *argv[]) {
     StateMachine *sM;
     if(hmmFile != NULL) {
         st_logInfo("Loading the hmm from file %s\n", hmmFile);
-        Hmm *hmm = hmm_loadFromFile(hmmFile);
+        Hmm *hmm = hmmDiscrete_loadFromFile(hmmFile);
         StateMachineFunctions *sMfs = stateMachineFunctions_construct(emissions_symbol_getGapProb, emissions_symbol_getGapProb, emissions_symbol_getMatchProb);
         sM = getStateMachine5(hmm, sMfs);
-        //hmm_normalise(hmm);
-        hmm_destruct(hmm);
+        hmmDiscrete_normalize(hmm);
+        hmmDiscrete_destruct(hmm);
     }
     else { //TODO probably need a switch statement here to decide on which defaults to set
         sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
-                                     emissions_symbol_setGapProbsToDefaults,
-                                     emissions_symbol_setGapProbsToDefaults,
-                                     emissions_symbol_setMatchProbsToDefaults,
+                                     emissions_symbol_setEmissionsToDefaults,
                                      emissions_symbol_getGapProb,
                                      emissions_symbol_getGapProb,
                                      emissions_symbol_getMatchProb);
@@ -528,7 +532,8 @@ int main(int argc, char *argv[]) {
                                                      hmmDiscrete_getTransitionExpectation,
                                                      hmmDiscrete_addToEmissionExpectation,
                                                      hmmDiscrete_setEmissionExpectation,
-                                                     hmmDiscrete_getEmissionExpectation);
+                                                     hmmDiscrete_getEmissionExpectation,
+                                                     emissions_getBaseIndex);
     }
 
     //Read in input sequences
@@ -642,8 +647,8 @@ int main(int argc, char *argv[]) {
     if(expectationsFile != NULL) {
         st_logInfo("Writing out expectations to file %s\n", expectationsFile);
         FILE *fH = fopen(expectationsFile, "w");
-        hmm_write(hmmExpectations, fH);
-        hmm_destruct(hmmExpectations);
+        hmmDiscrete_write(hmmExpectations, fH);
+        hmmDiscrete_destruct(hmmExpectations);
         fclose(fH);
     }
 

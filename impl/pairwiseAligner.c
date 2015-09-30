@@ -15,12 +15,19 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <stdint.h>
+#include "../../sonLib/lib/sonLib.h"
+#include "../../sonLib/lib/pairwiseAlignment.h"
+#include "../../sonLib/lib/sonLibString.h"
+#include "../../sonLib/lib/sonLibCommon.h"
+#include "../inc/emissionMatrix.h"
+#include "../inc/pairwiseAligner.h"
 #include "sonLib.h"
 #include "bioioC.h"
 #include "pairwiseAligner.h"
 #include "pairwiseAlignment.h"
 #include "stateMachine.h"
 #include "emissionMatrix.h"
+#include "../../sonLib/lib/bioioC.h"
 
 
 ///////////////////////////////////
@@ -266,7 +273,7 @@ double logAdd(double x, double y) {
 ///////////////////////////////////
 ///////////////////////////////////
 
-Sequence* sequenceConstruct(int64_t length, void *elements, void (*getFcn)) {
+Sequence *sequence_sequenceConstruct(int64_t length, void *elements, void (*getFcn)) {
     /*
      * Sequence constructor function
      * stringLength should be the length of the sequence in bases ie ATGAC has
@@ -281,23 +288,23 @@ Sequence* sequenceConstruct(int64_t length, void *elements, void (*getFcn)) {
     return self;
 }
 
-Sequence*sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength, void (*getFcn)) {
+Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength, void (*getFcn)) {
     /*
      * slice a sequence object
      */
     //size_t elementSize = sizeof(inputSequence->elements)/inputSequence->length;
     void *elementSlice; // = malloc(elementSize* sliceLength);
     elementSlice = &inputSequence->elements[start];
-    Sequence* newSequence = sequenceConstruct(sliceLength, elementSlice, getFcn);
+    Sequence* newSequence = sequence_sequenceConstruct(sliceLength, elementSlice, getFcn);
     return newSequence;
 }
 
-void sequenceDestroy(Sequence* seq) {
+void sequence_sequenceDestroy(Sequence *seq) {
     //assert(seq != NULL);
     free(seq);
 }
 
-void *getBase(void *elements, int64_t index) {
+void *sequence_getBase(void *elements, int64_t index) {
     /*
      * Returns a single base from a sequence object. This will likely be depreciated in favor of
      * using only indexes for elements
@@ -308,15 +315,15 @@ void *getBase(void *elements, int64_t index) {
     return index >= 0 ? &(((char *)elements)[index]) : n;
 }
 
-void *getKmer(void *elements, int64_t index) {
+void *sequence_getKmer(void *elements, int64_t index) {
     /*
-     * Returns a kmer from a sequence object, similarly to getBase, this might be changed to only
+     * Returns a kmer from a sequence object, similarly to sequence_getBase, this might be changed to only
      * if we decide to only use indicies for kmers/events/nucleotides. That would also make it easy to
      * remove the malloc...
      */
     //
     char* n;
-    n = "NN"; // hardwired null kmer
+    n = "NNNNNN"; // hardwired null kmer
     int64_t i = index;
     // change kmer length here, hardwired so far...
     int kmerLength = KMER_LENGTH;
@@ -327,10 +334,9 @@ void *getKmer(void *elements, int64_t index) {
     return index >= 0 ? k_i : n;
 }
 
-void *getEvent(void *elements, int64_t index) {
-    double *nullEvent;
-    *nullEvent = 0.0;
-    return index >= 0 ? &(((double *)elements)[index]) : nullEvent;
+void *sequence_getEvent(void *elements, int64_t index) {
+    return index >= 0 ? &(((double *)elements)[index]) : NULL;
+    //return &(((double *)elements)[index]);
 }
 
 int64_t correctSeqLength(int64_t length, sequenceType type) {
@@ -351,7 +357,6 @@ int64_t correctSeqLength(int64_t length, sequenceType type) {
         }
     }
 }
-
 
 ///////////////////////////////////
 ///////////////////////////////////
@@ -411,18 +416,17 @@ void updateExpectations(double *fromCells, double *toCells, int64_t from, int64_
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
     Hmm *hmmExpectations = ((void **) extraArgs)[1];
-    int64_t x = *((int64_t *)((void **) extraArgs)[2]);
-    int64_t y = *((int64_t *)((void **) extraArgs)[3]);
+
+    int64_t x = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]);
+    int64_t y = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[3]);
+
     //Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
-
     hmmExpectations->addToTransitionExpectationFcn(hmmExpectations, from, to, p);
 
     if(x < hmmExpectations->symbolSetSize && y < hmmExpectations->symbolSetSize) { //Ignore gaps involving Ns.
         hmmExpectations->addToEmissionExpectationFcn(hmmExpectations, to, x, y, p);
     }
-
-
 }
 
 static void cell_calculateExpectation(StateMachine *sM,
@@ -431,7 +435,8 @@ static void cell_calculateExpectation(StateMachine *sM,
                                       void *extraArgs) {
     void *extraArgs2[4] = { ((void **)extraArgs)[0], // hmmExpectations
                             ((void **)extraArgs)[1], // &totalProbabability
-                            &cX, &cY };
+                            cX,
+                            cY };
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, updateExpectations, extraArgs2);
 }
 
@@ -610,21 +615,18 @@ static Symbol getYCharacter(const SymbolString sY, int64_t xay, int64_t xmy) {
 /*
  * Functions for indexing through Sequence objects
  */
-int64_t getXposition(Sequence *sX, int64_t xay, int64_t xmy) {
+static int64_t getXposition(Sequence *sX, int64_t xay, int64_t xmy) {
     int64_t x = diagonal_getXCoordinate(xay, xmy);
     assert(x >= 0 && x <= sX->length);
     return x;
 }
 
-int64_t getYposition(Sequence *sY, int64_t xay, int64_t xmy) {
+static int64_t getYposition(Sequence *sY, int64_t xay, int64_t xmy) {
     int64_t y = diagonal_getYCoordinate(xay, xmy);
     assert(y >= 0 && y <= sY->length);
     return y;
 }
-/*
- * diagonalCalculation now uses char* for nucleotides and kmers.  I think eventually
- * this will be changed to ints or indexes for kmers and events.
- */
+
 static void diagonalCalculation(StateMachine *sM,
                                 DpDiagonal *dpDiagonal, DpDiagonal *dpDiagonalM1, DpDiagonal *dpDiagonalM2,
                                 Sequence* sX, Sequence* sY,
@@ -645,7 +647,7 @@ static void diagonalCalculation(StateMachine *sM,
         // it could be anything (base, kmer, event, etc.)
         void* x = sX->get(sX->elements, indexX);
         void* y = sY->get(sY->elements, indexY);
-        //st_uglyf("got X:%s, Y:%s\n",  (char*) x, (char*) y);
+        //st_uglyf("SENTINAL: diagonalCalculation --> got X:%c, Y:%c\n",  *(char*) x, *(char*) y);
 
         // do the calculations
         double *current = dpDiagonal_getCell(dpDiagonal, xmy);
@@ -722,23 +724,23 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
         int64_t y = diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy);
         if (x > 0 && y > 0) {
             double *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
-            //fprintf(stderr, "cellForward->MatchState: %f \n", cellForward[sM->matchState]);
+            //st_uglyf(stderr, "cellForward->MatchState: %f \n", cellForward[sM->matchState]);
             double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
-            //fprintf(stderr, "cellBackward->MatchState: %f \n", cellBackward[sM->matchState]);
+            //st_uglyf(stderr, "cellBackward->MatchState: %f \n", cellBackward[sM->matchState]);
 
             double posteriorProbability = exp(
                     (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
-            //fprintf(stderr, "posteriorProb: %f\n", posteriorProbability);
+            //st_uglyf(stderr, "posteriorProb: %f\n", posteriorProbability);
             if (posteriorProbability >= p->threshold) {
                 if (posteriorProbability > 1.0) {
                     posteriorProbability = 1.0;
                 }
                 posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
-                //fprintf(stderr, "Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%s)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
+                //st_uglyf(stderr, "Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%s)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
             }
             if (posteriorProbability <= p->threshold) {
-                //fprintf(stderr, "NOT Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%s)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
+                //st_uglyf(stderr, "NOT Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%s)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
             }
         }
         xmy += 2;
@@ -1326,8 +1328,8 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
 
         //Clean up
         stList_destruct(subListOfAnchorPoints);
-        sequenceDestroy(sX3);
-        sequenceDestroy(sY3);
+        sequence_sequenceDestroy(sX3);
+        sequence_sequenceDestroy(sY3);
     }
     assert(j == stList_length(anchorPairs));
     stList_destruct(splitPoints);
@@ -1405,14 +1407,14 @@ stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_
     //stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(cX, cY, p);
     stList *anchorPairs = getAnchorPairFcn(cX, cY, p);
 
-    Sequence *SsX = sequenceConstruct(lX, cX, getFcn);
-    Sequence *SsY = sequenceConstruct(lY, cY, getFcn);
+    Sequence *SsX = sequence_sequenceConstruct(lX, cX, getFcn);
+    Sequence *SsY = sequence_sequenceConstruct(lY, cY, getFcn);
 
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, SsX, SsY,
                                                        anchorPairs, p, alignmentHasRaggedLeftEnd,
                                                        alignmentHasRaggedRightEnd);
-    sequenceDestroy(SsX);
-    sequenceDestroy(SsY);
+    sequence_sequenceDestroy(SsX);
+    sequence_sequenceDestroy(SsY);
     stList_destruct(anchorPairs);
     return alignedPairs;
 }
@@ -1447,16 +1449,16 @@ void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
     stList *anchorPairs = getAnchorPairFcn(sX, sY, p);
     // Make Sequence objects
 
-    Sequence *SsX = sequenceConstruct(lX, sX, getFcn);
-    Sequence *SsY = sequenceConstruct(lY, sY, getFcn);
+    Sequence *SsX = sequence_sequenceConstruct(lX, sX, getFcn);
+    Sequence *SsY = sequence_sequenceConstruct(lY, sY, getFcn);
 
     getExpectationsUsingAnchors(sM, hmmExpectations, SsX, SsY,
                                 anchorPairs, p,
                                 alignmentHasRaggedLeftEnd,
                                 alignmentHasRaggedRightEnd);
 
-    sequenceDestroy(SsX);
-    sequenceDestroy(SsY);
+    sequence_sequenceDestroy(SsX);
+    sequence_sequenceDestroy(SsY);
     stList_destruct(anchorPairs);
 }
 
