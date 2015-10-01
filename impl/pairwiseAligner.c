@@ -709,7 +709,6 @@ double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatr
 void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
                                             DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
                                             double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs) {
-    //fprintf(stderr, "going in, totalProbability=%f\n", totalProbability);
     assert(p->threshold >= 0.0);
     assert(p->threshold <= 1.0);
     stList *alignedPairs = ((void **) extraArgs)[0];
@@ -724,28 +723,28 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
         int64_t y = diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy);
         if (x > 0 && y > 0) {
             double *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
-            //st_uglyf(stderr, "cellForward->MatchState: %f \n", cellForward[sM->matchState]);
+            st_uglyf("cellForward->MatchState: %f \n", cellForward[sM->matchState]);
             double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
-            //st_uglyf(stderr, "cellBackward->MatchState: %f \n", cellBackward[sM->matchState]);
+            st_uglyf("cellBackward->MatchState: %f \n", cellBackward[sM->matchState]);
 
             double posteriorProbability = exp(
                     (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
-            //st_uglyf(stderr, "posteriorProb: %f\n", posteriorProbability);
+            st_uglyf("posteriorProb: %f\n", posteriorProbability);
             if (posteriorProbability >= p->threshold) {
                 if (posteriorProbability > 1.0) {
                     posteriorProbability = 1.0;
                 }
                 posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
-                //st_uglyf(stderr, "Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%s)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
+                st_uglyf("Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%f)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
             }
             if (posteriorProbability <= p->threshold) {
-                //st_uglyf(stderr, "NOT Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%s)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
+                st_uglyf("NOT Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%f)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
             }
         }
         xmy += 2;
     }
-    //fprintf(stderr, "final length for alignedPairs: %lld\n", stList_length(alignedPairs));
+    st_uglyf("final length for alignedPairs: %lld\n", stList_length(alignedPairs));
 }
 /*
  * This function now takes Sequence objects and determines if the alignment is between nucleotides
