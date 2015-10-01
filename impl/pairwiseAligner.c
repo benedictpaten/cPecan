@@ -15,20 +15,12 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <stdint.h>
-#include "../../sonLib/lib/sonLib.h"
-#include "../../sonLib/lib/pairwiseAlignment.h"
-#include "../../sonLib/lib/sonLibString.h"
-#include "../../sonLib/lib/sonLibCommon.h"
-#include "../inc/emissionMatrix.h"
-#include "../inc/pairwiseAligner.h"
 #include "sonLib.h"
 #include "bioioC.h"
-#include "pairwiseAligner.h"
 #include "pairwiseAlignment.h"
+#include "pairwiseAligner.h"
 #include "stateMachine.h"
 #include "emissionMatrix.h"
-#include "../../sonLib/lib/bioioC.h"
-
 
 ///////////////////////////////////
 ///////////////////////////////////
@@ -735,11 +727,11 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
                     posteriorProbability = 1.0;
                 }
                 posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
-                st_uglyf("Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%f)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
+                st_uglyf("Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%f)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
             }
             if (posteriorProbability <= p->threshold) {
-                st_uglyf("NOT Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%f)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, sY->get(sY->elements, y-1));
+                st_uglyf("NOT Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%f)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
             }
         }
         xmy += 2;

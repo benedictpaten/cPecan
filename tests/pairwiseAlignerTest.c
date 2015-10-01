@@ -17,19 +17,7 @@
 #include "pairwiseAligner.h"
 #include "multipleAligner.h"
 #include "emissionMatrix.h"
-#include "../../sonLib/lib/CuTest.h"
-#include "../inc/pairwiseAligner.h"
-#include "../../sonLib/lib/sonLibExcept.h"
-#include "../../sonLib/lib/sonLibCommon.h"
-#include "../../sonLib/lib/sonLibList.h"
-#include "../../sonLib/lib/sonLibTuples.h"
-#include "../../sonLib/lib/sonLibRandom.h"
-#include "../inc/emissionMatrix.h"
-#include "../../sonLib/lib/sonLibString.h"
-#include "../../sonLib/lib/sonLibFile.h"
-#include "../../sonLib/lib/sonLibSortedSet.h"
-#include "../inc/multipleAligner.h"
-#include "../inc/discreteHmm.h"
+#include "discreteHmm.h"
 
 static void test_diagonal(CuTest *testCase) {
     //Construct an example diagonal.
@@ -843,10 +831,7 @@ static void test_filterToRemoveOverlap(CuTest *testCase) {
                 (int (*)(const void *, const void *)) stIntTuple_cmpFn);
         st_logDebug("The non-overlapping set sizes are %" PRIi64 " %" PRIi64 "\n",
                 stSortedSet_size(nonOverlappingPairsSet), stSortedSet_size(nonOverlappingPairsSet2));
-        //printf("The non-overlapping set sizes are %" PRIi64 " %" PRIi64 "\n",
-        //            stSortedSet_size(nonOverlappingPairsSet), stSortedSet_size(nonOverlappingPairsSet2));
 
-        // TODO this is failing
         CuAssertTrue(testCase, stSortedSet_equals(nonOverlappingPairsSet, nonOverlappingPairsSet2));
 
         //Cleanup

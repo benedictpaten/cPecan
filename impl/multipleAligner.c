@@ -11,17 +11,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include "stGraph.h"
-#include "../inc/multipleAligner.h"
-#include "../../sonLib/lib/sonLibCommon.h"
-#include "../../sonLib/lib/sonLibString.h"
-#include "../../sonLib/lib/sonLibSortedSet.h"
-#include "../../sonLib/lib/sonLibHash.h"
-#include "../../sonLib/lib/sonLibSet.h"
-#include "../../sonLib/lib/sonLibRandom.h"
-#include "../../sonLib/lib/sonLibList.h"
-#include "../../sonLib/lib/sonLibTuples.h"
-#include "../../sonLib/lib/stGraph.h"
-#include "../../sonLib/lib/stPosetAlignment.h"
 #include <inttypes.h>
 #include <assert.h>
 

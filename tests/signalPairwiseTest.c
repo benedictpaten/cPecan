@@ -4,6 +4,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <discreteHmm.h>
 #include "randomSequences.h"
 #include "stateMachine.h"
 #include "CuTest.h"
@@ -11,19 +12,7 @@
 #include "pairwiseAligner.h"
 #include "multipleAligner.h"
 #include "emissionMatrix.h"
-#include "../../sonLib/lib/CuTest.h"
-#include "../inc/pairwiseAligner.h"
-#include "../../sonLib/lib/sonLibExcept.h"
-#include "../../sonLib/lib/sonLibCommon.h"
-#include "../../sonLib/lib/sonLibList.h"
-#include "../../sonLib/lib/sonLibTuples.h"
-#include "../../sonLib/lib/sonLibRandom.h"
-#include "../inc/emissionMatrix.h"
-#include "../../sonLib/lib/sonLibString.h"
-#include "../../sonLib/lib/sonLibFile.h"
-#include "../../sonLib/lib/sonLibSortedSet.h"
-#include "../inc/multipleAligner.h"
-#include "../inc/discreteHmm.h"
+
 
 
 static void test_signal_cell(CuTest *testCase) {

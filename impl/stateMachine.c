@@ -11,22 +11,12 @@
 #include <ctype.h>
 #include <assert.h>
 #include <stdint.h>
-
 #include "bioioC.h"
 #include "sonLib.h"
 #include "pairwiseAligner.h"
 #include "stateMachine.h"
-
-#include "../inc/emissionMatrix.h"
-#include "../inc/stateMachine.h"
-#include "../../sonLib/lib/sonLibCommon.h"
-#include "../../sonLib/lib/sonLibList.h"
-#include "../../sonLib/lib/sonLibString.h"
-#include "../../sonLib/lib/sonLibFile.h"
-#include "../inc/pairwiseAligner.h"
-#include "../../sonLib/lib/sonLibRandom.h"
-#include "../inc/discreteHmm.h"
-
+#include "emissionMatrix.h"
+#include "discreteHmm.h"
 
 ///////////////////////////////////
 // StateMachine Emission functions/

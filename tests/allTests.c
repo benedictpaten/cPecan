@@ -4,13 +4,12 @@
  * Released under the MIT license, see LICENSE.txt
  */
 
-#include "CuTest.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include "sonLib.h"
-#include "../../sonLib/lib/CuTest.h"
-#include "../../sonLib/lib/sonLibCommon.h"
+#include "CuTest.h"
+#include "sonLibCommon.h"
 
 CuSuite *pairwiseAlignmentTestSuite(void);
 CuSuite *signalPairwiseTestSuite(void);

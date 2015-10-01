@@ -17,8 +17,7 @@
 #include "bioioC.h"
 #include "sonLib.h"
 #include "stateMachine.h"
-#include "../../sonLib/lib/sonLibTypes.h"
-
+#include "sonLibTypes.h"
 
 
 //The exception string
