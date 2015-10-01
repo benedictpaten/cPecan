@@ -162,8 +162,6 @@ int64_t emissions_getKmerIndex(void *kmer) {
     /*
      * Returns the index for a kmer
      */
-    st_uglyf("SENTINAL: getKmerIndex: looking at kmer %s\n", (char *) kmer);
-
     int64_t kmerLen = strlen(kmer);
     assert(kmerLen == KMER_LENGTH);
     //int64_t axisLength = 25; // for 2-mers
@@ -325,24 +323,20 @@ static double phi(double zScore) {
     return p;
 }
 
-double emissions_signal_getLogPhiMatchProb(const double *eventModel, void *event, void *kmer) {
+double emissions_signal_getLogPhiMatchProb(const double *eventModel, void *kmer, void *event) {
     /*
      * evaluates the probability based on the PDF of a normal distribution
      */
-    st_uglyf("running getPhiMatchProb\n");
-    double eventMean = *(int64_t *) event;
+    double eventMean = *(double *) event;
     int64_t kmerIndex = emissions_getKmerIndex(kmer);
-    double modelMean = eventModel[kmerIndex];
-    double modelStdDev = eventModel[kmerIndex+1];
+    double modelMean = eventModel[kmerIndex*MODEL_PARAMS];
+    double modelStdDev = eventModel[(kmerIndex*MODEL_PARAMS)+1];
     double ab_z = fabs(calc_zScore(eventMean, modelMean, modelStdDev));
-    st_uglyf("for kmer µ: %f, got kmerIndex: %lld, model σ: %f, model µ: %f\n", eventMean, kmerIndex, modelMean, modelStdDev);
     return log(1 - phi(ab_z));
 }
 
 double emissions_signal_getKmerGapProb(const double *kmerGapModel, void *kmer) {
-    st_uglyf("SENTINAL: signal_getKmerGapProb - start\n");
     int64_t kmerIndex = emissions_getKmerIndex(kmer);
-    st_uglyf("kmerIndex: %lld\n", kmerIndex);
     return kmerGapModel[kmerIndex];
 }
 
@@ -351,7 +345,6 @@ double emissions_signal_getEventGapProb(const double *eventGapModel, void *event
 }
 
 double emissions_signal_getlogGaussPDFMatchProb(const double *eventModel, void *kmer, void *event) {
-    st_uglyf("SENTINAL: getLogGaussPDF - start\n");
     double log_inv_sqrt_2pi = log(0.3989422804014327);
     double eventMean = *(double *) event;
     int64_t kmerIndex = emissions_getKmerIndex(kmer);
@@ -359,7 +352,6 @@ double emissions_signal_getlogGaussPDFMatchProb(const double *eventModel, void *
     double modelStdDev = eventModel[(kmerIndex*MODEL_PARAMS)+1];
     double log_modelSD = log(modelStdDev);
     double a = (eventMean - modelMean) / modelStdDev;
-    st_uglyf("for kmer %s µ: %f, got kmerIndex: %lld, model σ: %f, model µ: %f\n", kmer, eventMean, kmerIndex, modelMean, modelStdDev);
     return log_inv_sqrt_2pi - log_modelSD + (-0.5f * a * a);
 }
 
