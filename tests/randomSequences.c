@@ -42,7 +42,7 @@ char *evolveSequence(const char *startSequence) {
             seq[i] = getRandomChar();
         }
     }
-
+    
     //Do indels
     while (st_random() > 0.2) {
         char *toReplace = getRandomSequence(st_randomInt(2, 4));

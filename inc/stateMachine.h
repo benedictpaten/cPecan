@@ -213,6 +213,7 @@ double emissions_signal_getlogGaussPDFMatchProb(const double *eventModel, void *
 double emissions_signal_getModelEntry(const double *model, void *kmer);
 
 StateMachine *getSignalStateMachine3(const char *modelFile, StateMachineFunctions *sMfs);
+
 // EM
 StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs);
 

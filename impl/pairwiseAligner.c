@@ -270,7 +270,7 @@ Sequence *sequence_sequenceConstruct(int64_t length, void *elements, void (*getF
      * Sequence constructor function
      * stringLength should be the length of the sequence in bases ie ATGAC has
      * length 5.  *elements is a pointer to the char array, typically.  The
-     * sequenceType is 0-nucleotide, 1-kmer, 2-event
+     * SequenceType is 0-nucleotide, 1-kmer, 2-event
      */
     Sequence* self = malloc(sizeof(Sequence));
     // correct the sequence length for kmers/events
@@ -331,7 +331,7 @@ void *sequence_getEvent(void *elements, int64_t index) {
     //return &(((double *)elements)[index]);
 }
 
-int64_t correctSeqLength(int64_t length, sequenceType type) {
+int64_t correctSeqLength(int64_t length, SequenceType type) {
     /*
      * Correct the sequence length for non-nucleotide sequences, eg. kmers/events.
      */
@@ -715,28 +715,28 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
         int64_t y = diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy);
         if (x > 0 && y > 0) {
             double *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
-            st_uglyf("cellForward->MatchState: %f \n", cellForward[sM->matchState]);
+            //st_uglyf("cellForward->MatchState: %f \n", cellForward[sM->matchState]);
             double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
-            st_uglyf("cellBackward->MatchState: %f \n", cellBackward[sM->matchState]);
+            //st_uglyf("cellBackward->MatchState: %f \n", cellBackward[sM->matchState]);
 
             double posteriorProbability = exp(
                     (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
-            st_uglyf("posteriorProb: %f\n", posteriorProbability);
+            //st_uglyf("posteriorProb: %f\n", posteriorProbability);
             if (posteriorProbability >= p->threshold) {
                 if (posteriorProbability > 1.0) {
                     posteriorProbability = 1.0;
                 }
                 posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
-                st_uglyf("Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%f)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
+                //st_uglyf("Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%f)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
             }
             if (posteriorProbability <= p->threshold) {
-                st_uglyf("NOT Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%f)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
+                //st_uglyf("NOT Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%f)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
             }
         }
         xmy += 2;
     }
-    st_uglyf("final length for alignedPairs: %lld\n", stList_length(alignedPairs));
+    //st_uglyf("final length for alignedPairs: %lld\n", stList_length(alignedPairs));
 }
 /*
  * This function now takes Sequence objects and determines if the alignment is between nucleotides
@@ -777,13 +777,11 @@ static void diagonalCalculationExpectations(StateMachine *sM,
  */
 void getPosteriorProbsWithBanding(StateMachine *sM,
                                   stList *anchorPairs,
-                                  const Sequence* sX, const Sequence* sY,
+                                  Sequence* sX, Sequence* sY,
                                   PairwiseAlignmentParameters *p,
                                   bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
-                                  void (*diagonalPosteriorProbFn)(StateMachine *,
-                                                                  int64_t,
-                                                                  DpMatrix *, DpMatrix *,
-                                                                  const Sequence*, const Sequence*,
+                                  void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *, DpMatrix *,
+                                                                  Sequence*, Sequence*,
                                                                   double, PairwiseAlignmentParameters *, void *),
                                   void *extraArgs) {
     //Prerequisites
@@ -802,8 +800,9 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
     Band *band = band_construct(anchorPairs, sX->length, sY->length, p->diagonalExpansion);
     BandIterator *forwardBandIterator = bandIterator_construct(band);
     DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
+    //Initialise forward matrix.
     dpDiagonal_initialiseValues(dpMatrix_createDiagonal(forwardDpMatrix, bandIterator_getNext(forwardBandIterator)),
-                                sM, alignmentHasRaggedLeftEnd ? sM->raggedStartStateProb : sM->startStateProb); //Initialise forward matrix.
+                                sM, alignmentHasRaggedLeftEnd ? sM->raggedStartStateProb : sM->startStateProb);
 
     //Backward matrix.
     DpMatrix *backwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
@@ -816,17 +815,19 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
         //Forward calculation
         dpDiagonal_zeroValues(dpMatrix_createDiagonal(forwardDpMatrix, diagonal));
         diagonalCalculationForward(sM, diagonal_getXay(diagonal), forwardDpMatrix, sX, sY);
-
-        bool atEnd = diagonal_getXay(diagonal) == diagonalNumber; //Condition true at the end of the matrix
+        //Condition true at the end of the matrix
+        bool atEnd = diagonal_getXay(diagonal) == diagonalNumber;
+        //Condition true when we want to do an intermediate traceback.
         bool tracebackPoint = diagonal_getXay(diagonal) >= tracedBackTo + p->minDiagsBetweenTraceBack
-                && diagonal_getWidth(diagonal) <= p->diagonalExpansion * 2 + 1; //Condition true when we want to do an intermediate traceback.
+                && diagonal_getWidth(diagonal) <= p->diagonalExpansion * 2 + 1;
 
         //Traceback
         if (atEnd || tracebackPoint) {
             //Initialise the last row (until now) of the backward matrix to represent an end point
             dpDiagonal_initialiseValues(dpMatrix_createDiagonal(backwardDpMatrix, diagonal), sM,
                     (atEnd && alignmentHasRaggedRightEnd) ? sM->raggedEndStateProb : sM->endStateProb);
-            if (diagonal_getXay(diagonal) > tracedBackTo + 1) { //This is a diagonal between the place we trace back to and where we trace back from
+            //This is a diagonal between the place we trace back to and where we trace back from
+            if (diagonal_getXay(diagonal) > tracedBackTo + 1) {
                 DpDiagonal *j = dpMatrix_getDiagonal(forwardDpMatrix, diagonal_getXay(diagonal) - 1);
                 assert(j != NULL);
                 dpDiagonal_zeroValues(dpMatrix_createDiagonal(backwardDpMatrix, j->diagonal));
@@ -872,13 +873,14 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
                                             forwardDpMatrix, backwardDpMatrix,
                                             sX, sY,
                                             totalProbability, p, extraArgs);
-
+                    //Delete forward diagonal after last access in posterior calculation
                     if (diagonal_getXay(diagonal2) < tracedBackFrom || atEnd) {
-                        dpMatrix_deleteDiagonal(forwardDpMatrix, diagonal_getXay(diagonal2)); //Delete forward diagonal after last access in posterior calculation
+                        dpMatrix_deleteDiagonal(forwardDpMatrix, diagonal_getXay(diagonal2));
                     }
                 }
+                //Delete backward diagonal after last access in backward calculation
                 if (diagonal_getXay(diagonal2) + 1 <= diagonalNumber) {
-                    dpMatrix_deleteDiagonal(backwardDpMatrix, diagonal_getXay(diagonal2) + 1); //Delete backward diagonal after last access in backward calculation
+                    dpMatrix_deleteDiagonal(backwardDpMatrix, diagonal_getXay(diagonal2) + 1);
                 }
                 diagonal2 = bandIterator_getPrevious(backwardBandIterator);
             }
@@ -972,9 +974,8 @@ stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatM
      * pairs in the list (x1, y1) (x2, y2) in the set of aligned pairs x1 appears before x2 in X and y1
      * appears before y2 in Y.
      */
-    stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct); //the list to put the output in
+    stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
 
-    // Unpack Sequence objects
     int64_t lX = strlen(sX);
     int64_t lY = strlen(sY);
 
@@ -1131,9 +1132,7 @@ static void getBlastPairsForPairwiseAlignmentParametersP(
         stList_destruct(bottomLevelAnchorPairs);
     }
 }
-/*
- * This function take Sequence objects but then umpacks them into char strings for use with lastz
- */
+// remake this function to translate anchors
 stList *getBlastPairsForPairwiseAlignmentParameters(void *sX, void *sY, PairwiseAlignmentParameters *p) {
 
     // cast to char arrays for lastz
@@ -1145,14 +1144,19 @@ stList *getBlastPairsForPairwiseAlignmentParameters(void *sX, void *sY, Pairwise
     if ((int64_t) lX * lY <= p->anchorMatrixBiggerThanThis) {
         return stList_construct();
     }
-    //Anchor pairs
+    // anchorPairs
+    // Get anchors
     stList *unfilteredTopLevelAnchorPairs = getBlastPairs(cX, cY, p->constraintDiagonalTrim, 1);
+    // sort them
     stList_sort(unfilteredTopLevelAnchorPairs, (int (*)(const void *, const void *)) stIntTuple_cmpFn);
+    // filter
     stList *topLevelAnchorPairs = filterToRemoveOverlap(unfilteredTopLevelAnchorPairs);
     st_logDebug("Got %" PRIi64 " top level anchor pairs, which reduced to %" PRIi64 " after filtering \n",
             stList_length(unfilteredTopLevelAnchorPairs), stList_length(topLevelAnchorPairs));
+    // intermediate cleanup
     stList_destruct(unfilteredTopLevelAnchorPairs);
 
+    // go though topLevelAnchorPairs and combine them based on certain conditions
     int64_t pX = 0;
     int64_t pY = 0;
     stList *combinedAnchorPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
@@ -1160,15 +1164,21 @@ stList *getBlastPairsForPairwiseAlignmentParameters(void *sX, void *sY, Pairwise
         stIntTuple *anchorPair = stList_get(topLevelAnchorPairs, i);
         int64_t x = stIntTuple_get(anchorPair, 0);
         int64_t y = stIntTuple_get(anchorPair, 1);
+        // make sure x and y are within the length of the sequence
         assert(x >= 0 && x < lX);
         assert(y >= 0 && y < lY);
+        // make sure x and y are 'in front of' the last pair
         assert(x >= pX);
         assert(y >= pY);
+        // see if we want to split the matrix into two
         getBlastPairsForPairwiseAlignmentParametersP(cX, cY, pX, pY, x, y, p, combinedAnchorPairs);
+        // finally append
         stList_append(combinedAnchorPairs, anchorPair);
+        // increment for next iteration
         pX = x + 1;
         pY = y + 1;
     }
+    // one final check
     getBlastPairsForPairwiseAlignmentParametersP(cX, cY, pX, pY, lX, lY, p, combinedAnchorPairs);
     stList_setDestructor(topLevelAnchorPairs, NULL);
     stList_destruct(topLevelAnchorPairs);
@@ -1388,7 +1398,7 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM,
 
     return alignedPairs;
 }
-
+// Make cY a NanoporeRead that way I can access the parts I need.
 stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,
                         void *(*getFcn)(void *, int64_t),
                         stList *(*getAnchorPairFcn)(void *, void *, PairwiseAlignmentParameters *),

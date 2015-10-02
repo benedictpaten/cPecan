@@ -31,7 +31,7 @@ typedef enum {
     nucleotide=0,
     kmer=1,
     event=2
-} sequenceType;
+} SequenceType;
 
 typedef struct sequence {
     int64_t length;
@@ -39,6 +39,7 @@ typedef struct sequence {
     void* (*get)(void *elements, int64_t index);
 } Sequence;
 
+// Sequence handling functions
 Sequence *sequence_sequenceConstruct(int64_t length, void *elements, void (*getFcn));
 
 Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength, void (*getFcn));
@@ -51,12 +52,9 @@ void *sequence_getKmer(void *elements, int64_t index);
 
 void *sequence_getEvent(void *elements, int64_t index);
 
-//int64_t getXposition(Sequence *sX, int64_t xay, int64_t xmy); // made private
+int64_t correctSeqLength(int64_t length, SequenceType type);
 
-//int64_t getYposition(Sequence *sY, int64_t xay, int64_t xmy); // made private
-
-int64_t correctSeqLength(int64_t length, sequenceType type);
-
+// Pairwise alignment
 typedef struct _pairwiseAlignmentBandingParameters {
     double threshold; //Minimum posterior probability of a match to be added to the output
     int64_t minDiagsBetweenTraceBack; //Minimum x+y diagonals to leave between doing traceback.
@@ -84,7 +82,7 @@ stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_
 
 stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignment *pA, int64_t trim);
 
-stList *getAlignedPairsUsingAnchors(StateMachine *sM, Sequence *SsX, Sequence *SsY, //sequenceType t,
+stList *getAlignedPairsUsingAnchors(StateMachine *sM, Sequence *SsX, Sequence *SsY, //SequenceType t,
                                     stList *anchorPairs, PairwiseAlignmentParameters *p,
                                     bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
@@ -95,7 +93,7 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM, Sequence *SsX, Sequence *S
 void updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP, void *extraArgs);
 
 void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
-                                 Sequence *sX, Sequence *sY, //sequenceType t,
+                                 Sequence *sX, Sequence *sY, //SequenceType t,
                                  stList *anchorPairs,
                                  PairwiseAlignmentParameters *p,
                                  bool alignmentHasRaggedLeftEnd,
@@ -230,10 +228,15 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
 
 //Banded matrix calculation of posterior probs
 
-void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const Sequence* sX, const Sequence* sY,
-        PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
-        void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *, DpMatrix *, const Sequence*, const Sequence*,
-              double, PairwiseAlignmentParameters *, void *), void *extraArgs);
+void getPosteriorProbsWithBanding(StateMachine *sM,
+                                  stList *anchorPairs,
+                                  Sequence* sX, Sequence* sY,
+                                  PairwiseAlignmentParameters *p,
+                                  bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
+                                  void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *, DpMatrix *,
+                                                                  Sequence*, Sequence*,
+                                                                  double, PairwiseAlignmentParameters *, void *),
+                                  void *extraArgs);
 
 //Blast pairs
 
@@ -250,7 +253,7 @@ stList *getSplitPoints(stList *anchorPairs, int64_t lX, int64_t lY,
 
 void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         StateMachine *sM, stList *anchorPairs,
-        Sequence *SsX, Sequence *SsY, //sequenceType t,
+        Sequence *SsX, Sequence *SsY, //SequenceType t,
         PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd,
         bool alignmentHasRaggedRightEnd,
         void (*diagonalPosteriorProbFn)(StateMachine *,

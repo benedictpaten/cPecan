@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <discreteHmm.h>
+#include <nanopore.h>
 #include "randomSequences.h"
 #include "stateMachine.h"
 #include "CuTest.h"
@@ -77,7 +78,7 @@ static void test_signal_cell(CuTest *testCase) {
 static void test_signal_diagonalDPCalculations(CuTest *testCase) {
     // make some DNA sequences
     //char *sX = "ATGACACATT";
-    char *sX = "ATGACGACATT"; // has G insert
+    char *sX =   "ATGACATTCATT"; // has TT insert
     double sY[5] = {
             60.032615, //ATGACA
             60.332089, //TGACAC
@@ -147,7 +148,7 @@ static void test_signal_diagonalDPCalculations(CuTest *testCase) {
     // Perform alignment
     for (int64_t i = 1; i <= lX + lY; i++) {
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-        p->threshold = 0.4; // used to be 0.2 needs to be doubled for kmers;
+        p->threshold = 0.2;
         diagonalCalculationPosteriorMatchProbs(sM, i, dpMatrixForward, dpMatrixBackward, SsX, SsY,
                                                totalProbForward, p, extraArgs);
         pairwiseAlignmentBandingParameters_destruct(p);
@@ -161,27 +162,56 @@ static void test_signal_diagonalDPCalculations(CuTest *testCase) {
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(0, 0));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(1, 1));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 2));
-    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 3));
-    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(4, 4));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(5, 3));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(6, 4));
 
     // make sure alignedPairs is correct
     for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
         stIntTuple *pair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
         st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
-        st_uglyf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
-        //CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
+        CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
-    //CuAssertIntEquals(testCase, 5, (int) stList_length(alignedPairs));
+    CuAssertIntEquals(testCase, 5, (int) stList_length(alignedPairs));
 
     // clean up
     sequence_sequenceDestroy(SsX);
     sequence_sequenceDestroy(SsY);
 }
 
+static void test_loadNanoporeRead(CuTest *testCase) {
+    char *npReadFile = stString_print("../../cPecan/tests/testExtract.npRead");
+    NanoporeRead *npRead = loadNanoporeReadFromFile(npReadFile);
+    st_uglyf("for this nanopore read: \n \t read length: %lld\n", npRead->length);
+    st_uglyf("\t # of events: %lld\n", npRead->nb_events);
+}
+/*
+static void test_signal_getAlignedPairsWithBanding(CuTest *testCase) {
+    for (int64_t test = 0; test < 3; test++) {
+        // generate a random reference sequence
+
+        // generate a simulated event sequence
+        // check eveolveSequence
+
+        // correct sequence lengths
+
+        // make sequence objects
+
+        // do alignment
+        // make pairwise alignement banding parameters (check how these work)
+
+        // make stateMachine
+        // get some random anchors
+
+
+    }
+}
+*/
+
 CuSuite *signalPairwiseTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, test_signal_cell);
     SUITE_ADD_TEST(suite, test_signal_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_loadNanoporeRead);
     return suite;
 }

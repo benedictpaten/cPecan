@@ -164,7 +164,7 @@ Hmm *hmmDiscrete_loadFromFile(const char *fileName) {
 
     // improper input check
     if (stList_length(tokens) < 2) {
-        st_errAbort("Got an empty line in the input state machine file %s\n", fileName);
+        st_errAbort("Got an empty line in the input state machine file %s\n", fileName); // this is the wrong error message?
     }
     // setup
     int type;
