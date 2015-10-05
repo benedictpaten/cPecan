@@ -93,7 +93,13 @@ NanoporeRead *loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     // events
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
-
+    // check
+    if (stList_length(tokens) != (npRead->nb_events * NB_EVENT_PARAMS)) {
+        st_errAbort(
+                "event map is not the correct length, should be %lld, got %lld",
+                npRead->length,
+                stList_length(tokens));
+    }
     // load in events
     for (int64_t i = 0; i < (npRead->nb_events * NB_EVENT_PARAMS); i++) {
         j = sscanf(stList_get(tokens, i), "%lf", &(npRead->events[i]));
