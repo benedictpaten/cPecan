@@ -1,116 +1,193 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <nanopore.h>
 #include "pairwiseAligner.h"
-/*
-#include "sonLibFile.h"
-#include "sonLibTypes.h"
-#include "sonLibString.h"
-#include "sonLibList.h"
-#include "sonLibCommon.h"
- */
 #include "nanopore.h"
 
 #define NB_EVENT_PARAMS 3
 
-NanoporeRead *nanoporeRead_construct(int64_t length, int64_t nb_events, double scale, double shift) {
-    // do a malloc
+NanoporeRead *nanoporeRead_construct(int64_t readLength, int64_t nbTemplateEvents, int64_t nbComplementEvents) {
     NanoporeRead *npRead = st_malloc(sizeof(NanoporeRead));
 
-    // set parts to size
-    // initialize parts
-    npRead->length = length;
-    npRead->nb_events = nb_events;
-    npRead->scale = scale,
-    npRead->shift = shift;
-    npRead->read = st_malloc(npRead->length * sizeof(char));
-    npRead->eventMap = st_malloc(npRead->length * sizeof(int64_t));
-    npRead->events = st_malloc(npRead->nb_events * NB_EVENT_PARAMS * sizeof(double));
+    npRead->readLength = readLength;
+    npRead->nbTemplateEvents = nbTemplateEvents;
+    npRead->nbComplementEvents = nbComplementEvents;
+
+    npRead->twoDread = st_malloc(npRead->readLength * sizeof(char));
+
+    // the map contains the index of the event corresponding to each kmer in the read sequence so
+    // the length of the map has to be the same as the read sequence, not the number of events
+    // there can be events that aren't mapped to a kmer
+    npRead->templateEventMap = st_malloc(npRead->readLength * sizeof(int64_t));
+    npRead->templateEvents = st_malloc(npRead->nbTemplateEvents * NB_EVENT_PARAMS * sizeof(double));
+
+    npRead->complementEventMap = st_malloc(npRead->readLength * sizeof(int64_t));
+    npRead->complementEvents = st_malloc(npRead->nbComplementEvents * NB_EVENT_PARAMS * sizeof(double));
+
     // return
     return npRead;
 }
 
 NanoporeRead *loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     FILE *fH = fopen(nanoporeReadFile, "r");
-    // the first line is the length of the read (in bases), the scale, and the shift
+
+    // line 1 [2D read length] [# of template events] [# of complement events]
+    //        [template scale] [template shift] [template var] [template scale_sd] [template var_sd]
+    //        [complement scale] [complement shift] [complement var] [complement scale_sd] [complement var_sd] \n
     char *string = stFile_getLineFromFile(fH);
     stList *tokens = stString_split(string);
-    int64_t npRead_length, npRead_nbEvents;
-    double npRead_scale, npRead_shift;
+    int64_t npRead_readLength, npRead_nbTemplateEvents, npRead_nbComplementEvents;
+    assert(stList_length(tokens) == 12);
 
-    int64_t j = sscanf(stList_get(tokens, 0), "%lld", &npRead_length);
+    int64_t j = sscanf(stList_get(tokens, 0), "%lld", &npRead_readLength);
     if (j != 1) {
         st_errAbort("error parsing nanopore read length\n");
     }
-    int64_t h = sscanf(stList_get(tokens, 1), "%lld", &npRead_nbEvents);
+    j = sscanf(stList_get(tokens, 1), "%lld", &npRead_nbTemplateEvents);
     if (j != 1) {
-        st_errAbort("error parsing nanopore read length\n");
+        st_errAbort("error parsing nanopore template event lengths\n");
     }
-    int64_t s = sscanf(stList_get(tokens, 2), "%lf", &npRead_scale);
-    if (s != 1) {
-        st_errAbort("error parsing nanopore read scale\n");
+    j = sscanf(stList_get(tokens, 2), "%lld", &npRead_nbComplementEvents);
+    if (j != 1) {
+        st_errAbort("error parsing nanopore complement event lengths\n");
     }
-    int64_t n = sscanf(stList_get(tokens, 3), "%lf", &npRead_shift);
-    if (s != 1) {
-        st_errAbort("error parsing nanopore read shift\n");
+    NanoporeRead *npRead = nanoporeRead_construct(npRead_readLength,
+                                                  npRead_nbTemplateEvents,
+                                                  npRead_nbComplementEvents);
+    // template params
+    j = sscanf(stList_get(tokens, 3), "%lf", &(npRead->templateParams.scale));
+    if (j != 1) {
+        st_errAbort("error parsing nanopore template scale\n");
+    }
+    j = sscanf(stList_get(tokens, 4), "%lf", &(npRead->templateParams.shift));
+    if (j != 1) {
+        st_errAbort("error parsing nanopore template shift\n");
+    }
+    j = sscanf(stList_get(tokens, 5), "%lf", &(npRead->templateParams.var));
+    if (j != 1) {
+        st_errAbort("error parsing nanopore template var\n");
+    }
+    j = sscanf(stList_get(tokens, 6), "%lf", &(npRead->templateParams.scale_sd));
+    if (j != 1) {
+        st_errAbort("error parsing nanopore template scale_sd\n");
+    }
+    j = sscanf(stList_get(tokens, 7), "%lf", &(npRead->templateParams.var_sd));
+    if (j != 1) {
+        st_errAbort("error parsing nanopore template var_sd\n");
     }
 
-    NanoporeRead *npRead = nanoporeRead_construct(npRead_length, npRead_nbEvents,
-                                                  npRead_scale, npRead_shift);
+    // complement params
+    j = sscanf(stList_get(tokens, 8), "%lf", &(npRead->complementParams.scale));
+    if (j != 1) {
+        st_errAbort("error parsing nanopore complement scale\n");
+    }
+    j = sscanf(stList_get(tokens, 9), "%lf", &(npRead->complementParams.shift));
+    if (j != 1) {
+        st_errAbort("error parsing nanopore complement shift\n");
+    }
+    j = sscanf(stList_get(tokens, 10), "%lf", &(npRead->complementParams.var));
+    if (j != 1) {
+        st_errAbort("error parsing nanopore complement var\n");
+    }
+    j = sscanf(stList_get(tokens, 11), "%lf", &(npRead->complementParams.scale_sd));
+    if (j != 1) {
+        st_errAbort("error parsing nanopore complement scale_sd\n");
+    }
+    j = sscanf(stList_get(tokens, 12), "%lf", &(npRead->complementParams.var_sd));
+    if (j != 1) {
+        st_errAbort("error parsing nanopore template var_sd\n");
+    }
 
-    // cleanup first line
+    // cleanup line 1
+    // TODO freeup readLength, nbTemplateEvents, nbComplementEvents
     free(string);
     stList_destruct(tokens);
 
-    // read sequence
+    // line 2 [2D read sequence] \n
     string = stFile_getLineFromFile(fH);
-    j = sscanf(string, "%s", npRead->read);
+    j = sscanf(string, "%s", npRead->twoDread);
     if (j != 1) {
         st_errAbort("error parsing read from npRead file\n");
     }
     free(string);
 
-    // event map
+    // line 3 [template event map] \n
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     // check for correctness
-    if (stList_length(tokens) != npRead->length) {
+    if (stList_length(tokens) != npRead->readLength) {
         st_errAbort(
-                "event map is not the correct length, should be %lld, got %lld",
-                npRead->length,
+                "template event map is not the correct length, should be %lld, got %lld",
+                npRead->readLength,
                 stList_length(tokens));
     }
-    // load in the map
-    for (int64_t i = 0; i < npRead->length; i++) {
-        j = sscanf(stList_get(tokens, i), "%lld", &(npRead->eventMap[i]));
+    for (int64_t i = 0; i < npRead->readLength; i++) {
+        j = sscanf(stList_get(tokens, i), "%lld", &(npRead->templateEventMap[i]));
         if (j != 1) {
-            st_errAbort("error loading in eventMap\n");
+            st_errAbort("error loading in template eventMap\n");
         }
     }
     free(string);
     stList_destruct(tokens);
 
-    // events
+    // line 4 [template events (mean, stddev, length)] \n
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     // check
-    if (stList_length(tokens) != (npRead->nb_events * NB_EVENT_PARAMS)) {
+    if (stList_length(tokens) != (npRead->nbTemplateEvents * NB_EVENT_PARAMS)) {
         st_errAbort(
-                "event map is not the correct length, should be %lld, got %lld",
-                npRead->length,
+                "incorrect number of template events, should be %lld, got %lld",
+                npRead->nbTemplateEvents,
                 stList_length(tokens));
     }
-    // load in events
-    for (int64_t i = 0; i < (npRead->nb_events * NB_EVENT_PARAMS); i++) {
-        j = sscanf(stList_get(tokens, i), "%lf", &(npRead->events[i]));
+    for (int64_t i = 0; i < (npRead->nbTemplateEvents * NB_EVENT_PARAMS); i++) {
+        j = sscanf(stList_get(tokens, i), "%lf", &(npRead->templateEvents[i]));
         if (j != 1) {
-            st_errAbort("error loading in events\n");
+            st_errAbort("error loading in template events\n");
+        }
+    }
+    free(string);
+    stList_destruct(tokens);
+
+    // line 5 [complement event map] \n
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+    // check for correctness
+    if (stList_length(tokens) != npRead->readLength) {
+        st_errAbort(
+                "complament event map is not the correct length, should be %lld, got %lld",
+                npRead->readLength,
+                stList_length(tokens));
+    }
+    for (int64_t i = 0; i < npRead->readLength; i++) {
+        j = sscanf(stList_get(tokens, i), "%lld", &(npRead->complementEventMap[i]));
+        if (j != 1) {
+            st_errAbort("error loading in complement eventMap\n");
+        }
+    }
+    free(string);
+    stList_destruct(tokens);
+
+    // line 6 [complement events (mean, stddev, length)] \n
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+    // check
+    if (stList_length(tokens) != (npRead->nbComplementEvents * NB_EVENT_PARAMS)) {
+        st_errAbort(
+                "incorrect number of complement events, should be %lld, got %lld",
+                npRead->nbComplementEvents,
+                stList_length(tokens));
+    }
+    for (int64_t i = 0; i < (npRead->nbComplementEvents * NB_EVENT_PARAMS); i++) {
+        j = sscanf(stList_get(tokens, i), "%lf", &(npRead->complementEvents[i]));
+        if (j != 1) {
+            st_errAbort("error loading in complement events\n");
         }
     }
     free(string);
     stList_destruct(tokens);
 
     fclose(fH);
-
     return npRead;
 }

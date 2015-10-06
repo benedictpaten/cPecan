@@ -1399,11 +1399,11 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM,
     return alignedPairs;
 }
 // Make cY a NanoporeRead that way I can access the parts I need.
+// TODO might need to make a new version of this function that used NanoporeReads? Check out line 24-29 of log
 stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,
                         void *(*getFcn)(void *, int64_t),
                         stList *(*getAnchorPairFcn)(void *, void *, PairwiseAlignmentParameters *),
                         bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
-
 
     //stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(cX, cY, p);
     stList *anchorPairs = getAnchorPairFcn(cX, cY, p);

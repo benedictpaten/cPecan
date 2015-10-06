@@ -2,8 +2,9 @@
 """Convert a MinION fast5 to a npRead for cPecan
 
 Format:
-line 1 [2D read length] [# of template events] [# of complement events] [template scale] [template shift] [template var]
-       [complement scale] [complement shift] [complement var] \n
+line 1 [2D read length] [# of template events] [# of complement events]
+       [template scale] [template shift] [template var] [template scale_sd] [template var_sd]
+       [complement scale] [complement shift] [complement var] [complement scale_sd] [complement var_sd] \n
 line 2 [2D read sequence] \n
 line 3 [template event map] \n
 line 4 [template events (mean, stddev, length)] \n
@@ -14,7 +15,6 @@ line 6 [complement events (mean, stddev, length)] \n
 from __future__ import print_function
 from nanoporeLib import NanoporeRead
 import sys
-import h5py
 
 
 def main():
@@ -36,11 +36,13 @@ def main():
         print(npRead.template_scale, end=' ', file=out_file)          # template scale
         print(npRead.template_shift, end=' ', file=out_file)          # template shift
         print(npRead.template_var, end=' ', file=out_file)            # template var
-        # TODO add noise correction for template
+        print(npRead.template_scale_sd, end=' ', file=out_file)       # template scale_sd
+        print(npRead.template_var_sd, end=' ', file=out_file)         # template var_sd
         print(npRead.complement_scale, end=' ', file=out_file)        # complement scale
         print(npRead.complement_shift, end=' ', file=out_file)        # complement shift
-        print(npRead.complement_var, end='\n', file=out_file)          # complement var
-        # TODO add noise correction for complement
+        print(npRead.complement_var, end=' ', file=out_file)         # complement var
+        print(npRead.complement_scale_sd, end=' ', file=out_file)     # complement scale_sd
+        print(npRead.complement_var_sd, end='\n', file=out_file)      # complement var_sd
 
         # line 2
         print(npRead.twoD_read_sequence, end='\n', file=out_file)

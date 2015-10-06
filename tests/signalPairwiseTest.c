@@ -180,11 +180,35 @@ static void test_signal_diagonalDPCalculations(CuTest *testCase) {
 }
 
 static void test_loadNanoporeRead(CuTest *testCase) {
-    char *npReadFile = stString_print("../../cPecan/tests/testExtract.npRead");
+    char *npReadFile = stString_print("../../cPecan/tests/ZymoC_file1.npRead");
     NanoporeRead *npRead = loadNanoporeReadFromFile(npReadFile);
-    st_uglyf("for this nanopore read: \n \t read length: %lld\n", npRead->length);
-    st_uglyf("\t # of events: %lld\n", npRead->nb_events);
+    st_uglyf("for this nanopore read: \n \t read length: %lld\n", npRead->readLength);
+    st_uglyf("\t # of template events: %lld\n", npRead->nbTemplateEvents);
+
 }
+
+static void test_scaleModel(CuTest *testCase) {
+    char *modelFile = stString_print("../../cPecan/models/template.eTable.model");
+    StateMachineFunctions *sMfs = stateMachineFunctions_construct(emissions_signal_getKmerGapProb,
+                                                                  emissions_signal_getEventGapProb,
+                                                                  emissions_signal_getlogGaussPDFMatchProb);
+    StateMachine *sM = getSignalStateMachine3(modelFile, sMfs);
+
+    char *npReadFile = stString_print("../../cPecan/tests/ZymoC_file1.npRead");
+    NanoporeRead *npRead = loadNanoporeReadFromFile(npReadFile);
+
+    emissions_signal_scaleModel(sM, npRead->templateParams.scale, npRead->templateParams.shift,
+                                npRead->templateParams.var, npRead->templateParams.scale_sd,
+                                npRead->templateParams.var_sd);
+
+    StateMachine *sM2 = getSignalStateMachine3(modelFile, sMfs);
+
+    for (int64_t i = 0; i < sM->parameterSetSize * MODEL_PARAMS; i += 4) {
+        st_uglyf("unscaled: %f - scaled: %f\n", sM->EMISSION_MATCH_PROBS[i], sM2->EMISSION_MATCH_PROBS[i]);
+    }
+
+}
+
 /*
 static void test_signal_getAlignedPairsWithBanding(CuTest *testCase) {
     for (int64_t test = 0; test < 3; test++) {
@@ -213,5 +237,6 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_signal_cell);
     SUITE_ADD_TEST(suite, test_signal_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_loadNanoporeRead);
+    SUITE_ADD_TEST(suite, test_scaleModel);
     return suite;
 }

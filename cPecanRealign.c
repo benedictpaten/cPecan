@@ -516,7 +516,7 @@ int main(int argc, char *argv[]) {
         hmmDiscrete_normalize(hmm);
         hmmDiscrete_destruct(hmm);
     }
-    else { //TODO probably need a switch statement here to decide on which defaults to set
+    else {
         sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
                                      emissions_symbol_setEmissionsToDefaults,
                                      emissions_symbol_getGapProb,

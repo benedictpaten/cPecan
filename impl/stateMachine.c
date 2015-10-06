@@ -338,11 +338,23 @@ double emissions_signal_getlogGaussPDFMatchProb(const double *eventModel, void *
     double log_inv_sqrt_2pi = log(0.3989422804014327);
     double eventMean = *(double *) event;
     int64_t kmerIndex = emissions_getKmerIndex(kmer);
-    double modelMean = eventModel[kmerIndex*MODEL_PARAMS];
-    double modelStdDev = eventModel[(kmerIndex*MODEL_PARAMS)+1];
+    double modelMean = eventModel[kmerIndex * MODEL_PARAMS];
+    double modelStdDev = eventModel[(kmerIndex * MODEL_PARAMS) + 1];
     double log_modelSD = log(modelStdDev);
     double a = (eventMean - modelMean) / modelStdDev;
     return log_inv_sqrt_2pi - log_modelSD + (-0.5f * a * a);
+}
+
+void emissions_signal_scaleModel(StateMachine *sM,
+                                 double scale, double shift, double var,
+                                 double scale_sd, double var_sd) {
+    // model is arranged: level_mean, level_stdev, sd_mean, sd_stdev per kmer
+    for (int64_t i = 0; i < sM->parameterSetSize * MODEL_PARAMS; i += 4) {
+        sM->EMISSION_MATCH_PROBS[i] = sM->EMISSION_MATCH_PROBS[i] * scale + shift; // mean = mean * scale + shift
+        sM->EMISSION_MATCH_PROBS[i+1] = sM->EMISSION_MATCH_PROBS[i+1] * var; // stdev = stdev * var
+        sM->EMISSION_MATCH_PROBS[i+2] = sM->EMISSION_MATCH_PROBS[i+2] * scale_sd;
+        sM->EMISSION_MATCH_PROBS[i+3] = sM->EMISSION_MATCH_PROBS[i+3] * sqrt(pow(scale_sd, 3.0) / var_sd);
+    }
 }
 
 

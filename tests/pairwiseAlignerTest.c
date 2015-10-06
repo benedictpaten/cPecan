@@ -959,11 +959,11 @@ static void test_getAlignedPairs(CuTest *testCase) {
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 
-        StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,                                // type
+        StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
                                                    emissions_symbol_setEmissionsToDefaults,
-                                                   emissions_symbol_getGapProb,              // gapX prob fcn
-                                                   emissions_symbol_getGapProb,              // gapY prob fcn
-                                                   emissions_symbol_getMatchProb);           // match prob fcn
+                                                   emissions_symbol_getGapProb,
+                                                   emissions_symbol_getGapProb,
+                                                   emissions_symbol_getMatchProb);
 
         stList *alignedPairs = getAlignedPairs(sM, sX, sY, lX, lY, p,
                                                sequence_getBase, getBlastPairsForPairwiseAlignmentParameters,
