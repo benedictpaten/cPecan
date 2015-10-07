@@ -307,18 +307,30 @@ static void test_signal_strandAlignmentNoBanding(CuTest *testCase) {
     //}
 }
 
+static stList *compareAlignedPairs(stList *pairs1, stList *pairs2) {
+    /*
+     * Selects the aligned pairs contained in anchor pairs. Taken from cPecanRealign scoreAnchorPairs
+     */
+    stSortedSet *sortedSet1 = stList_getSortedSet(pairs1, (int (*)(const void *, const void *))stIntTuple_cmpFn);
+    stSortedSet *sortedSet2 = stList_getSortedSet(pairs2, (int (*)(const void *, const void *))stIntTuple_cmpFn);
+    stSortedSet *intersection = stSortedSet_getIntersection(sortedSet1, sortedSet2);
+    stList *list = stSortedSet_getList(intersection);
+    return list;
+}
+
 static void test_signal_strandAlignmentNoBanding2(CuTest *testCase) {
     char *ZymoReference = stString_print("../../cPecan/tests/ZymoRef.txt");
     FILE *fH = fopen(ZymoReference, "r");
     char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
-
+    char *RC_ZymoReferenceSeq = stString_reverseComplementString(ZymoReferenceSeq);
     // load NanoporeRead
     char *npReadFile = stString_print("../../cPecan/tests/ZymoC_file1.npRead");
     NanoporeRead *npRead = loadNanoporeReadFromFile(npReadFile);
 
     int64_t lX = correctSeqLength(strlen(ZymoReferenceSeq), event);
     int64_t lY = npRead->nbTemplateEvents;
-    
+    //int64_t lY = npRead->nbComplementEvents;
+
     // load stateMachine and model
     char *modelFile = stString_print("../../cPecan/models/template.eTable.model");
     StateMachineFunctions *sMfs = stateMachineFunctions_construct(emissions_signal_getKmerGapProb,
@@ -334,7 +346,134 @@ static void test_signal_strandAlignmentNoBanding2(CuTest *testCase) {
 
     stList *alignedPairs = getAlignedPairsWithoutBanding(sM, ZymoReferenceSeq, npRead->templateEvents, lX, lY, p,
                                                          sequence_getKmer, sequence_getEvent, 0, 0);
+
+    //stList *alignedPairs = getAlignedPairsWithoutBanding(sM, RC_ZymoReferenceSeq, npRead->complementEvents, lX, lY, p,
+    //                                                     sequence_getKmer, sequence_getEvent, 0, 0);
+
     st_uglyf("No. aligned pairs: %lld\n", stList_length(alignedPairs));
+}
+
+static void test_signal_compareAlignedPairs(CuTest *testCase) {
+    char *ZymoReference = stString_print("../../cPecan/tests/ZymoRef.txt");
+    FILE *fH = fopen(ZymoReference, "r");
+    char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
+    char *RC_ZymoReferenceSeq = stString_reverseComplementString(ZymoReferenceSeq);
+
+    // load NanoporeRead
+    char *npReadFile = stString_print("../../cPecan/tests/ZymoC_file1.npRead");
+    NanoporeRead *npRead = loadNanoporeReadFromFile(npReadFile);
+
+    int64_t lX = correctSeqLength(strlen(ZymoReferenceSeq), event);
+    int64_t clX = correctSeqLength(strlen(RC_ZymoReferenceSeq), event);
+    int64_t lY = npRead->nbTemplateEvents;
+    int64_t clY = npRead->nbComplementEvents;
+
+    // load stateMachine and model
+    char *modelFile = stString_print("../../cPecan/models/template.eTable.model");
+    StateMachineFunctions *sMfs = stateMachineFunctions_construct(emissions_signal_getKmerGapProb,
+                                                                  emissions_signal_getEventGapProb,
+                                                                  emissions_signal_getlogGaussPDFMatchProb);
+    StateMachine *sM = getSignalStateMachine3(modelFile, sMfs);
+    emissions_signal_scaleModel(sM, npRead->templateParams.scale, npRead->templateParams.shift,
+                                npRead->templateParams.var, npRead->templateParams.scale_sd,
+                                npRead->templateParams.var_sd); // clunky
+
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+    p->threshold = 0.4;
+
+    stList *alignedPairs = getAlignedPairsWithoutBanding(sM, ZymoReferenceSeq, npRead->templateEvents, lX, lY, p,
+                                                         sequence_getKmer, sequence_getEvent, 0, 0);
+
+    stList *alignedPairs2 = getAlignedPairsWithoutBanding(sM, ZymoReferenceSeq, npRead->templateEvents, lX, lY, p,
+                                                          sequence_getKmer, sequence_getEvent, 0, 0);
+
+    stList *rc_alignedPairs = getAlignedPairsWithoutBanding(sM, RC_ZymoReferenceSeq, npRead->complementEvents,
+                                                            clX, clY, p,
+                                                            sequence_getKmer, sequence_getEvent, 0, 0);
+
+    stList *alignedPairsTalignedPairs2 = compareAlignedPairs(alignedPairs, alignedPairs2);
+    stList *templateVsComplement = compareAlignedPairs(rc_alignedPairs, alignedPairs);
+    // test that they ended up with the same results
+    CuAssertIntEquals(testCase, stList_length(alignedPairs), stList_length(alignedPairsTalignedPairs2));
+
+    st_uglyf("alignedPairs 1 and 2 have %lld, pairs in common\n", stList_length(alignedPairsTalignedPairs2));
+    st_uglyf("the template read has %lld aligned pairs, the complement read has %lld aligned pairs\n",
+             stList_length(alignedPairs), stList_length(rc_alignedPairs));
+    st_uglyf("the template and complement reads have %lld aligned pairs in common\n",
+             stList_length(templateVsComplement));
+}
+
+static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY) {
+    st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
+    st_uglyf("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
+    stSortedSet *pairs = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
+                                                (void (*)(void *)) stIntTuple_destruct);
+    for (int64_t i = 0; i < stList_length(blastPairs); i++) {
+        stIntTuple *j = stList_get(blastPairs, i);
+        CuAssertTrue(testCase, stIntTuple_length(j) == 3);
+
+        int64_t x = stIntTuple_get(j, 1);
+        int64_t y = stIntTuple_get(j, 2);
+        int64_t score = stIntTuple_get(j, 0);
+        CuAssertTrue(testCase, score > 0);
+        CuAssertTrue(testCase, score <= PAIR_ALIGNMENT_PROB_1);
+
+        CuAssertTrue(testCase, x >= 0);
+        CuAssertTrue(testCase, y >= 0);
+        CuAssertTrue(testCase, x < lX);
+        CuAssertTrue(testCase, y < lY);
+
+        //Check is unique
+        stIntTuple *pair = stIntTuple_construct2(x, y);
+        CuAssertTrue(testCase, stSortedSet_search(pairs, pair) == NULL);
+        stSortedSet_insert(pairs, pair);
+    }
+    stSortedSet_destruct(pairs);
+}
+
+static void test_signal_getAlignedPairsWithBanding(CuTest *testCase) {
+    // load up test stuff and make stateMachine
+    char *ZymoReference = stString_print("../../cPecan/tests/ZymoRef.txt");
+    FILE *fH = fopen(ZymoReference, "r");
+    char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
+
+    char *npReadFile = stString_print("../../cPecan/tests/ZymoC_file1.npRead");
+    NanoporeRead *npRead = loadNanoporeReadFromFile(npReadFile);
+
+    int64_t lX = correctSeqLength(strlen(ZymoReferenceSeq), event);
+    int64_t lY = npRead->nbTemplateEvents;
+
+    char *templateModelFile = stString_print("../../cPecan/models/template.eTable.model");
+    StateMachineFunctions *sMfs = stateMachineFunctions_construct(emissions_signal_getKmerGapProb,
+                                                                  emissions_signal_getEventGapProb,
+                                                                  emissions_signal_getlogGaussPDFMatchProb);
+    StateMachine *sMt = getSignalStateMachine3(templateModelFile, sMfs);
+    emissions_signal_scaleModel(sMt, npRead->templateParams.scale, npRead->templateParams.shift,
+                                npRead->templateParams.var, npRead->templateParams.scale_sd,
+                                npRead->templateParams.var_sd); // clunky
+
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+    p->threshold = 0.4;
+
+    // get anchors
+    stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
+
+    // might need to re-sort?
+    //stList_sort(anchorPairs, (int (*)(const void *, const void *)) stIntTuple_cmpFn);
+
+    // remap and filter
+    remapAnchorPairs(anchorPairs, npRead->templateEventMap);
+    stList *filteredRemappedAnchors = filterToRemoveOverlap(anchorPairs);
+
+    // make Sequences
+    Sequence *refSeq = sequence_sequenceConstruct(lX, ZymoReferenceSeq, sequence_getKmer);
+    Sequence *templateSeq = sequence_sequenceConstruct(lY, npRead->templateEvents, sequence_getEvent);
+
+    // do alignment
+    stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p, 0, 0);
+
+    st_uglyf("got %lld alignedPairs", stList_length(alignedPairs));
+    checkAlignedPairs(testCase, alignedPairs, lX, lY);
 }
 
 CuSuite *signalPairwiseTestSuite(void) {
@@ -342,7 +481,9 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_signal_cell);
     SUITE_ADD_TEST(suite, test_signal_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_scaleModel);
-    SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding);
+    //SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding);
     SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding2);
+    SUITE_ADD_TEST(suite, test_signal_compareAlignedPairs);
+    SUITE_ADD_TEST(suite, test_signal_getAlignedPairsWithBanding);
     return suite;
 }

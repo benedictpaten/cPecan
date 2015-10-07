@@ -963,7 +963,8 @@ static void test_getAlignedPairs(CuTest *testCase) {
                                                    emissions_symbol_getMatchProb);
 
         stList *alignedPairs = getAlignedPairs(sM, sX, sY, lX, lY, p,
-                                               sequence_getBase, getBlastPairsForPairwiseAlignmentParameters,
+                                               sequence_getBase, sequence_getBase,
+                                               getBlastPairsForPairwiseAlignmentParameters,
                                                0, 0);
 
         //Check the aligned pairs.
@@ -1001,7 +1002,8 @@ static void test_kmer_getAlignedPairs(CuTest *testCase) {
                                                    emissions_kmer_getMatchProb);             // match prob fcn
 
         stList *alignedPairs = getAlignedPairs(sM, sX, sY, lX2, lY2, p,
-                                               sequence_getBase, getBlastPairsForPairwiseAlignmentParameters,
+                                               sequence_getKmer, sequence_getKmer,
+                                               getBlastPairsForPairwiseAlignmentParameters,
                                                0, 0); // this is where the magic happens
         //Check the aligned pairs.
         checkAlignedPairs_kmer(testCase, alignedPairs, lX2, lY2);
@@ -1041,7 +1043,8 @@ static void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
                                                    emissions_symbol_getMatchProb);
 
         stList *alignedPairs = getAlignedPairs(sM, sX, sY, lX, lY, p,
-                                               sequence_getBase, getBlastPairsForPairwiseAlignmentParameters,
+                                               sequence_getBase, sequence_getBase,
+                                               getBlastPairsForPairwiseAlignmentParameters,
                                                1, 1);
 
         //printf("Before filtering alignedPairs Length: %lld\n", (int64_t) stList_length(alignedPairs));
@@ -1096,7 +1099,8 @@ static void test_kmer_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
                                                    emissions_kmer_getMatchProb);             // match prob fcn
 
         stList *alignedPairs = getAlignedPairs(sM, sX, sY, lX2, lY2, p,
-                                               sequence_getKmer, getBlastPairsForPairwiseAlignmentParameters,
+                                               sequence_getKmer, sequence_getKmer,
+                                               getBlastPairsForPairwiseAlignmentParameters,
                                                1, 1);
 
         // TODO figure out how to deal with this
@@ -1343,7 +1347,7 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_dpDiagonal);
     SUITE_ADD_TEST(suite, test_getSubSequence);
     SUITE_ADD_TEST(suite, test_dpMatrix);
-    //SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
     //SUITE_ADD_TEST(suite, test_getSplitPoints);
     //SUITE_ADD_TEST(suite, test_getBlastPairs);
     //SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);

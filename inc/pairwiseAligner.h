@@ -75,8 +75,10 @@ void pairwiseAlignmentBandingParameters_destruct(PairwiseAlignmentParameters *p)
 /*
  * Gets the set of posterior match probabilities under a simple HMM model of alignment for two DNA sequences.
  */
-stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,
-                        void *(*getFcn)(void *, int64_t),
+stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY,
+                        PairwiseAlignmentParameters *p,
+                        void *(*getXFcn)(void *, int64_t),
+                        void *(*getYFcn)(void *, int64_t),
                         stList *(*getAnchorPairFcn)(void *, void *, PairwiseAlignmentParameters *),
                         bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 

@@ -738,9 +738,8 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
                 if (posteriorProbability > 1.0) {
                     posteriorProbability = 1.0;
                 }
-                st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld (%s), Y: %lld (%f)\n", posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
+                //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld (%s), Y: %lld (%f)\n", posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
                 posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
-                //st_uglyf("Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%f)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
             }
             if (posteriorProbability <= p->threshold) {
@@ -1407,19 +1406,19 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM,
 
     return alignedPairs;
 }
-// Make cY a NanoporeRead that way I can access the parts I need.
-// OR... Can destruct this function for using Nanopore Reads, ie. Run getBlastPairsForPairwise.. then run
-// getAlignedPairsUsingAnchors seperately, later patch these two into one function
-stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,
-                        void *(*getFcn)(void *, int64_t),
+
+stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY,
+                        PairwiseAlignmentParameters *p,
+                        void *(*getXFcn)(void *, int64_t),
+                        void *(*getYFcn)(void *, int64_t),
                         stList *(*getAnchorPairFcn)(void *, void *, PairwiseAlignmentParameters *),
                         bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
 
     //stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(cX, cY, p);
     stList *anchorPairs = getAnchorPairFcn(cX, cY, p);
 
-    Sequence *SsX = sequence_sequenceConstruct(lX, cX, getFcn);
-    Sequence *SsY = sequence_sequenceConstruct(lY, cY, getFcn);
+    Sequence *SsX = sequence_sequenceConstruct(lX, cX, getXFcn);
+    Sequence *SsY = sequence_sequenceConstruct(lY, cY, getYFcn);
 
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, SsX, SsY,
                                                        anchorPairs, p, alignmentHasRaggedLeftEnd,
@@ -1432,15 +1431,10 @@ stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_
 
 stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY,
                                       PairwiseAlignmentParameters *p,
-                                      //Sequence *(SeqXConstructorFcn)(int64_t, void *, void *(*)),
-                                      //Sequence *(SeqYConstructorFcn)(int64_t, void *, void *(*)),
-                                      //void *(getXFcn), void *(getYFcn),
                                       void *(*getXFcn)(void *, int64_t),
                                       void *(*getYFcn)(void *, int64_t),
                                       bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
     // make sequence objects
-    //Sequence *SsX = SeqXConstructorFcn(lX, cX, getXFcn);
-    //Sequence *SsY = SeqYConstructorFcn(lY, cY, getYFcn);
     Sequence *ScX = sequence_sequenceConstruct(lX, cX, getXFcn);
     Sequence *ScY = sequence_sequenceConstruct(lY, cY, getYFcn);
 

@@ -1,5 +1,7 @@
 #ifndef NANOPORE
 #define NANOPORE
+#include "sonLibTypes.h"
+
 
 typedef struct _nanoporeReadAdjustmentParameters {
     double scale;
@@ -26,5 +28,7 @@ typedef struct _nanoporeRead {
 } NanoporeRead;
 
 NanoporeRead *loadNanoporeReadFromFile(const char *nanoporeReadFile);
+
+void remapAnchorPairs(stList *blastPairs, int64_t *eventMap);
 
 #endif
