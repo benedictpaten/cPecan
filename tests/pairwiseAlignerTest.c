@@ -570,7 +570,6 @@ stList *getRandomAnchorPairs(int64_t lX, int64_t lY) {
         }
         assert(x >= 0 && x < lX);
         assert(y >= 0 && y < lY);
-        st_uglyf("about to append x:%lld - y:%lld to anchorPairs\n", x, y);
         stList_append(anchorPairs, stIntTuple_construct2(x, y));
     }
     return anchorPairs;
@@ -605,9 +604,7 @@ static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, 
 }
 
 static void checkAlignedPairs_kmer(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY) {
-    /*
-     * why is this here?
-     */
+
     st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
     stSortedSet *pairs = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
                                                 (void (*)(void *)) stIntTuple_destruct
@@ -1346,7 +1343,7 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_dpDiagonal);
     SUITE_ADD_TEST(suite, test_getSubSequence);
     SUITE_ADD_TEST(suite, test_dpMatrix);
-    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
     //SUITE_ADD_TEST(suite, test_getSplitPoints);
     //SUITE_ADD_TEST(suite, test_getBlastPairs);
     //SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);

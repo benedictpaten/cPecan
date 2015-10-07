@@ -726,6 +726,7 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
                 if (posteriorProbability > 1.0) {
                     posteriorProbability = 1.0;
                 }
+                st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld (%s), Y: %lld (%f)\n", posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
                 posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
                 //st_uglyf("Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%f)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
@@ -1273,9 +1274,6 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
                                         const Sequence*, double,
                                         PairwiseAlignmentParameters *, void *),
         void (*coordinateCorrectionFn)(), void *extraArgs) {
-    /*
-     * TODO pretty major changes need to happen here
-     */
 
     //int64_t lX = strlen(SsX->repr); // so here you want the total number of elements
     //int64_t lY = strlen(SsY->repr);
@@ -1399,7 +1397,6 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM,
     return alignedPairs;
 }
 // Make cY a NanoporeRead that way I can access the parts I need.
-// TODO might need to make a new version of this function that used NanoporeReads? Check out line 24-29 of log
 stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,
                         void *(*getFcn)(void *, int64_t),
                         stList *(*getAnchorPairFcn)(void *, void *, PairwiseAlignmentParameters *),
@@ -1419,6 +1416,19 @@ stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_
     stList_destruct(anchorPairs);
     return alignedPairs;
 }
+
+stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY,
+                                      PairwiseAlignmentParameters *p,
+                                      Sequence *(SeqXConstructorFcn)(int64_t, void *, void *(*)),
+                                      Sequence *(SeqYConstructorFcn)(int64_t, void *, void *(*)),
+                                      void *(getXFcn)(void *, int64_t),
+                                      void *(getYFcn)(void *, int64_t),
+                                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
+    // make sequence objects
+
+    // make matrices and bands
+}
+
 
 void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                  Sequence *SsX, Sequence *SsY,

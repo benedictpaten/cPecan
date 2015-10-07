@@ -344,7 +344,7 @@ double emissions_signal_getlogGaussPDFMatchProb(const double *eventModel, void *
     double a = (eventMean - modelMean) / modelStdDev;
     return log_inv_sqrt_2pi - log_modelSD + (-0.5f * a * a);
 }
-
+// Might want to move this function somewhere else
 void emissions_signal_scaleModel(StateMachine *sM,
                                  double scale, double shift, double var,
                                  double scale_sd, double var_sd) {
