@@ -205,7 +205,6 @@ static void test_scaleModel(CuTest *testCase) {
 
 }
 
-
 static void test_signal_strandAlignmentNoBanding(CuTest *testCase) {
     /*
      * test strand event alignment to it's 2D read
@@ -220,12 +219,12 @@ static void test_signal_strandAlignmentNoBanding(CuTest *testCase) {
 
     // make Sequence objects
     // 2D read sequence
-    int64_t lX = correctSeqLength(npRead->readLength, event);
-    Sequence *twoDreadSeq = sequence_sequenceConstruct(lX, npRead->twoDread, sequence_getKmer);
+    //int64_t lX = correctSeqLength(npRead->readLength, event);
+    //Sequence *twoDreadSeq = sequence_sequenceConstruct(lX, npRead->twoDread, sequence_getKmer);
 
     // reference nucleotide sequence
-    //int64_t lX = correctSeqLength(strlen(ZymoReferenceSeq), event);
-    //Sequence *twoDreadSeq = sequence_sequenceConstruct(lX, ZymoReferenceSeq, sequence_getKmer);
+    int64_t lX = correctSeqLength(strlen(ZymoReferenceSeq), event);
+    Sequence *twoDreadSeq = sequence_sequenceConstruct(lX, ZymoReferenceSeq, sequence_getKmer);
 
     // event sequence
     int64_t lY = npRead->nbTemplateEvents;
@@ -239,7 +238,7 @@ static void test_signal_strandAlignmentNoBanding(CuTest *testCase) {
     StateMachine *sM = getSignalStateMachine3(modelFile, sMfs);
     emissions_signal_scaleModel(sM, npRead->templateParams.scale, npRead->templateParams.shift,
                                 npRead->templateParams.var, npRead->templateParams.scale_sd,
-                                npRead->templateParams.var_sd);
+                                npRead->templateParams.var_sd); // clunky
 
     // matrix and bands
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
@@ -308,6 +307,35 @@ static void test_signal_strandAlignmentNoBanding(CuTest *testCase) {
     //}
 }
 
+static void test_signal_strandAlignmentNoBanding2(CuTest *testCase) {
+    char *ZymoReference = stString_print("../../cPecan/tests/ZymoRef.txt");
+    FILE *fH = fopen(ZymoReference, "r");
+    char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
+
+    // load NanoporeRead
+    char *npReadFile = stString_print("../../cPecan/tests/ZymoC_file1.npRead");
+    NanoporeRead *npRead = loadNanoporeReadFromFile(npReadFile);
+
+    int64_t lX = correctSeqLength(strlen(ZymoReferenceSeq), event);
+    int64_t lY = npRead->nbTemplateEvents;
+    
+    // load stateMachine and model
+    char *modelFile = stString_print("../../cPecan/models/template.eTable.model");
+    StateMachineFunctions *sMfs = stateMachineFunctions_construct(emissions_signal_getKmerGapProb,
+                                                                  emissions_signal_getEventGapProb,
+                                                                  emissions_signal_getlogGaussPDFMatchProb);
+    StateMachine *sM = getSignalStateMachine3(modelFile, sMfs);
+    emissions_signal_scaleModel(sM, npRead->templateParams.scale, npRead->templateParams.shift,
+                                npRead->templateParams.var, npRead->templateParams.scale_sd,
+                                npRead->templateParams.var_sd); // clunky
+
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+    p->threshold = 0.4;
+
+    stList *alignedPairs = getAlignedPairsWithoutBanding(sM, ZymoReferenceSeq, npRead->templateEvents, lX, lY, p,
+                                                         sequence_getKmer, sequence_getEvent, 0, 0);
+    st_uglyf("No. aligned pairs: %lld\n", stList_length(alignedPairs));
+}
 
 CuSuite *signalPairwiseTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
@@ -315,5 +343,6 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_signal_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_scaleModel);
     SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding);
+    SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding2);
     return suite;
 }

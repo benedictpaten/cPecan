@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <stdint.h>
+#include "nanopore.h"
 #include "sonLib.h"
 #include "bioioC.h"
 #include "pairwiseAlignment.h"
@@ -272,13 +273,24 @@ Sequence *sequence_sequenceConstruct(int64_t length, void *elements, void (*getF
      * length 5.  *elements is a pointer to the char array, typically.  The
      * SequenceType is 0-nucleotide, 1-kmer, 2-event
      */
-    Sequence* self = malloc(sizeof(Sequence));
-    // correct the sequence length for kmers/events
+    Sequence *self = malloc(sizeof(Sequence));
+
     self->length = length;
     self->elements = elements;
     self->get = getFcn;
     return self;
 }
+/* half baked
+Sequence **sequence_sequenceConstructFromNanoporeRead(int64_t length, void *elements, void (*getFcn)) {
+    NanoporeRead *npRead = (NanoporeRead *) elements;
+    Sequence *template = sequence_sequenceConstruct(npRead->nbTemplateEvents, npRead->templateEvents,
+                                                    getFcn);
+    Sequence *complement = sequence_sequenceConstruct(npRead->nbComplementEvents, npRead->complementEvents,
+                                                      getFcn);
+    void *templateAndComplement[2] = { template, complement };
+    return templateAndComplement;
+}
+*/
 
 Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength, void (*getFcn)) {
     /*
@@ -869,7 +881,6 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
                         }
                         totalProbability = newTotalProbability;
                     }
-
                     diagonalPosteriorProbFn(sM, diagonal_getXay(diagonal2),
                                             forwardDpMatrix, backwardDpMatrix,
                                             sX, sY,
@@ -1397,6 +1408,8 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM,
     return alignedPairs;
 }
 // Make cY a NanoporeRead that way I can access the parts I need.
+// OR... Can destruct this function for using Nanopore Reads, ie. Run getBlastPairsForPairwise.. then run
+// getAlignedPairsUsingAnchors seperately, later patch these two into one function
 stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,
                         void *(*getFcn)(void *, int64_t),
                         stList *(*getAnchorPairFcn)(void *, void *, PairwiseAlignmentParameters *),
@@ -1419,14 +1432,57 @@ stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_
 
 stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY,
                                       PairwiseAlignmentParameters *p,
-                                      Sequence *(SeqXConstructorFcn)(int64_t, void *, void *(*)),
-                                      Sequence *(SeqYConstructorFcn)(int64_t, void *, void *(*)),
-                                      void *(getXFcn)(void *, int64_t),
-                                      void *(getYFcn)(void *, int64_t),
+                                      //Sequence *(SeqXConstructorFcn)(int64_t, void *, void *(*)),
+                                      //Sequence *(SeqYConstructorFcn)(int64_t, void *, void *(*)),
+                                      //void *(getXFcn), void *(getYFcn),
+                                      void *(*getXFcn)(void *, int64_t),
+                                      void *(*getYFcn)(void *, int64_t),
                                       bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
     // make sequence objects
+    //Sequence *SsX = SeqXConstructorFcn(lX, cX, getXFcn);
+    //Sequence *SsY = SeqYConstructorFcn(lY, cY, getYFcn);
+    Sequence *ScX = sequence_sequenceConstruct(lX, cX, getXFcn);
+    Sequence *ScY = sequence_sequenceConstruct(lY, cY, getYFcn);
 
     // make matrices and bands
+    int64_t diagonalNumber = ScX->length + ScY->length;
+    DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
+    DpMatrix *backwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
+    stList *emptyList = stList_construct(); // place holder for band_construct
+    Band *band = band_construct(emptyList, ScX->length, ScY->length, 2); // why 2?
+    BandIterator *bandIt = bandIterator_construct(band);
+
+    for (int64_t i = 0; i <= diagonalNumber; i++) {
+        Diagonal d = bandIterator_getNext(bandIt);
+        dpDiagonal_zeroValues(dpMatrix_createDiagonal(backwardDpMatrix, d));
+        dpDiagonal_zeroValues(dpMatrix_createDiagonal(forwardDpMatrix, d));
+    }
+
+    dpDiagonal_initialiseValues(dpMatrix_getDiagonal(forwardDpMatrix, 0), sM,
+                                alignmentHasRaggedLeftEnd ? sM->raggedStartStateProb : sM->startStateProb);
+    dpDiagonal_initialiseValues(dpMatrix_getDiagonal(backwardDpMatrix, diagonalNumber), sM,
+                                alignmentHasRaggedRightEnd ? sM->raggedEndStateProb : sM->endStateProb);
+
+    // perform forward algorithm
+    for (int64_t i = 0; i <= diagonalNumber; i++) {
+        diagonalCalculationForward(sM, i, forwardDpMatrix, ScX, ScY);
+    }
+    // perform backward algorithm
+    for (int64_t i = diagonalNumber; i > 0; i--) {
+        diagonalCalculationBackward(sM, i, backwardDpMatrix, ScX, ScY);
+    }
+    // calculate total probability, make a place for the aligned pairs to go then run
+    // diagoinalCalculationPosteriorMatchProbs
+    double totalProbability = diagonalCalculationTotalProbability(sM, diagonalNumber, forwardDpMatrix,
+                                                                  backwardDpMatrix, ScX, ScY);
+    st_uglyf("total probability: %f\n", totalProbability);
+    stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
+    void *extraArgs[1] = { alignedPairs };
+    for (int64_t i = 0; i <= diagonalNumber; i++) {
+        diagonalCalculationPosteriorMatchProbs(sM, i, forwardDpMatrix, backwardDpMatrix,
+                                               ScX, ScY, totalProbability, p, extraArgs);
+    }
+    return alignedPairs;
 }
 
 

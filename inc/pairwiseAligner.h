@@ -80,6 +80,15 @@ stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_
                         stList *(*getAnchorPairFcn)(void *, void *, PairwiseAlignmentParameters *),
                         bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
+stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY,
+                                      PairwiseAlignmentParameters *p,
+        //Sequence *(SeqXConstructorFcn)(int64_t, void *, void *(*)),
+        //Sequence *(SeqYConstructorFcn)(int64_t, void *, void *(*)),
+        //void *(getXFcn), void *(getYFcn),
+                                      void *(*getXFcn)(void *, int64_t),
+                                      void *(*getYFcn)(void *, int64_t),
+                                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+
 stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignment *pA, int64_t trim);
 
 stList *getAlignedPairsUsingAnchors(StateMachine *sM, Sequence *SsX, Sequence *SsY, //SequenceType t,
