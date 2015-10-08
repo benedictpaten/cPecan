@@ -205,111 +205,9 @@ static void test_scaleModel(CuTest *testCase) {
 
 }
 
-static void test_signal_strandAlignmentNoBanding(CuTest *testCase) {
-    /*
-     * test strand event alignment to it's 2D read
-     */
-    char *ZymoReference = stString_print("../../cPecan/tests/ZymoRef.txt");
-    FILE *fH = fopen(ZymoReference, "r");
-    char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
-
-    // load NanoporeRead
-    char *npReadFile = stString_print("../../cPecan/tests/ZymoC_file1.npRead");
-    NanoporeRead *npRead = loadNanoporeReadFromFile(npReadFile);
-
-    // make Sequence objects
-    // 2D read sequence
-    //int64_t lX = correctSeqLength(npRead->readLength, event);
-    //Sequence *twoDreadSeq = sequence_sequenceConstruct(lX, npRead->twoDread, sequence_getKmer);
-
-    // reference nucleotide sequence
-    int64_t lX = correctSeqLength(strlen(ZymoReferenceSeq), event);
-    Sequence *twoDreadSeq = sequence_sequenceConstruct(lX, ZymoReferenceSeq, sequence_getKmer);
-
-    // event sequence
-    int64_t lY = npRead->nbTemplateEvents;
-    Sequence *templateEventSeq = sequence_sequenceConstruct(lY, npRead->templateEvents, sequence_getEvent);
-
-    // load stateMachine and model
-    char *modelFile = stString_print("../../cPecan/models/template.eTable.model");
-    StateMachineFunctions *sMfs = stateMachineFunctions_construct(emissions_signal_getKmerGapProb,
-                                                                  emissions_signal_getEventGapProb,
-                                                                  emissions_signal_getlogGaussPDFMatchProb);
-    StateMachine *sM = getSignalStateMachine3(modelFile, sMfs);
-    emissions_signal_scaleModel(sM, npRead->templateParams.scale, npRead->templateParams.shift,
-                                npRead->templateParams.var, npRead->templateParams.scale_sd,
-                                npRead->templateParams.var_sd); // clunky
-
-    // matrix and bands
-    DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
-    DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
-    stList *anchorPairs = stList_construct();
-    Band *band = band_construct(anchorPairs, twoDreadSeq->length, templateEventSeq->length, 2);
-    BandIterator *bandIt = bandIterator_construct(band);
-
-    // Ini matrices
-    // Initialize Matrices
-    for (int64_t i = 0; i <= lX + lY; i++) {
-        Diagonal d = bandIterator_getNext(bandIt);
-        //initialisation
-        dpDiagonal_zeroValues(dpMatrix_createDiagonal(dpMatrixBackward, d));
-        dpDiagonal_zeroValues(dpMatrix_createDiagonal(dpMatrixForward, d));
-    }
-    dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixForward, 0), sM, sM->startStateProb);
-    dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixBackward, lX + lY), sM, sM->endStateProb);
-
-    //Forward algorithm
-    for (int64_t i = 1; i <= lX + lY; i++) {
-        //Do the forward calculation
-        diagonalCalculationForward(sM, i, dpMatrixForward, twoDreadSeq, templateEventSeq);
-    }
-    //Backward algorithm
-    for (int64_t i = lX + lY; i > 0; i--) {
-        //Do the backward calculation
-        diagonalCalculationBackward(sM, i, dpMatrixBackward, twoDreadSeq, templateEventSeq);
-    }
-
-    //Calculate total probabilities
-    double totalProbForward = cell_dotProduct2(
-            dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY), sM, sM->endStateProb);
-    double totalProbBackward = cell_dotProduct2(
-            dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
-    st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
-    st_uglyf("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
-
-    // Test the posterior probabilities along the diagonals of the matrix.
-    for (int64_t i = 0; i <= lX + lY; i++) {
-        double totalDiagonalProb = diagonalCalculationTotalProbability(sM, i,
-                                                                       dpMatrixForward,
-                                                                       dpMatrixBackward,
-                                                                       twoDreadSeq, templateEventSeq);
-        //Check the forward and back probabilities are about equal
-        CuAssertDblEquals(testCase, totalProbForward, totalDiagonalProb, 0.02);
-    }
-
-    // Now do the posterior probabilities, get aligned pairs with posterior match probs above threshold
-    stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
-    void *extraArgs[1] = { alignedPairs };
-    // Perform alignment
-    for (int64_t i = 1; i <= lX + lY; i++) {
-        PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-        p->threshold = 0.4;
-        diagonalCalculationPosteriorMatchProbs(sM, i, dpMatrixForward, dpMatrixBackward, twoDreadSeq, templateEventSeq,
-                                               totalProbForward, p, extraArgs);
-        pairwiseAlignmentBandingParameters_destruct(p);
-    }
-    st_uglyf("No. aligned pairs: %lld\n", stList_length(alignedPairs));
-    //for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
-    //    stIntTuple *pair = stList_get(alignedPairs, i);
-    //    int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
-    //    st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
-    //    st_uglyf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
-    //}
-}
-
 static stList *compareAlignedPairs(stList *pairs1, stList *pairs2) {
     /*
-     * Selects the aligned pairs contained in anchor pairs. Taken from cPecanRealign scoreAnchorPairs
+     * doesn't work, need to remove probs
      */
     stSortedSet *sortedSet1 = stList_getSortedSet(pairs1, (int (*)(const void *, const void *))stIntTuple_cmpFn);
     stSortedSet *sortedSet2 = stList_getSortedSet(pairs2, (int (*)(const void *, const void *))stIntTuple_cmpFn);
@@ -369,25 +267,30 @@ static void test_signal_compareAlignedPairs(CuTest *testCase) {
     int64_t clY = npRead->nbComplementEvents;
 
     // load stateMachine and model
-    char *modelFile = stString_print("../../cPecan/models/template.eTable.model");
+    char *templateModelFile = stString_print("../../cPecan/models/template.eTable.model");
+    char *complementModelFile = stString_print("../../cPecan/models/complement.eTable.model");
     StateMachineFunctions *sMfs = stateMachineFunctions_construct(emissions_signal_getKmerGapProb,
                                                                   emissions_signal_getEventGapProb,
                                                                   emissions_signal_getlogGaussPDFMatchProb);
-    StateMachine *sM = getSignalStateMachine3(modelFile, sMfs);
-    emissions_signal_scaleModel(sM, npRead->templateParams.scale, npRead->templateParams.shift,
+    StateMachine *sMt = getSignalStateMachine3(templateModelFile, sMfs);
+    StateMachine *sMc = getSignalStateMachine3(complementModelFile, sMfs);
+    emissions_signal_scaleModel(sMt, npRead->templateParams.scale, npRead->templateParams.shift,
                                 npRead->templateParams.var, npRead->templateParams.scale_sd,
-                                npRead->templateParams.var_sd); // clunky
+                                npRead->templateParams.var_sd); //// clunky
+    emissions_signal_scaleModel(sMc, npRead->complementParams.scale, npRead->complementParams.shift,
+                                npRead->complementParams.var, npRead->complementParams.scale_sd,
+                                npRead->complementParams.var_sd); //// clunky
 
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-    p->threshold = 0.4;
+    p->threshold = 0.2;
 
-    stList *alignedPairs = getAlignedPairsWithoutBanding(sM, ZymoReferenceSeq, npRead->templateEvents, lX, lY, p,
+    stList *alignedPairs = getAlignedPairsWithoutBanding(sMt, ZymoReferenceSeq, npRead->templateEvents, lX, lY, p,
                                                          sequence_getKmer, sequence_getEvent, 0, 0);
 
-    stList *alignedPairs2 = getAlignedPairsWithoutBanding(sM, ZymoReferenceSeq, npRead->templateEvents, lX, lY, p,
+    stList *alignedPairs2 = getAlignedPairsWithoutBanding(sMt, ZymoReferenceSeq, npRead->templateEvents, lX, lY, p,
                                                           sequence_getKmer, sequence_getEvent, 0, 0);
 
-    stList *rc_alignedPairs = getAlignedPairsWithoutBanding(sM, RC_ZymoReferenceSeq, npRead->complementEvents,
+    stList *rc_alignedPairs = getAlignedPairsWithoutBanding(sMc, RC_ZymoReferenceSeq, npRead->complementEvents,
                                                             clX, clY, p,
                                                             sequence_getKmer, sequence_getEvent, 0, 0);
 
@@ -431,12 +334,43 @@ static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, 
     stSortedSet_destruct(pairs);
 }
 
+static stList *scoreAnchorPairs(stList *anchorPairs, stList *alignedPairs) {
+    /*
+     * Selects the aligned pairs contained in anchor pairs.
+     */
+    stSortedSet *anchorPairsSet = stList_getSortedSet(anchorPairs, (int (*)(const void *, const void *))stIntTuple_cmpFn);
+    assert(stList_length(anchorPairs) == stSortedSet_size(anchorPairsSet));
+    stList *scoredAnchorPairs = stList_construct3(0, (void (*)(void *))stIntTuple_destruct);
+
+    for(int64_t i=0; i<stList_length(alignedPairs); i++) {
+        stIntTuple *aPair = stList_get(alignedPairs, i);
+        stIntTuple *j = stIntTuple_construct2(stIntTuple_get(aPair, 1), stIntTuple_get(aPair, 2));
+        if(stSortedSet_search(anchorPairsSet, j) != NULL) {
+            stList_append(scoredAnchorPairs, stIntTuple_construct3(stIntTuple_get(aPair, 0), stIntTuple_get(aPair, 1), stIntTuple_get(aPair, 2)));
+            stSortedSet_remove(anchorPairsSet, j);
+        }
+        stIntTuple_destruct(j);
+    }
+
+    //The following should not really be needed, and may be masking a bug/numerical precision issues
+    stSortedSetIterator *it = stSortedSet_getIterator(anchorPairsSet);
+    stIntTuple *pair;
+    while((pair = stSortedSet_getNext(it))) {
+        stList_append(scoredAnchorPairs, stIntTuple_construct3(0, stIntTuple_get(pair, 0), stIntTuple_get(pair, 1)));
+    }
+    stSortedSet_destructIterator(it);
+
+    stSortedSet_destruct(anchorPairsSet);
+    assert(stList_length(anchorPairs) == stList_length(scoredAnchorPairs));
+
+    return scoredAnchorPairs;
+}
+
 static void test_signal_getAlignedPairsWithBanding(CuTest *testCase) {
     // load up test stuff and make stateMachine
     char *ZymoReference = stString_print("../../cPecan/tests/ZymoRef.txt");
     FILE *fH = fopen(ZymoReference, "r");
     char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
-
     char *npReadFile = stString_print("../../cPecan/tests/ZymoC_file1.npRead");
     NanoporeRead *npRead = loadNanoporeReadFromFile(npReadFile);
 
@@ -471,9 +405,16 @@ static void test_signal_getAlignedPairsWithBanding(CuTest *testCase) {
 
     // do alignment
     stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p, 0, 0);
-
-    st_uglyf("got %lld alignedPairs", stList_length(alignedPairs));
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
+
+    // do alignment without banding
+    stList *alignedPairs2 = getAlignedPairsWithoutBanding(sMt, ZymoReferenceSeq, npRead->templateEvents, lX, lY, p,
+                                                          sequence_getKmer, sequence_getEvent, 0, 0);
+
+    stList *commonAlignedPairs = scoreAnchorPairs(alignedPairs, alignedPairs2); //TODO double check this
+    CuAssertIntEquals(testCase, stList_length(commonAlignedPairs), stList_length(alignedPairs));
+    st_uglyf("there are %lld aligned pairs in the banded alignment that are also in the non-banded one\n",
+             stList_length(commonAlignedPairs));
 }
 
 CuSuite *signalPairwiseTestSuite(void) {
@@ -481,7 +422,6 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_signal_cell);
     SUITE_ADD_TEST(suite, test_signal_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_scaleModel);
-    //SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding);
     SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding2);
     SUITE_ADD_TEST(suite, test_signal_compareAlignedPairs);
     SUITE_ADD_TEST(suite, test_signal_getAlignedPairsWithBanding);

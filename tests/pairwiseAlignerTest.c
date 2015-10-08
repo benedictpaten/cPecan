@@ -577,7 +577,6 @@ stList *getRandomAnchorPairs(int64_t lX, int64_t lY) {
 
 static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY) {
     st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
-    st_uglyf("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
     stSortedSet *pairs = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
             (void (*)(void *)) stIntTuple_destruct);
     for (int64_t i = 0; i < stList_length(blastPairs); i++) {
@@ -1336,8 +1335,7 @@ static void test_hmmDiscrete_EM_5State_symbols(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-    // older tests
-
+    /*
     SUITE_ADD_TEST(suite, test_diagonal);
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_logAdd);
@@ -1345,28 +1343,27 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     //SUITE_ADD_TEST(suite, test_getKmerIndex);
     SUITE_ADD_TEST(suite, test_cell);
     SUITE_ADD_TEST(suite, test_dpDiagonal);
-    SUITE_ADD_TEST(suite, test_getSubSequence);
+    //SUITE_ADD_TEST(suite, test_getSubSequence);
     SUITE_ADD_TEST(suite, test_dpMatrix);
     SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
-    //SUITE_ADD_TEST(suite, test_getSplitPoints);
+    SUITE_ADD_TEST(suite, test_getSplitPoints);
     //SUITE_ADD_TEST(suite, test_getBlastPairs);
     //SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
     //SUITE_ADD_TEST(suite, test_kmer_cell);
-    //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
+    SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
     //SUITE_ADD_TEST(suite, test_kmer_diagonalDPCalculations);
-    //SUITE_ADD_TEST(suite, test_getAlignedPairs);
-
+    SUITE_ADD_TEST(suite, test_getAlignedPairs);
     //SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
     //SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairs);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairsWithBanding);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairsWithRaggedEnds);
-    //SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_symbols);
+    SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_kmers);
-    //SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_symbols);
+    SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_kmers);
-    //SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
+    SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_kmers);
-
+    */
     return suite;
 }
