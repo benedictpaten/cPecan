@@ -173,17 +173,6 @@ static void test_getSubSequence(CuTest* testCase) {
     }
 }
 
-static void test_getKmerIndex(CuTest* testCase) {
-    char kmer2Set[25][3] = {"AA", "AC", "AG", "AT", "AN", "CA", "CC", "CG", "CT", "CN",
-                            "GA", "GC", "GG", "GT", "GN", "TA", "TC", "TG", "TT", "TN",
-                            "NA", "NC", "NG", "NT", "NN"};
-
-    for (int64_t i = 0; i < NUM_OF_KMERS; i++) {
-        int64_t kmer_index_result = emissions_getKmerIndex(kmer2Set[i]);
-        CuAssertIntEquals(testCase, kmer_index_result, i);
-    }
-}
-
 
 static void test_cell(CuTest *testCase) {
     /*
@@ -1335,12 +1324,11 @@ static void test_hmmDiscrete_EM_5State_symbols(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-    /*
+/*
     SUITE_ADD_TEST(suite, test_diagonal);
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_logAdd);
     SUITE_ADD_TEST(suite, test_sequenceConstruct);
-    //SUITE_ADD_TEST(suite, test_getKmerIndex);
     SUITE_ADD_TEST(suite, test_cell);
     SUITE_ADD_TEST(suite, test_dpDiagonal);
     //SUITE_ADD_TEST(suite, test_getSubSequence);
@@ -1353,8 +1341,8 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
     //SUITE_ADD_TEST(suite, test_kmer_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_getAlignedPairs);
-    //SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
-    //SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
+    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairs);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairsWithBanding);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairsWithRaggedEnds);
@@ -1364,6 +1352,6 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_kmers);
     SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_kmers);
-    */
+*/
     return suite;
 }

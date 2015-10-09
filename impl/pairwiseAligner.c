@@ -339,6 +339,7 @@ void *sequence_getKmer(void *elements, int64_t index) {
 }
 
 void *sequence_getEvent(void *elements, int64_t index) {
+    index = index * NB_EVENT_PARAMS;
     return index >= 0 ? &(((double *)elements)[index]) : NULL;
     //return &(((double *)elements)[index]);
 }
@@ -743,7 +744,7 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
             }
             if (posteriorProbability <= p->threshold) {
-                //st_uglyf("NOT Adding to alignedPairs! posteriorProb: %lld, X: %lld (%s), Y: %lld (%f)\n", (int64_t) posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
+                //st_uglyf("NOT Adding to alignedPairs! posteriorProb: %f, X: %lld (%s), Y: %lld (%f)\n", posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
             }
         }
         xmy += 2;
@@ -1469,7 +1470,6 @@ stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int6
     // diagoinalCalculationPosteriorMatchProbs
     double totalProbability = diagonalCalculationTotalProbability(sM, diagonalNumber, forwardDpMatrix,
                                                                   backwardDpMatrix, ScX, ScY);
-    st_uglyf("total probability: %f\n", totalProbability);
     stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
     void *extraArgs[1] = { alignedPairs };
     for (int64_t i = 0; i <= diagonalNumber; i++) {

@@ -5,7 +5,6 @@
 #include "pairwiseAligner.h"
 #include "nanopore.h"
 
-#define NB_EVENT_PARAMS 3
 
 NanoporeRead *nanoporeRead_construct(int64_t readLength, int64_t nbTemplateEvents, int64_t nbComplementEvents) {
     NanoporeRead *npRead = st_malloc(sizeof(NanoporeRead));

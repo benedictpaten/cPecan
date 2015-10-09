@@ -1,7 +1,7 @@
 #ifndef NANOPORE
 #define NANOPORE
 #include "sonLibTypes.h"
-
+#define NB_EVENT_PARAMS 3
 
 typedef struct _nanoporeReadAdjustmentParameters {
     double scale;

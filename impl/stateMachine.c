@@ -150,13 +150,11 @@ static int64_t intPow(int64_t base, int64_t exp) {
 
 int64_t emissions_getKmerIndex(void *kmer) {
     /*
-     * Returns the index for a kmer
+     * Returns the index for a kmer.
      */
     int64_t kmerLen = strlen(kmer);
-    assert(kmerLen == KMER_LENGTH);
-    //int64_t axisLength = 25; // for 2-mers
+    assert(kmerLen == KMER_LENGTH); // disable this check?
     int64_t axisLength = intPow(SYMBOL_NUMBER_NO_N, KMER_LENGTH);
-    //int64_t l = axisLength/5;
     int64_t l = axisLength / SYMBOL_NUMBER_NO_N;
     int64_t i = 0;
     int64_t x = 0;
@@ -208,11 +206,11 @@ double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, vo
 static inline void emissions_signal_initializeEmissionsMatrices(StateMachine *sM) {
     sM->EMISSION_GAP_X_PROBS = st_malloc(sM->parameterSetSize * sizeof(double));
     sM->EMISSION_GAP_Y_PROBS = st_malloc(sM->parameterSetSize * sizeof(double));
-    sM->EMISSION_MATCH_PROBS = st_malloc(sM->parameterSetSize * MODEL_PARAMS * sizeof(double));
+    sM->EMISSION_MATCH_PROBS = st_malloc(1 + (sM->parameterSetSize * MODEL_PARAMS) * sizeof(double));
 }
 
 static inline void emissions_signal_initMatchMatrixToZero(double *matchModel, int64_t parameterSetSize) {
-    memset(matchModel, 0, parameterSetSize * MODEL_PARAMS * sizeof(double));
+    memset(matchModel, 0, (1 + (parameterSetSize * MODEL_PARAMS)) * sizeof(double));
 }
 
 static inline void emissions_signal_initGapMatirxToZero(double *gapModel, int64_t parameterSetSize) {
@@ -228,13 +226,13 @@ void emissions_signal_initEmissionsToZero(StateMachine *sM) {
     // set match matrix to zeros
     emissions_signal_initMatchMatrixToZero(sM->EMISSION_MATCH_PROBS, sM->parameterSetSize);
 }
-
+/*
 double emissions_signal_getModelEntry(const double *model, void *kmer) {
     int64_t kmerIndex = emissions_getKmerIndex(kmer);
     int64_t tableIndex = kmerIndex * MODEL_PARAMS;
     return model[tableIndex];
 }
-
+*/
 static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFile) {
     /*
      *  the model file has the format:
@@ -250,11 +248,11 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
     char *string = stFile_getLineFromFile(fH);
     stList *tokens = stString_split(string);
     // check to make sure that the model will fit in the stateMachine
-    if (stList_length(tokens) != sM->parameterSetSize * MODEL_PARAMS) {
+    if (stList_length(tokens) != 1 + (sM->parameterSetSize * MODEL_PARAMS)) {
         st_errAbort("This stateMachine is not correct for signal model (match emissions)\n");
     }
     // load the model into the state machine emissions
-    for (int64_t i = 0; i < sM->parameterSetSize * MODEL_PARAMS; i++) {
+    for (int64_t i = 0; i < 1 + (sM->parameterSetSize * MODEL_PARAMS); i++) {
         int64_t j = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_MATCH_PROBS[i]));
         if (j != 1) {
             st_errAbort("emissions_signal_loadPoreModel: error loading pore model (match emissions)\n");
@@ -287,13 +285,13 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
     tokens = stString_split(string);
     // check for correctness
     if (stList_length(tokens) != sM->parameterSetSize) {
-        st_errAbort("This stateMachine is not correct for signal model (X gap emissions)\n");
+        st_errAbort("This stateMachine is not correct for signal model (Y gap emissions)\n");
     }
     // load Y Gap emissions into stateMachine
     for (int64_t i = 0; i < sM->parameterSetSize; i++) {
         int64_t j = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_GAP_Y_PROBS[i]));
         if (j != 1) {
-            st_errAbort("emissions_signal_loadPoreModel: error loading pore model (X Gap emissions)\n");
+            st_errAbort("emissions_signal_loadPoreModel: error loading pore model (Y Gap emissions)\n");
         }
     }
     // clean up Y Gap emissions line
@@ -302,27 +300,6 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
 
     // close file
     fclose(fH);
-}
-
-static inline double calc_zScore(double measurement, double u, double sigma) {
-    return (measurement - u) / sigma;
-}
-
-static double phi(double zScore) {
-    double p = (1.0 + erf(zScore/SQRT_TWO)) / 2.0;
-    return p;
-}
-
-double emissions_signal_getLogPhiMatchProb(const double *eventModel, void *kmer, void *event) {
-    /*
-     * evaluates the probability based on the PDF of a normal distribution
-     */
-    double eventMean = *(double *) event;
-    int64_t kmerIndex = emissions_getKmerIndex(kmer);
-    double modelMean = eventModel[kmerIndex*MODEL_PARAMS];
-    double modelStdDev = eventModel[(kmerIndex*MODEL_PARAMS)+1];
-    double ab_z = fabs(calc_zScore(eventMean, modelMean, modelStdDev));
-    return log(1 - phi(ab_z));
 }
 
 double emissions_signal_getKmerGapProb(const double *kmerGapModel, void *kmer) {
@@ -335,21 +312,31 @@ double emissions_signal_getEventGapProb(const double *eventGapModel, void *event
 }
 
 double emissions_signal_getlogGaussPDFMatchProb(const double *eventModel, void *kmer, void *event) {
-    double log_inv_sqrt_2pi = log(0.3989422804014327);
+    /*
+     * returns log of the probability density function for a Gaussian distribution
+     */
+    double log_inv_sqrt_2pi = log(0.3989422804014327); // constant
     double eventMean = *(double *) event;
     int64_t kmerIndex = emissions_getKmerIndex(kmer);
-    double modelMean = eventModel[kmerIndex * MODEL_PARAMS];
-    double modelStdDev = eventModel[(kmerIndex * MODEL_PARAMS) + 1];
+    // 1 + because the first element in the array is now the covariance of mean and fluctuation
+    double modelMean = eventModel[1 + (kmerIndex * MODEL_PARAMS)];
+    double modelStdDev = eventModel[1 + (kmerIndex * MODEL_PARAMS + 1)];
     double log_modelSD = log(modelStdDev);
     double a = (eventMean - modelMean) / modelStdDev;
     return log_inv_sqrt_2pi - log_modelSD + (-0.5f * a * a);
 }
-// Might want to move this function somewhere else
+
+emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, void *kmer, void *event) {
+    double eventMean = *(double *) event;
+    double eventNoise = *(double *) (event + sizeof(double)); // aaah pointers
+}
+
+// could make this just take a NanoporeReadAdjustmentParameters object?
 void emissions_signal_scaleModel(StateMachine *sM,
                                  double scale, double shift, double var,
                                  double scale_sd, double var_sd) {
     // model is arranged: level_mean, level_stdev, sd_mean, sd_stdev per kmer
-    for (int64_t i = 0; i < sM->parameterSetSize * MODEL_PARAMS; i += 4) {
+    for (int64_t i = 1; i < (sM->parameterSetSize * MODEL_PARAMS) + 1; i += 4) {
         sM->EMISSION_MATCH_PROBS[i] = sM->EMISSION_MATCH_PROBS[i] * scale + shift; // mean = mean * scale + shift
         sM->EMISSION_MATCH_PROBS[i+1] = sM->EMISSION_MATCH_PROBS[i+1] * var; // stdev = stdev * var
         sM->EMISSION_MATCH_PROBS[i+2] = sM->EMISSION_MATCH_PROBS[i+2] * scale_sd;

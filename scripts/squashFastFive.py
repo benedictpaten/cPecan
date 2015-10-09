@@ -36,6 +36,7 @@ if len(sys.argv) == 2:
     for i, model in enumerate([template_model, complement_model]):
         out_file = open(file_paths[i], 'w')
         nb_params = 0
+        print("0", end=' ', file=out_file) # placeholder for covariance parameter
         for kmer, level_mean, level_stdev, sd_mean, sd_stdev, weight in model:
             print(level_mean, level_stdev, sd_mean, sd_stdev, end=' ', file=out_file)
             nb_params += 1

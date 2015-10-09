@@ -203,8 +203,6 @@ double emissions_signal_getKmerGapProb(const double *kmerGapModel, void *kmer);
 
 double emissions_signal_getEventGapProb(const double *eventGapModel, void *event);
 
-double emissions_signal_getLogPhiMatchProb(const double *eventModel, void *event, void *kmer);
-
 double emissions_signal_getlogGaussPDFMatchProb(const double *eventModel, void *kmer, void *event);
 
 // signal
