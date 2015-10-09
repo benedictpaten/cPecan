@@ -40,7 +40,7 @@ def main():
         print(npRead.template_var_sd, end=' ', file=out_file)         # template var_sd
         print(npRead.complement_scale, end=' ', file=out_file)        # complement scale
         print(npRead.complement_shift, end=' ', file=out_file)        # complement shift
-        print(npRead.complement_var, end=' ', file=out_file)         # complement var
+        print(npRead.complement_var, end=' ', file=out_file)          # complement var
         print(npRead.complement_scale_sd, end=' ', file=out_file)     # complement scale_sd
         print(npRead.complement_var_sd, end='\n', file=out_file)      # complement var_sd
 

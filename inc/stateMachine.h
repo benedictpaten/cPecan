@@ -205,6 +205,8 @@ double emissions_signal_getEventGapProb(const double *eventGapModel, void *event
 
 double emissions_signal_getlogGaussPDFMatchProb(const double *eventModel, void *kmer, void *event);
 
+double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, void *kmer, void *event);
+
 // signal
 //void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFile);
 

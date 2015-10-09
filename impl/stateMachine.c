@@ -326,9 +326,29 @@ double emissions_signal_getlogGaussPDFMatchProb(const double *eventModel, void *
     return log_inv_sqrt_2pi - log_modelSD + (-0.5f * a * a);
 }
 
-emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, void *kmer, void *event) {
+double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, void *kmer, void *event) {
+    // model is arranged: level_mean, level_stdev, sd_mean, sd_stdev
+    // wrangle event data
     double eventMean = *(double *) event;
     double eventNoise = *(double *) (event + sizeof(double)); // aaah pointers
+    // correlation coeffecient is the 0th member of the event model
+    double p = eventModel[0];
+    double pSq = p * p;
+    // get model parameters
+    int64_t kmerIndex = emissions_getKmerIndex(kmer);
+    // 1 + because the first element in the array is now the covariance of mean and fluctuation
+    double levelMean = eventModel[1 + (kmerIndex * MODEL_PARAMS)];
+    double levelStdDev = eventModel[1 + (kmerIndex * MODEL_PARAMS + 1)];
+    double noiseMean = eventModel[1 + (kmerIndex * MODEL_PARAMS + 2)];
+    double noiseStdDev = eventModel[1 + (kmerIndex * MODEL_PARAMS + 3)];
+    // do calculation
+    double log_inv_2pi = -1.8378770664093453;
+    double expC = -1 / (2 * (1 - pSq));
+    double xu = (eventMean - levelMean) / levelStdDev;
+    double yu = (eventNoise - noiseMean) / noiseStdDev;
+    double a = expC * ((xu * xu) + (yu * yu) - (2 * p * xu * yu));
+    double c = log_inv_2pi - log(levelStdDev * noiseStdDev * sqrt(1 - pSq));
+    return c + a;
 }
 
 // could make this just take a NanoporeReadAdjustmentParameters object?
