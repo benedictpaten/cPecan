@@ -313,7 +313,6 @@ void *sequence_getBase(void *elements, int64_t index) {
      * Returns a single base from a sequence object. This will likely be depreciated in favor of
      * using only indexes for elements
      */
-    // TODO add check to make sure index is within bounds
     char* n;
     n = "n";
     return index >= 0 ? &(((char *)elements)[index]) : n;
@@ -331,11 +330,20 @@ void *sequence_getKmer(void *elements, int64_t index) {
     int64_t i = index;
     // change kmer length here, hardwired so far...
     int kmerLength = KMER_LENGTH;
-    char *k_i = malloc((kmerLength+1) * sizeof(char)); // TODO remove this malloc
+    char *k_i = malloc((kmerLength+1) * sizeof(char));
     for (int x = 0; x < kmerLength; x++) {
         k_i[x] = *((char *)elements+(i+x));
     }
     return index >= 0 ? k_i : n;
+}
+
+void *sequence_getKmer2(void *elements, int64_t index) {
+    /*
+     * get the kmer at index and the previous kmer
+     */
+    //index = index > 0 ? index-1 : index;
+    //return index < 0 ? NULL : &(((char *)elements)[index]); // TODO figure out what to do with index < 0
+    return index > 0 ? &(((char *)elements)[index-1]) : &(((char *)elements)[index]);
 }
 
 void *sequence_getEvent(void *elements, int64_t index) {
@@ -344,7 +352,7 @@ void *sequence_getEvent(void *elements, int64_t index) {
     //return &(((double *)elements)[index]);
 }
 
-int64_t correctSeqLength(int64_t length, SequenceType type) {
+int64_t sequence_correctSeqLength(int64_t length, SequenceType type) {
     /*
      * Correct the sequence length for non-nucleotide sequences, eg. kmers/events.
      */
@@ -728,10 +736,9 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
         int64_t y = diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy);
         if (x > 0 && y > 0) {
             double *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
-            //st_uglyf("cellForward->MatchState: %f \n", cellForward[sM->matchState]);
+            //st_uglyf("X: %lld Y: %lld cellForward->MatchState: %f ", x, y, cellForward[sM->matchState]);
             double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
-            //st_uglyf("cellBackward->MatchState: %f \n", cellBackward[sM->matchState]);
-
+            //st_uglyf("cellBackward->MatchState: %f ", cellBackward[sM->matchState]);
             double posteriorProbability = exp(
                     (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
             //st_uglyf("posteriorProb: %f\n", posteriorProbability);
@@ -930,7 +937,7 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
 ///////////////////////////////////
 ///////////////////////////////////
 
-static int sortByXPlusYCoordinate(const void *i, const void *j) {
+int sortByXPlusYCoordinate(const void *i, const void *j) {
     int64_t k = stIntTuple_get((stIntTuple *) i, 0) + stIntTuple_get((stIntTuple *) i, 1);
     int64_t l = stIntTuple_get((stIntTuple *) j, 0) + stIntTuple_get((stIntTuple *) j, 1);
     return k > l ? 1 : (k < l ? -1 : 0);
@@ -1285,10 +1292,6 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
                                         const Sequence*, double,
                                         PairwiseAlignmentParameters *, void *),
         void (*coordinateCorrectionFn)(), void *extraArgs) {
-
-    //int64_t lX = strlen(SsX->repr); // so here you want the total number of elements
-    //int64_t lY = strlen(SsY->repr);
-
     // you are going to cut the sequences into subSequences anyways, so not having the correct
     // number of elements in length, ie having it reflect the number of nucleotides might be ok?
     int64_t lX = SsX->length; // so here you want the total number of elements

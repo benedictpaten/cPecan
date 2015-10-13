@@ -10,8 +10,7 @@
 
 void emissions_kmer_setMatchProbsToDefaults(double *emissionMatchProbs) {
     /*
-     * This sets the match probabilities to default values for matching kmers
-     * TODO maybe use relloc here so that we can have one stateMachine object?
+     * This sets the match probabilities to default values for matching kmers, not really used anymore...
      */
 
     const double M=-2.1149196655034745; //log(0.12064298095701059);

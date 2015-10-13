@@ -43,8 +43,6 @@ typedef struct _hmm {
     double *transitions;
     double *emissions;
 
-    //void (*writeFcn)(struct hmm, FILE *fileHandle); TODO figure out how this is going to work
-
     void (*addToTransitionExpectationFcn)(Hmm *hmm, int64_t from, int64_t to, double p);
 
     void (*setTransitionFcn)(Hmm *hmm, int64_t from, int64_t to, double p);
@@ -64,10 +62,11 @@ typedef struct _hmm {
 };
 
 struct _stateMachine {
-    StateMachineType type; // TODO get rid of this
+    StateMachineType type;
     int64_t stateNumber;
     int64_t matchState;
     int64_t parameterSetSize;
+
     double *EMISSION_MATCH_PROBS; //Match emission probs
     double *EMISSION_GAP_X_PROBS; //Gap emission probs
     double *EMISSION_GAP_Y_PROBS; //Gap emission probs
@@ -79,18 +78,6 @@ struct _stateMachine {
     double (*raggedEndStateProb)(StateMachine *sM, int64_t state);
 
     double (*raggedStartStateProb)(StateMachine *sM, int64_t state);
-
-    //void (*setMatchDefaultsFcn)(double* emissionMatchProbs);
-    //void (*setXGapDefaultsFcn)(double* emissionXGapProbs);
-    //void (*setYGapDefaultsFcn)(double* emissionYGapProbs);
-
-    double (*getXGapProbFcn)(const double* emissionGapProbs, void *i);
-
-    double (*getYGapProbFcn)(const double* emissionGapProbs, void *i);
-
-    double (*getMatchProbFcn)(const double* emissionMatchProbs, void *x, void *y);
-
-    //void (*updateExpectationsFcn)(Hmm *hmmExpectations, int64_t from, int64_t to, double p);
 
     //Cells (states at a given coordinate)
     void (*cellCalculate)(StateMachine *sM, double *current, double *lower, double *middle, double *upper,
@@ -120,9 +107,10 @@ struct _StateMachine5 {
     double TRANSITION_GAP_LONG_OPEN_Y; //(1.0 - match - 2*gapOpenShort)/2 = 0.001821479941473
     double TRANSITION_GAP_LONG_EXTEND_Y; //0.99656342579062f;
     double TRANSITION_GAP_LONG_SWITCH_TO_Y; //0.0073673675173412815f;
-    //double *EMISSION_MATCH_PROBS; //Match emission probs
-    //double *EMISSION_GAP_X_PROBS; //Gap emission probs
-    //double *EMISSION_GAP_Y_PROBS; //Gap emission probs
+
+    double (*getXGapProbFcn)(const double *emissionXGapProbs, void *i);
+    double (*getYGapProbFcn)(const double *emissionYGapProbs, void *i);
+    double (*getMatchProbFcn)(const double *emissionMatchProbs, void *x, void *y);
 
 };
 
@@ -140,12 +128,27 @@ struct _StateMachine3 {
     double TRANSITION_GAP_EXTEND_Y; //0.7126062401851738f;
     double TRANSITION_GAP_SWITCH_TO_X; //0.0073673675173412815f;
     double TRANSITION_GAP_SWITCH_TO_Y; //0.0073673675173412815f;
-    //double *EMISSION_MATCH_PROBS; //Match emission probs
-    //double *EMISSION_GAP_X_PROBS; //Gap X emission probs
-    //double *EMISSION_GAP_Y_PROBS; //Gap Y emission probs
+
+    double (*getXGapProbFcn)(const double *emissionXGapProbs, void *i);
+    double (*getYGapProbFcn)(const double *emissionYGapProbs, void *i);
+    double (*getMatchProbFcn)(const double *emissionMatchProbs, void *x, void *y);
 };
 
-typedef struct _stateMachineFunctions {
+typedef struct _StateMachine3vanilla {
+    // for signal-level alignments, most basic model
+    StateMachine model;
+
+    double TRANSITION_M_TO_Y_NOT_X;
+    double DEFAULT_END_MATCH_PROB; //0.79015888282447311; // stride_prb
+    double DEFAULT_END_FROM_X_PROB; //0.19652425498269727; // skip_prob
+    double DEFAULT_END_FROM_Y_PROB; //0.013316862192910478; // stay_prob
+
+    double (*getKmerSkipProb)(StateMachine *sM, void *kmerList);
+    double (*getScaledMatchProbFcn)(const double *scaledEventModel, void *kmer, void *event);
+    double (*getMatchProbFcn)(const double *eventModel, void *kmer, void *event);
+} StateMachine3Vanilla;
+
+typedef struct _stateMachineFunctions { // TODO rename these to be more general
     double (*gapXProbFcn)(const double *, void *);
     double (*gapYProbFcn)(const double *, void *);
     double (*matchProbFcn)(const double *, void *, void *);
@@ -158,32 +161,28 @@ typedef struct _stateMachineFunctions {
 // StateMachine constructors
 StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSetSize,
                                       void (*setEmissionsDefaults)(StateMachine *sM),
-        //void (*setXGapDefaultsFcn)(double *),
-        //void (*setYGapDefaultsFcn)(double *),
-        //void (*setMatchDefaultsFcn)(double *),
                                       double (*gapXProbFcn)(const double *, void *),
                                       double (*gapYProbFcn)(const double *, void *),
                                       double (*matchProbFcn)(const double *, void *, void *));
 
 StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSetSize,
                                       void (*setEmissionsDefaults)(StateMachine *sM),
-        //void (*setXGapDefaultsFcn)(double *),
-        //void (*setYGapDefaultsFcn)(double *),
-        //void (*setMatchDefaultsFcn)(double *),
                                       double (*gapXProbFcn)(const double *, void *),
                                       double (*gapYProbFcn)(const double *, void *),
                                       double (*matchProbFcn)(const double *, void *, void *));
+
+StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t parameterSetSize,
+                                             void (*setEmissionsDefaults)(StateMachine *sM),
+                                             double (*xSkipProbFcn)(StateMachine *, void *),
+                                             double (*scaledMatchProbFcn)(const double *, void *, void *),
+                                             double (*matchProbFcn)(const double *, void *, void *));
 
 // indexing
 int64_t emissions_getKmerIndex(void *kmer);
 
 int64_t emissions_getBaseIndex(void *base);
 
-// defaults
-void emissions_symbol_setMatchProbsToDefaults(double *emissionMatchProbs);
-
-void emissions_symbol_setGapProbsToDefaults(double *emissionGapProbs);
-
+// emissions defaults
 void emissions_discrete_initEmissionsToZero(StateMachine *sM);
 
 void emissions_symbol_setEmissionsToDefaults(StateMachine *sM);
@@ -199,9 +198,7 @@ double emissions_kmer_getGapProb(const double *emissionGapProbs, void *kmer);
 
 double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, void *y);
 
-double emissions_signal_getKmerGapProb(const double *kmerGapModel, void *kmer);
-
-double emissions_signal_getEventGapProb(const double *eventGapModel, void *event);
+double emissions_signal_getKmerSkipProb(StateMachine *sM, void *kmers);
 
 double emissions_signal_getlogGaussPDFMatchProb(const double *eventModel, void *kmer, void *event);
 
@@ -215,7 +212,7 @@ double emissions_signal_getModelEntry(const double *model, void *kmer);
 void emissions_signal_scaleModel(StateMachine *sM, double scale, double shift, double var,
                                  double scale_sd, double var_sd);
 
-StateMachine *getSignalStateMachine3(const char *modelFile, StateMachineFunctions *sMfs);
+StateMachine *getSignalStateMachine3(const char *modelFile);
 
 // EM
 StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs);

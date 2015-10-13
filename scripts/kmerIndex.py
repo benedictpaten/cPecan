@@ -40,7 +40,7 @@ def getKmerIndex(kmer):
 kmers = []
 alphabet = 'ACGT'
 
-for kmer in product(alphabet, repeat=2): #change repeat for longer kmers
+for kmer in product(alphabet, repeat=6): #change repeat for longer kmers
     kmers.append(''.join(kmer))
 
 #print("[", end="")

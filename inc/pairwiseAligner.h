@@ -50,9 +50,11 @@ void *sequence_getBase(void *elements, int64_t index);
 
 void *sequence_getKmer(void *elements, int64_t index);
 
+void *sequence_getKmer2(void *elements, int64_t index);
+
 void *sequence_getEvent(void *elements, int64_t index);
 
-int64_t correctSeqLength(int64_t length, SequenceType type);
+int64_t sequence_correctSeqLength(int64_t length, SequenceType type);
 
 // Pairwise alignment
 typedef struct _pairwiseAlignmentBandingParameters {
@@ -250,6 +252,8 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
                                   void *extraArgs);
 
 //Blast pairs
+
+int sortByXPlusYCoordinate(const void *i, const void *j);
 
 stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatMask);
 

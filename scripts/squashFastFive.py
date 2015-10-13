@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-"""Super preliminary barebones way to extract useful bits of information from a
-fast5 nanopore file
+"""Keeping around for comparison of extracted nanopore models
 """
 
 from __future__ import print_function
@@ -46,3 +45,4 @@ if len(sys.argv) == 2:
         print("", end="\n", file=out_file)
         for _ in xrange(nb_params):
             print(stay_prob, end=' ', file=out_file)
+        print("", end="\n", file=out_file)

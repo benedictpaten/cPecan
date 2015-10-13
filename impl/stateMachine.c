@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include <assert.h>
 #include <stdint.h>
+#include "nanopore.h"
 #include "bioioC.h"
 #include "sonLib.h"
 #include "pairwiseAligner.h"
@@ -34,33 +35,6 @@ static inline void emissions_discrete_initializeEmissionsMatrices(StateMachine *
     sM->EMISSION_GAP_X_PROBS = st_malloc(sM->parameterSetSize*sizeof(double));
     sM->EMISSION_GAP_Y_PROBS = st_malloc(sM->parameterSetSize*sizeof(double));
     sM->EMISSION_MATCH_PROBS = st_malloc(sM->parameterSetSize*sM->parameterSetSize*sizeof(double));
-}
-
-void emissions_symbol_setMatchProbsToDefaults(double *emissionMatchProbs) {
-    /*
-     * This is used to set the emissions to reasonable values. For nucleotide/nucleotide alignment
-     */
-    const double EMISSION_MATCH=-2.1149196655034745; //log(0.12064298095701059);
-    const double EMISSION_TRANSVERSION=-4.5691014376830479; //log(0.010367271172731285);
-    const double EMISSION_TRANSITION=-3.9833860032220842; //log(0.01862247669752685);
-
-    //Symmetric matrix of transition probabilities.
-    const double i[SYMBOL_NUMBER_NO_N*SYMBOL_NUMBER_NO_N] = {
-            EMISSION_MATCH, EMISSION_TRANSVERSION, EMISSION_TRANSITION, EMISSION_TRANSVERSION,
-            EMISSION_TRANSVERSION, EMISSION_MATCH, EMISSION_TRANSVERSION, EMISSION_TRANSITION,
-            EMISSION_TRANSITION, EMISSION_TRANSVERSION, EMISSION_MATCH, EMISSION_TRANSVERSION,
-            EMISSION_TRANSVERSION, EMISSION_TRANSITION, EMISSION_TRANSVERSION, EMISSION_MATCH };
-
-    memcpy(emissionMatchProbs, i, sizeof(double)*SYMBOL_NUMBER_NO_N*SYMBOL_NUMBER_NO_N);
-}
-
-void emissions_symbol_setGapProbsToDefaults(double *emissionGapProbs) {
-    /*
-     * This is used to set the emissions to reasonable values.
-     */
-    const double EMISSION_GAP = -1.6094379124341003; //log(0.2)
-    const double i[4] = { EMISSION_GAP, EMISSION_GAP, EMISSION_GAP, EMISSION_GAP };
-    memcpy(emissionGapProbs, i, sizeof(double)*SYMBOL_NUMBER_NO_N);
 }
 
 void emissions_symbol_setEmissionsToDefaults(StateMachine *sM) {
@@ -152,8 +126,10 @@ int64_t emissions_getKmerIndex(void *kmer) {
     /*
      * Returns the index for a kmer.
      */
-    int64_t kmerLen = strlen(kmer);
-    assert(kmerLen == KMER_LENGTH); // disable this check?
+    int64_t kmerLen = strlen((char*) kmer);
+    if (kmerLen == 0) {
+        return NUM_OF_KMERS+1;
+    }
     int64_t axisLength = intPow(SYMBOL_NUMBER_NO_N, KMER_LENGTH);
     int64_t l = axisLength / SYMBOL_NUMBER_NO_N;
     int64_t i = 0;
@@ -200,12 +176,17 @@ double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, vo
     int64_t tableIndex = iX * NUM_OF_KMERS + iY;
     return emissionMatchProbs[tableIndex];
 }
-
-// functions for sigmal/kmer alignment //
+/////////////////////////////////////////
+// functions for signal/kmer alignment //
+/////////////////////////////////////////
 
 static inline void emissions_signal_initializeEmissionsMatrices(StateMachine *sM) {
-    sM->EMISSION_GAP_X_PROBS = st_malloc(sM->parameterSetSize * sizeof(double));
-    sM->EMISSION_GAP_Y_PROBS = st_malloc(sM->parameterSetSize * sizeof(double));
+    //sM->EMISSION_GAP_X_PROBS = st_malloc(sM->parameterSetSize * sizeof(double));
+    // changed to 30 for skip prob bins
+    sM->EMISSION_GAP_X_PROBS = st_malloc(30 * sizeof(double));
+    //sM->EMISSION_GAP_Y_PROBS = st_malloc(sM->parameterSetSize * sizeof(double));
+    // changed to scaled emissionModel
+    sM->EMISSION_GAP_Y_PROBS = st_malloc(1 + (sM->parameterSetSize * MODEL_PARAMS) * sizeof(double));
     sM->EMISSION_MATCH_PROBS = st_malloc(1 + (sM->parameterSetSize * MODEL_PARAMS) * sizeof(double));
 }
 
@@ -213,38 +194,48 @@ static inline void emissions_signal_initMatchMatrixToZero(double *matchModel, in
     memset(matchModel, 0, (1 + (parameterSetSize * MODEL_PARAMS)) * sizeof(double));
 }
 
-static inline void emissions_signal_initGapMatirxToZero(double *gapModel, int64_t parameterSetSize) {
-    memset(gapModel, 0, parameterSetSize * sizeof(double));
+static inline void emissions_signal_initKmerSkipTableToZero(double *skipModel, int64_t parameterSetSize) {
+    memset(skipModel, 0, parameterSetSize * sizeof(double));
+}
+
+static inline double emissions_getModelLevelMean(const double *eventModel, int64_t kmerIndex) {
+    // return 1 + i*MODEL PARAMS because the first element is the correlation parameter
+    return kmerIndex > NUM_OF_KMERS ? 0.0 : eventModel[1 + (kmerIndex * MODEL_PARAMS)];
+}
+
+static inline double emissions_getModelLevelSd(const double *eventModel, int64_t kmerIndex) {
+    return kmerIndex > NUM_OF_KMERS ? 0.0 : eventModel[1 + (kmerIndex * MODEL_PARAMS + 1)];
+}
+
+static inline double emissions_getModelFluctuationMean(const double *eventModel, int64_t kmerIndex) {
+    return kmerIndex > NUM_OF_KMERS ? 0.0 : eventModel[1 + (kmerIndex * MODEL_PARAMS + 2)];
+}
+
+static inline double emissions_getModelFluctuationSd(const double *eventModel, int64_t kmerIndex) {
+    return kmerIndex > NUM_OF_KMERS ? 0.0 : eventModel[1 + (kmerIndex * MODEL_PARAMS + 3)];
 }
 
 void emissions_signal_initEmissionsToZero(StateMachine *sM) {
     // initialize
     emissions_signal_initializeEmissionsMatrices(sM);
     // set gap matrices to zeros
-    emissions_signal_initGapMatirxToZero(sM->EMISSION_GAP_X_PROBS, sM->parameterSetSize);
-    emissions_signal_initGapMatirxToZero(sM->EMISSION_GAP_Y_PROBS, sM->parameterSetSize);
+    emissions_signal_initKmerSkipTableToZero(sM->EMISSION_GAP_X_PROBS, 30);
+    emissions_signal_initMatchMatrixToZero(sM->EMISSION_GAP_Y_PROBS, sM->parameterSetSize);
     // set match matrix to zeros
     emissions_signal_initMatchMatrixToZero(sM->EMISSION_MATCH_PROBS, sM->parameterSetSize);
 }
-/*
-double emissions_signal_getModelEntry(const double *model, void *kmer) {
-    int64_t kmerIndex = emissions_getKmerIndex(kmer);
-    int64_t tableIndex = kmerIndex * MODEL_PARAMS;
-    return model[tableIndex];
-}
-*/
+
 static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFile) {
     /*
      *  the model file has the format:
-     *  Match emissions: level_u \t level_sigma \t noise_u \t noise_sigma for each kmer
-     *  X Gap emissions: skip prob repeated by the number of kmers (x)
-     *  Y Gap emissions: stay prob repeated by the number of kmers (y)
+     *  line 1: [correlation coefficient] [level_mean] [level_sd] [noise_mean] [noise_sd] (.../kmer) \n
+     *  line 2: skip bins \n
+     *  line 3: [correlation coefficient] [level_mean] [level_sd, scaled] [noise_mean] [noise_sd] (.../kmer) \n
      */
-    // initialize matrices in stateMachine
-    //emissions_signal_initializeEmissionsMatrices(sM);
 
     FILE *fH = fopen(modelFile, "r");
-    // parse the match emissions line
+
+    // Line 1: parse the match emissions line
     char *string = stFile_getLineFromFile(fH);
     stList *tokens = stString_split(string);
     // check to make sure that the model will fit in the stateMachine
@@ -262,18 +253,18 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
     free(string);
     stList_destruct(tokens);
 
-    // parse X Gap emissions line
+    // Line 2: parse X Gap emissions line
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     // check for correctness
-    if (stList_length(tokens) != sM->parameterSetSize) {
-        st_errAbort("This stateMachine is not correct for signal model (X gap emissions)\n");
+    if (stList_length(tokens) != 30) {
+        st_errAbort("Did not get expected number of kmer skip bins, expected 30, got %lld\n", stList_length(tokens));
     }
     // load X Gap emissions into stateMachine
-    for (int64_t i = 0; i < sM->parameterSetSize; i++) {
+    for (int64_t i = 0; i < 30; i++) {
         int64_t j = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_GAP_X_PROBS[i]));
         if (j != 1) {
-            st_errAbort("emissions_signal_loadPoreModel: error loading pore model (X Gap emissions)\n");
+            st_errAbort("emissions_signal_loadPoreModel: error loading kmer skip bins\n");
         }
     }
     // clean up X Gap emissions line
@@ -283,18 +274,18 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
     // parse Y Gap emissions line
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
-    // check for correctness
-    if (stList_length(tokens) != sM->parameterSetSize) {
-        st_errAbort("This stateMachine is not correct for signal model (Y gap emissions)\n");
+    // check to make sure that the model will fit in the stateMachine
+    if (stList_length(tokens) != 1 + (sM->parameterSetSize * MODEL_PARAMS)) {
+        st_errAbort("This stateMachine is not correct for signal model (dupeEvent - Y emissions)\n");
     }
-    // load Y Gap emissions into stateMachine
-    for (int64_t i = 0; i < sM->parameterSetSize; i++) {
+    // load the model into the state machine emissions
+    for (int64_t i = 0; i < 1 + (sM->parameterSetSize * MODEL_PARAMS); i++) {
         int64_t j = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_GAP_Y_PROBS[i]));
         if (j != 1) {
-            st_errAbort("emissions_signal_loadPoreModel: error loading pore model (Y Gap emissions)\n");
+            st_errAbort("emissions_signal_loadPoreModel: error loading pore model (dupeEvent - Y emissions)\n");
         }
     }
-    // clean up Y Gap emissions line
+    // clean up match emissions line
     free(string);
     stList_destruct(tokens);
 
@@ -302,45 +293,99 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
     fclose(fH);
 }
 
-double emissions_signal_getKmerGapProb(const double *kmerGapModel, void *kmer) {
-    int64_t kmerIndex = emissions_getKmerIndex(kmer);
-    return kmerGapModel[kmerIndex];
-}
+double emissions_signal_getKmerSkipProb(StateMachine *sM, void *kmers) {
+    StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *) sM;
+    // make kmer_i-1
+    char *kmer_im1 = malloc((KMER_LENGTH) * sizeof(char));
+    for (int64_t x = 0; x < KMER_LENGTH; x++) {
+        kmer_im1[x] = *((char *)kmers+x);
+    }
+    kmer_im1[KMER_LENGTH] = '\0';
 
-double emissions_signal_getEventGapProb(const double *eventGapModel, void *event) {
-    return eventGapModel[0];
+    // make kmer_i
+    char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
+    for (int64_t x = 0; x < KMER_LENGTH; x++) {
+        kmer_i[x] = *((char *)kmers+(x+1));
+    }
+    kmer_i[KMER_LENGTH] = '\0';
+
+    // get indices
+    int64_t k_i= emissions_getKmerIndex(kmer_i);
+    int64_t k_im1 = emissions_getKmerIndex(kmer_im1);
+
+    // get the expected mean current for each one
+    double u_ki = emissions_getModelLevelMean(sM3v->model.EMISSION_MATCH_PROBS, k_i);
+    double u_kim1 = emissions_getModelLevelMean(sM3v->model.EMISSION_MATCH_PROBS, k_im1);
+
+    // find the difference
+    double d = fabs(u_ki - u_kim1);
+
+    // get the 'bin' for skip prob, clamp to the last bin
+    int64_t bin = (int64_t)(d / 0.5); // 0.5 pA bins right now
+    bin = bin >= 30 ? 29 : bin;
+
+    // for debugging
+    //double pSkip = sM3v->model.EMISSION_GAP_X_PROBS[bin];
+    //st_uglyf("SENTINAL - getKmerSkipProb; kmer_i: %s (index: %lld, model u=%f), kmer_im1: %s (index: %lld, model u=%f),\n d: %f, bin: %lld, pSkip: %f\n",
+    //         kmer_i, k_i, u_ki, kmer_im1, k_im1, u_kim1, d, bin, pSkip);
+
+    // clean up
+    free(kmer_im1);
+    free(kmer_i);
+    return sM3v->model.EMISSION_GAP_X_PROBS[bin];
 }
 
 double emissions_signal_getlogGaussPDFMatchProb(const double *eventModel, void *kmer, void *event) {
     /*
      * returns log of the probability density function for a Gaussian distribution
      */
-    double log_inv_sqrt_2pi = log(0.3989422804014327); // constant
+    // make temp kmer
+    char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
+    for (int64_t x = 0; x < KMER_LENGTH; x++) {
+        kmer_i[x] = *((char *)kmer+(x+1));
+    }
+    kmer_i[KMER_LENGTH] = '\0';
+
+    // get event mean, and kmer index
     double eventMean = *(double *) event;
-    int64_t kmerIndex = emissions_getKmerIndex(kmer);
-    // 1 + because the first element in the array is now the covariance of mean and fluctuation
-    double modelMean = eventModel[1 + (kmerIndex * MODEL_PARAMS)];
-    double modelStdDev = eventModel[1 + (kmerIndex * MODEL_PARAMS + 1)];
+    int64_t kmerIndex = emissions_getKmerIndex(kmer_i);
+    double log_inv_sqrt_2pi = log(0.3989422804014327); // constant
+    // 1 + because the first element in the array is the covariance of mean and fluctuation
+    //double modelMean = eventModel[1 + (kmerIndex * MODEL_PARAMS)];
+    double modelMean = emissions_getModelLevelMean(eventModel, kmerIndex);
+    //double modelStdDev = eventModel[1 + (kmerIndex * MODEL_PARAMS + 1)];
+    double modelStdDev = emissions_getModelLevelSd(eventModel, kmerIndex);
     double log_modelSD = log(modelStdDev);
     double a = (eventMean - modelMean) / modelStdDev;
+    // clean up
+    free(kmer_i);
+
+    /// / debugging
+    //double prob = log_inv_sqrt_2pi - log_modelSD + (-0.5f * a * a);
+    //st_uglyf("MATCHING--kmer:%s (index: %lld), event mean: %f, levelMean: %f, prob: %f\n", kmer_i, kmerIndex, eventMean, modelMean, prob);
+
     return log_inv_sqrt_2pi - log_modelSD + (-0.5f * a * a);
 }
 
 double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, void *kmer, void *event) {
-    // model is arranged: level_mean, level_stdev, sd_mean, sd_stdev
     // wrangle event data
     double eventMean = *(double *) event;
     double eventNoise = *(double *) (event + sizeof(double)); // aaah pointers
-    // correlation coeffecient is the 0th member of the event model
+    // correlation coefficient is the 0th member of the event model
     double p = eventModel[0];
     double pSq = p * p;
     // get model parameters
     int64_t kmerIndex = emissions_getKmerIndex(kmer);
-    // 1 + because the first element in the array is now the covariance of mean and fluctuation
-    double levelMean = eventModel[1 + (kmerIndex * MODEL_PARAMS)];
-    double levelStdDev = eventModel[1 + (kmerIndex * MODEL_PARAMS + 1)];
-    double noiseMean = eventModel[1 + (kmerIndex * MODEL_PARAMS + 2)];
-    double noiseStdDev = eventModel[1 + (kmerIndex * MODEL_PARAMS + 3)];
+
+    //double levelMean = eventModel[1 + (kmerIndex * MODEL_PARAMS)];
+    double levelMean = emissions_getModelLevelMean(eventModel, kmerIndex);
+    //double levelStdDev = eventModel[1 + (kmerIndex * MODEL_PARAMS + 1)];
+    double levelStdDev = emissions_getModelLevelSd(eventModel, kmerIndex);
+    //double noiseMean = eventModel[1 + (kmerIndex * MODEL_PARAMS + 2)];
+    double noiseMean = emissions_getModelFluctuationMean(eventModel, kmerIndex);
+    //double noiseStdDev = eventModel[1 + (kmerIndex * MODEL_PARAMS + 3)];
+    double noiseStdDev = emissions_getModelFluctuationSd(eventModel, kmerIndex);
+
     // do calculation
     double log_inv_2pi = -1.8378770664093453;
     double expC = -1 / (2 * (1 - pSq));
@@ -356,6 +401,7 @@ void emissions_signal_scaleModel(StateMachine *sM,
                                  double scale, double shift, double var,
                                  double scale_sd, double var_sd) {
     // model is arranged: level_mean, level_stdev, sd_mean, sd_stdev per kmer
+    // already been adjusted for correlation coeff.
     for (int64_t i = 1; i < (sM->parameterSetSize * MODEL_PARAMS) + 1; i += 4) {
         sM->EMISSION_MATCH_PROBS[i] = sM->EMISSION_MATCH_PROBS[i] * scale + shift; // mean = mean * scale + shift
         sM->EMISSION_MATCH_PROBS[i+1] = sM->EMISSION_MATCH_PROBS[i+1] * var; // stdev = stdev * var
@@ -494,7 +540,7 @@ static void stateMachine5_cellCalculate(StateMachine *sM,
      */
     StateMachine5 *sM5 = (StateMachine5 *) sM;
     if (lower != NULL) {
-        double eP = sM5->model.getXGapProbFcn(sM5->model.EMISSION_GAP_X_PROBS, cX);
+        double eP = sM5->getXGapProbFcn(sM5->model.EMISSION_GAP_X_PROBS, cX);
         doTransition(lower, current, match, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_OPEN_X, extraArgs);
         doTransition(lower, current, shortGapX, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_X, extraArgs);
         // how come these are commented out?
@@ -504,7 +550,7 @@ static void stateMachine5_cellCalculate(StateMachine *sM,
         //doTransition(lower, current, longGapY, longGapX, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_X, extraArgs);
     }
     if (middle != NULL) {
-        double eP = sM5->model.getMatchProbFcn(sM5->model.EMISSION_MATCH_PROBS, cX, cY);
+        double eP = sM5->getMatchProbFcn(sM5->model.EMISSION_MATCH_PROBS, cX, cY);
         doTransition(middle, current, match, match, eP, sM5->TRANSITION_MATCH_CONTINUE, extraArgs);
         doTransition(middle, current, shortGapX, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X, extraArgs);
         doTransition(middle, current, shortGapY, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y, extraArgs);
@@ -512,7 +558,7 @@ static void stateMachine5_cellCalculate(StateMachine *sM,
         doTransition(middle, current, longGapY, match, eP, sM5->TRANSITION_MATCH_FROM_LONG_GAP_Y, extraArgs);
     }
     if (upper != NULL) {
-        double eP = sM5->model.getYGapProbFcn(sM5->model.EMISSION_GAP_Y_PROBS, cY);
+        double eP = sM5->getYGapProbFcn(sM5->model.EMISSION_GAP_Y_PROBS, cY);
         doTransition(upper, current, match, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_OPEN_Y, extraArgs);
         doTransition(upper, current, shortGapY, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_Y, extraArgs);
         //doTransition(upper, current, shortGapX, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_SWITCH_TO_Y, extraArgs);
@@ -524,9 +570,6 @@ static void stateMachine5_cellCalculate(StateMachine *sM,
 
 StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSetSize,
                                       void (*setEmissionsDefaults)(StateMachine *sM),
-                                      //void (*setXGapDefaultsFcn)(double *),
-                                      //void (*setYGapDefaultsFcn)(double *),
-                                      //void (*setMatchDefaultsFcn)(double *),
                                       double (*gapXProbFcn)(const double *, void *),
                                       double (*gapYProbFcn)(const double *, void *),
                                       double (*matchProbFcn)(const double *, void *, void *)) {
@@ -560,7 +603,7 @@ StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSe
     sM5->TRANSITION_GAP_LONG_EXTEND_Y = sM5->TRANSITION_GAP_LONG_EXTEND_X;
     sM5->TRANSITION_GAP_LONG_SWITCH_TO_Y = sM5->TRANSITION_GAP_LONG_SWITCH_TO_X;
     // setup the parent class
-    sM5->model.type = type; // TODO maybe don't need this?
+    sM5->model.type = type;
     sM5->model.parameterSetSize = parameterSetSize;
     sM5->model.stateNumber = 5;
     sM5->model.matchState = match;
@@ -568,24 +611,12 @@ StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSe
     sM5->model.endStateProb = stateMachine5_endStateProb;
     sM5->model.raggedStartStateProb = stateMachine5_raggedStartStateProb;
     sM5->model.raggedEndStateProb = stateMachine5_raggedEndStateProb;
-    sM5->model.getXGapProbFcn = gapXProbFcn;
-    sM5->model.getYGapProbFcn = gapYProbFcn;
-    sM5->model.getMatchProbFcn = matchProbFcn;
+    sM5->getXGapProbFcn = gapXProbFcn;
+    sM5->getYGapProbFcn = gapYProbFcn;
+    sM5->getMatchProbFcn = matchProbFcn;
     sM5->model.cellCalculate = stateMachine5_cellCalculate;
     // set emissions to defaults (or zeros)
     setEmissionsDefaults((StateMachine *) sM5);
-
-    // initialize e matrices
-    //sM5->EMISSION_GAP_X_PROBS = st_malloc(parameterSetSize*sizeof(double));
-    //sM5->EMISSION_GAP_Y_PROBS = st_malloc(parameterSetSize*sizeof(double));
-    //sM5->EMISSION_MATCH_PROBS = st_malloc(parameterSetSize*parameterSetSize* sizeof(double));
-    //emissions_discrete_initGapProbsToZero(sM5->model.EMISSION_GAP_X_PROBS, parameterSetSize);
-    //emissions_discrete_initGapProbsToZero(sM5->model.EMISSION_GAP_Y_PROBS, parameterSetSize);
-    //emissions_discrete_initMatchProbsToZero(sM5->model.EMISSION_MATCH_PROBS, parameterSetSize);
-
-    //setXGapDefaultsFcn(sM5->model.EMISSION_GAP_X_PROBS);
-    //setYGapDefaultsFcn(sM5->model.EMISSION_GAP_Y_PROBS);
-    //setMatchDefaultsFcn(sM5->model.EMISSION_MATCH_PROBS);
 
     return (StateMachine *) sM5;
 }
@@ -725,6 +756,20 @@ static double stateMachine3_raggedStartStateProb(StateMachine *sM, int64_t state
     return (state == shortGapX || state == shortGapY) ? 0 : LOG_ZERO;
 }
 
+static double stateMachine3Vanilla_endStateProb(StateMachine *sM, int64_t state) {
+    StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *) sM;
+    state_check(sM, state);
+    switch (state) {
+        case match:
+            return sM3v->DEFAULT_END_MATCH_PROB;
+        case shortGapX:
+            return sM3v->DEFAULT_END_FROM_X_PROB;
+        case shortGapY:
+            return sM3v->DEFAULT_END_FROM_Y_PROB;
+    }
+    return 0.0;
+}
+
 static double stateMachine3_endStateProb(StateMachine *sM, int64_t state) {
     //End state is like to going to a match
     StateMachine3 *sM3 = (StateMachine3 *) sM;
@@ -755,6 +800,22 @@ static double stateMachine3_raggedEndStateProb(StateMachine *sM, int64_t state) 
     return 0.0;
 }
 
+static void stateMachine3_setTransitionsToDefaults(StateMachine *sM) {
+    /*
+     * Migrate this into stateMachine constructors
+     */
+    StateMachine3 *sM3 = (StateMachine3 *) sM;
+    sM3->TRANSITION_MATCH_CONTINUE = -0.030064059121770816; //0.9703833696510062f
+    sM3->TRANSITION_MATCH_FROM_GAP_X = -1.272871422049609; //1.0 - gapExtend - gapSwitch = 0.280026392297485
+    sM3->TRANSITION_MATCH_FROM_GAP_Y = -1.272871422049609; //1.0 - gapExtend - gapSwitch = 0.280026392297485
+    sM3->TRANSITION_GAP_OPEN_X = -4.21256642; //0.0129868352330243
+    sM3->TRANSITION_GAP_OPEN_Y = -4.21256642; //0.0129868352330243
+    sM3->TRANSITION_GAP_EXTEND_X = -0.3388262689231553; //0.7126062401851738f;
+    sM3->TRANSITION_GAP_EXTEND_Y = -0.3388262689231553; //0.7126062401851738f;
+    sM3->TRANSITION_GAP_SWITCH_TO_X = -4.910694825551255; //0.0073673675173412815f;
+    sM3->TRANSITION_GAP_SWITCH_TO_Y = -4.910694825551255; //0.0073673675173412815f;
+}
+
 static void stateMachine3_cellCalculate(StateMachine *sM,
                                         double *current, double *lower, double *middle, double *upper,
                                         void *cX, void *cY,
@@ -765,31 +826,71 @@ static void stateMachine3_cellCalculate(StateMachine *sM,
                                         void *extraArgs) {
     StateMachine3 *sM3 = (StateMachine3 *) sM;
     if (lower != NULL) {
-        double eP = sM3->model.getXGapProbFcn(sM3->model.EMISSION_GAP_X_PROBS, cX);
+        double eP = sM3->getXGapProbFcn(sM3->model.EMISSION_GAP_X_PROBS, cX);
         doTransition(lower, current, match, shortGapX, eP, sM3->TRANSITION_GAP_OPEN_X, extraArgs);
         doTransition(lower, current, shortGapX, shortGapX, eP, sM3->TRANSITION_GAP_EXTEND_X, extraArgs);
         doTransition(lower, current, shortGapY, shortGapX, eP, sM3->TRANSITION_GAP_SWITCH_TO_X, extraArgs);
     }
     if (middle != NULL) {
-        double eP = sM3->model.getMatchProbFcn(sM3->model.EMISSION_MATCH_PROBS, cX, cY);  //symbol_matchProb(cX, cY);
+        double eP = sM3->getMatchProbFcn(sM3->model.EMISSION_MATCH_PROBS, cX, cY);
         doTransition(middle, current, match, match, eP, sM3->TRANSITION_MATCH_CONTINUE, extraArgs);
         doTransition(middle, current, shortGapX, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_X, extraArgs);
         doTransition(middle, current, shortGapY, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_Y, extraArgs);
 
     }
     if (upper != NULL) {
-        double eP = sM3->model.getYGapProbFcn(sM3->model.EMISSION_GAP_Y_PROBS, cY);
+        double eP = sM3->getYGapProbFcn(sM3->model.EMISSION_GAP_Y_PROBS, cY);
         doTransition(upper, current, match, shortGapY, eP, sM3->TRANSITION_GAP_OPEN_Y, extraArgs);
         doTransition(upper, current, shortGapY, shortGapY, eP, sM3->TRANSITION_GAP_EXTEND_Y, extraArgs);
         doTransition(upper, current, shortGapX, shortGapY, eP, sM3->TRANSITION_GAP_SWITCH_TO_Y, extraArgs);
     }
 }
 
+static void stateMachine3Vanilla_cellCalculate(StateMachine *sM,
+                                               double *current, double *lower, double *middle, double *upper,
+                                               void *cX, void *cY,
+                                               void (*doTransition)(double *, double *, int64_t, int64_t,
+                                                                    double, double, void *),
+                                               void *extraArgs) {
+    /*
+     * Hacking around with making the new 'vanilla' stateMachine
+     */
+    StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *) sM;
+    // from match
+    double a_mx = sM3v->getKmerSkipProb((StateMachine *) sM3v, cX);
+    double a_me = (1 - a_mx) * sM3v->TRANSITION_M_TO_Y_NOT_X; // trans M to Y not X fudge factor embed in sM3V
+    double a_mm = 1.0f - a_me - a_mx;
+    // from Y 
+    double a_ee = 0.55f; // also embed
+    double a_em = 1.0f - a_ee;
+    // from X
+    double a_xx = a_mx;
+    double a_xm = 1.0f - a_xx;
+
+    if (lower != NULL) {
+        doTransition(lower, current, match, shortGapX, 0, log(a_mx), extraArgs);
+        doTransition(lower, current, shortGapX, shortGapX, 0, log(a_xx), extraArgs);
+        // X to Y not allowed
+        //doTransition(lower, current, shortGapY, shortGapX, eP, sM3->TRANSITION_GAP_SWITCH_TO_X, extraArgs);
+    }
+    if (middle != NULL) {
+        double eP = sM3v->getMatchProbFcn(sM3v->model.EMISSION_MATCH_PROBS, cX, cY);
+        doTransition(middle, current, match, match, eP, log(a_mm), extraArgs);
+        doTransition(middle, current, shortGapX, match, eP, log(a_xm), extraArgs);
+        doTransition(middle, current, shortGapY, match, eP, log(a_em), extraArgs);
+
+    }
+    if (upper != NULL) {
+        double eP = sM3v->getScaledMatchProbFcn(sM3v->model.EMISSION_GAP_Y_PROBS, cX, cY);
+        doTransition(upper, current, match, shortGapY, eP, log(a_me), extraArgs);
+        doTransition(upper, current, shortGapY, shortGapY, eP, log(a_ee), extraArgs);
+        // Y to X not allowed
+        //doTransition(upper, current, shortGapX, shortGapY, eP, sM3->TRANSITION_GAP_SWITCH_TO_Y, extraArgs);
+    }
+}
+
 StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSetSize,
                                       void (*setEmissionsDefaults)(StateMachine *sM),
-                                      //void (*setXGapDefaultsFcn)(double *),
-                                      //void (*setYGapDefaultsFcn)(double *),
-                                      //void (*setMatchDefaultsFcn)(double *),
                                       double (*gapXProbFcn)(const double *, void *),
                                       double (*gapYProbFcn)(const double *, void *),
                                       double (*matchProbFcn)(const double *, void *, void *)) {
@@ -822,14 +923,53 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
     sM3->model.endStateProb = stateMachine3_endStateProb;
     sM3->model.raggedStartStateProb = stateMachine3_raggedStartStateProb;
     sM3->model.raggedEndStateProb = stateMachine3_raggedEndStateProb;
-    sM3->model.getXGapProbFcn = gapXProbFcn;
-    sM3->model.getYGapProbFcn = gapYProbFcn;
-    sM3->model.getMatchProbFcn = matchProbFcn;
+    sM3->getXGapProbFcn = gapXProbFcn;
+    sM3->getYGapProbFcn = gapYProbFcn;
+    sM3->getMatchProbFcn = matchProbFcn;
     sM3->model.cellCalculate = stateMachine3_cellCalculate;
     // set emissions to defaults or zeros
     setEmissionsDefaults((StateMachine *) sM3);
 
     return (StateMachine *) sM3;
+}
+
+StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t parameterSetSize,
+                                             void (*setEmissionsDefaults)(StateMachine *sM),
+                                             double (*xSkipProbFcn)(StateMachine *, void *),
+                                             double (*scaledMatchProbFcn)(const double *, void *, void *),
+                                             double (*matchProbFcn)(const double *, void *, void *)) {
+    /*
+     * State machine for basic event signal to sequence alignment
+     */
+    // upcast
+    StateMachine3Vanilla *sM3v = st_malloc(sizeof(StateMachine3Vanilla));
+    // check
+    if (type != threeState && type != threeStateAsymmetric) {
+        st_errAbort("Tried to create a three state state-machine with the wrong type");
+    }
+    // setup end state prob defaults
+    // defaults from a nanopore file
+    sM3v->TRANSITION_M_TO_Y_NOT_X = 0.17; //default for template
+    sM3v->DEFAULT_END_MATCH_PROB = 0.79015888282447311; // stride_prb
+    sM3v->DEFAULT_END_FROM_X_PROB = 0.19652425498269727; // skip_prob
+    sM3v->DEFAULT_END_FROM_Y_PROB = 0.013316862192910478; // stay_prob
+    // setup the parent class
+    sM3v->model.type = type;
+    sM3v->model.parameterSetSize = parameterSetSize;
+    sM3v->model.stateNumber = 3;
+    sM3v->model.matchState = match;
+    sM3v->model.startStateProb = stateMachine3_startStateProb;
+    sM3v->model.raggedStartStateProb = stateMachine3_raggedStartStateProb;
+    sM3v->model.endStateProb = stateMachine3Vanilla_endStateProb;
+    sM3v->model.raggedEndStateProb = stateMachine3Vanilla_endStateProb;
+    sM3v->getKmerSkipProb = xSkipProbFcn;
+    //sM3v->model.getYGapProbFcn = gapYProbFcn; don't use
+    sM3v->getScaledMatchProbFcn = scaledMatchProbFcn;
+    sM3v->getMatchProbFcn = matchProbFcn;
+    sM3v->model.cellCalculate = stateMachine3Vanilla_cellCalculate;
+    // set emissions to defaults or zeros
+    setEmissionsDefaults((StateMachine *) sM3v);
+    return (StateMachine *) sM3v;
 }
 
 /*
@@ -905,15 +1045,21 @@ StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
     }
 }
 
-StateMachine *getSignalStateMachine3(const char *modelFile, StateMachineFunctions *sMfs) {
+StateMachine *getSignalStateMachine3(const char *modelFile) {
     // construct a stateMachine full of zeros
-    StateMachine *sM3 = stateMachine3_construct(threeState, 4096,
-                                               emissions_signal_initEmissionsToZero,
-                                               sMfs->gapXProbFcn,
-                                               sMfs->gapYProbFcn,
-                                               sMfs->matchProbFcn);
-    emissions_signal_loadPoreModel(sM3, modelFile);
-    return sM3;
+    //StateMachine *sM3 = stateMachine3_construct(threeState, NUM_OF_KMERS, // 4096 for 6-mers,
+    //                                           emissions_signal_initEmissionsToZero,
+    //                                           sMfs->gapXProbFcn,
+    //                                           sMfs->gapYProbFcn,
+    //                                           sMfs->matchProbFcn);
+    StateMachine *sM3v = stateMachine3Vanilla_construct(threeState, NUM_OF_KMERS,
+                                                        emissions_signal_initEmissionsToZero,
+                                                        emissions_signal_getKmerSkipProb,
+                                                        emissions_signal_getlogGaussPDFMatchProb,
+                                                        emissions_signal_getlogGaussPDFMatchProb);
+
+    emissions_signal_loadPoreModel(sM3v, modelFile);
+    return sM3v;
 }
 
 void stateMachine_destruct(StateMachine *stateMachine) {

@@ -6,7 +6,7 @@
 #include "nanopore.h"
 
 
-NanoporeRead *nanoporeRead_construct(int64_t readLength, int64_t nbTemplateEvents, int64_t nbComplementEvents) {
+NanoporeRead *nanopore_nanoporeReadConstruct(int64_t readLength, int64_t nbTemplateEvents, int64_t nbComplementEvents) {
     NanoporeRead *npRead = st_malloc(sizeof(NanoporeRead));
 
     npRead->readLength = readLength;
@@ -28,7 +28,7 @@ NanoporeRead *nanoporeRead_construct(int64_t readLength, int64_t nbTemplateEvent
     return npRead;
 }
 
-NanoporeRead *loadNanoporeReadFromFile(const char *nanoporeReadFile) {
+NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     FILE *fH = fopen(nanoporeReadFile, "r");
 
     // line 1 [2D read length] [# of template events] [# of complement events]
@@ -51,9 +51,9 @@ NanoporeRead *loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     if (j != 1) {
         st_errAbort("error parsing nanopore complement event lengths\n");
     }
-    NanoporeRead *npRead = nanoporeRead_construct(npRead_readLength,
-                                                  npRead_nbTemplateEvents,
-                                                  npRead_nbComplementEvents);
+    NanoporeRead *npRead = nanopore_nanoporeReadConstruct(npRead_readLength,
+                                                          npRead_nbTemplateEvents,
+                                                          npRead_nbComplementEvents);
     // template params
     j = sscanf(stList_get(tokens, 3), "%lf", &(npRead->templateParams.scale));
     if (j != 1) {
@@ -99,7 +99,6 @@ NanoporeRead *loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     }
 
     // cleanup line 1
-    // TODO freeup readLength, nbTemplateEvents, nbComplementEvents
     free(string);
     stList_destruct(tokens);
 
@@ -191,7 +190,7 @@ NanoporeRead *loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     return npRead;
 }
 
-void remapAnchorPairs(stList *blastPairs, int64_t *eventMap) {
+void nanopore_remapAnchorPairs(stList *blastPairs, int64_t *eventMap) {
     for (int64_t i = 0; i < stList_length(blastPairs); i++) {
         stIntTuple *pair = stList_get(blastPairs, i);
         stList_set(blastPairs, i,

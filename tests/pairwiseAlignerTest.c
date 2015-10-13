@@ -449,8 +449,8 @@ static void test_kmer_diagonalDPCalculations(CuTest *testCase) {
     //const char *sY = evolveSequence(sX);
 
     // set lX and lY to the lengths of those sequences
-    int64_t slX = correctSeqLength(strlen(sX), kmer);
-    int64_t slY = correctSeqLength(strlen(sY), kmer);
+    int64_t slX = sequence_correctSeqLength(strlen(sX), kmer);
+    int64_t slY = sequence_correctSeqLength(strlen(sY), kmer);
 
     // construct a sequence struct from those sequences
     Sequence* sX2 = sequence_sequenceConstruct(slX, sX, sequence_getKmer);
@@ -675,8 +675,8 @@ static void test_kmer_getAlignedPairsWithBanding(CuTest *testCase) {
         char *sY = evolveSequence(sX); //stString_copy(seqX);
         int64_t clX = strlen(sX);
         int64_t clY = strlen(sY);
-        int64_t lX = correctSeqLength(clX, kmer);
-        int64_t lY = correctSeqLength(clY, kmer);
+        int64_t lX = sequence_correctSeqLength(clX, kmer);
+        int64_t lY = sequence_correctSeqLength(clY, kmer);
 
         st_logInfo("Sequence X to align: %s END\n", sX);
         st_logInfo("Sequence Y to align: %s END\n", sY);
@@ -973,8 +973,8 @@ static void test_kmer_getAlignedPairs(CuTest *testCase) {
         char *sY = evolveSequence(sX); //stString_copy(seqX);
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
-        int64_t lX2 = correctSeqLength(lX, kmer);
-        int64_t lY2 = correctSeqLength(lY, kmer);
+        int64_t lX2 = sequence_correctSeqLength(lX, kmer);
+        int64_t lY2 = sequence_correctSeqLength(lY, kmer);
         //Sequence* SsX = sequence_sequenceConstruct(slX, sX, sequence_getKmer);
         //Sequence* SsY = sequence_sequenceConstruct(slY, sY, sequence_getKmer);
         //st_logInfo("Sequence X to align: %s END\n", sX);
@@ -1068,9 +1068,9 @@ static void test_kmer_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
                                   getRandomSequence(randomPortionLength)); //x with an extra bit at the end.
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
-        int64_t lX2 = correctSeqLength(lX, kmer);
-        int64_t lY2 = correctSeqLength(lY, kmer);
-        int64_t coreLengthInKmers = correctSeqLength(coreLength, kmer);
+        int64_t lX2 = sequence_correctSeqLength(lX, kmer);
+        int64_t lY2 = sequence_correctSeqLength(lY, kmer);
+        int64_t coreLengthInKmers = sequence_correctSeqLength(coreLength, kmer);
         //Sequence* SsX = sequence_sequenceConstruct(slX, sX, sequence_getKmer);
         //Sequence* SsY = sequence_sequenceConstruct(slY, sY, sequence_getKmer);
 
@@ -1324,7 +1324,7 @@ static void test_hmmDiscrete_EM_5State_symbols(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-/*
+
     SUITE_ADD_TEST(suite, test_diagonal);
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_logAdd);
@@ -1352,6 +1352,6 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_kmers);
     SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_kmers);
-*/
+
     return suite;
 }
