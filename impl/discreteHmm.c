@@ -187,13 +187,13 @@ Hmm *hmmDiscrete_loadFromFile(const char *fileName) {
 
     // make empty Hmm
     Hmm *hmmD = hmmDiscrete_constructEmpty(0.0, stateNumber, parameterSetSize, type,
-                                          hmmDiscrete_addToTransitionExpectation,
-                                          hmmDiscrete_setTransitionExpectation,
-                                          hmmDiscrete_getTransitionExpectation,
-                                          hmmDiscrete_addToEmissionExpectation,
-                                          hmmDiscrete_setEmissionExpectation,
-                                          hmmDiscrete_getEmissionExpectation,
-                                          emissions_getBaseIndex);
+                                           hmmDiscrete_addToTransitionExpectation,
+                                           hmmDiscrete_setTransitionExpectation,
+                                           hmmDiscrete_getTransitionExpectation,
+                                           hmmDiscrete_addToEmissionExpectation,
+                                           hmmDiscrete_setEmissionExpectation,
+                                           hmmDiscrete_getEmissionExpectation,
+                                           emissions_discrete_getBaseIndex);
     // cleanup setup line
     free(string);
     stList_destruct(tokens);

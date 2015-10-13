@@ -533,7 +533,7 @@ int main(int argc, char *argv[]) {
                                                      hmmDiscrete_addToEmissionExpectation,
                                                      hmmDiscrete_setEmissionExpectation,
                                                      hmmDiscrete_getEmissionExpectation,
-                                                     emissions_getBaseIndex);
+                                                     emissions_discrete_getBaseIndex);
     }
 
     //Read in input sequences

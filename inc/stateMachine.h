@@ -139,6 +139,7 @@ typedef struct _StateMachine3vanilla {
     StateMachine model;
 
     double TRANSITION_M_TO_Y_NOT_X;
+    double TRANSITION_E_TO_E;
     double DEFAULT_END_MATCH_PROB; //0.79015888282447311; // stride_prb
     double DEFAULT_END_FROM_X_PROB; //0.19652425498269727; // skip_prob
     double DEFAULT_END_FROM_Y_PROB; //0.013316862192910478; // stay_prob
@@ -177,16 +178,23 @@ StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t para
                                              double (*scaledMatchProbFcn)(const double *, void *, void *),
                                              double (*matchProbFcn)(const double *, void *, void *));
 
-// indexing
-int64_t emissions_getKmerIndex(void *kmer);
+// indexing functions //
+//Returns the index for a base, for use with matrices and emissions_discrete_getKmerIndex
+int64_t emissions_discrete_getBaseIndex(void *base);
 
-int64_t emissions_getBaseIndex(void *base);
+//Returns the index for a kmer.
+int64_t emissions_discrete_getKmerIndex(void *kmer);
 
 // emissions defaults
 void emissions_discrete_initEmissionsToZero(StateMachine *sM);
 
 void emissions_symbol_setEmissionsToDefaults(StateMachine *sM);
 
+/*
+* For a discrete HMM the gap and match matrices are defined by the number of symbols in the set (nK). The gap
+* matrix is nK x 1 and the match matrix is nK x nK
+* In the most simple case, with 4 nucleotides the gap matrix is 4x1 matrix and the match matrix is a 4x4 matrix.
+*/
 void emissions_signal_initEmissionsToZero(StateMachine *sM);
 
 // get prob
@@ -202,9 +210,9 @@ double emissions_signal_getKmerSkipProb(StateMachine *sM, void *kmers);
 
 double emissions_signal_getlogGaussPDFMatchProb(const double *eventModel, void *kmer, void *event);
 
+// returns log of the probability density function for a Gaussian distribution
 double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, void *kmer, void *event);
 
-// signal
 //void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFile);
 
 double emissions_signal_getModelEntry(const double *model, void *kmer);
