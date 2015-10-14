@@ -31,35 +31,48 @@ class NanoporeRead(object):
 
         # get the 2D read sequence
         twoD_read_sequence_address = "/Analyses/Basecall_2D_000/BaseCalled_2D/Fastq"
-        self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
+
+        #self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
+        if twoD_read_sequence_address in self.fastFive:
+            self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
 
         # get the 2D alignment table
         twoD_alignment_table_address = "/Analyses/Basecall_2D_000/BaseCalled_2D/Alignment"
-        self.twoD_alignment_table = self.fastFive[twoD_alignment_table_address]
-        self.kmer_length = len(self.twoD_alignment_table[0][2])
+        if twoD_alignment_table_address in self.fastFive:
+            self.twoD_alignment_table = self.fastFive[twoD_alignment_table_address]
+            self.kmer_length = len(self.twoD_alignment_table[0][2])
 
         # need the event tables for comparing probs
-        self.template_event_table = self.fastFive['/Analyses/Basecall_2D_000/BaseCalled_template/Events']
-        self.template_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
-                                for e in self.fastFive['/Analyses/Basecall_2D_000/BaseCalled_template/Events']]
+        template_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_template/Events'
+        if template_event_table_address in self.fastFive:
+            self.template_event_table = self.fastFive[template_event_table_address]
+            self.template_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
+                                    for e in self.template_event_table]
 
-        self.complement_event_table = self.fastFive['/Analyses/Basecall_2D_000/BaseCalled_complement/Events']
-        self.complement_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
-                                  for e in self.fastFive['/Analyses/Basecall_2D_000/BaseCalled_complement/Events']]
+        complement_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_complement/Events'
+        if complement_event_table_address in self.fastFive:
+            self.complement_event_table = self.fastFive[complement_event_table_address]
+            self.complement_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
+                                      for e in self.complement_event_table]
 
         # need the scale and shift
-        self.template_scale = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_template/Model"].attrs["scale"]
-        self.template_shift = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_template/Model"].attrs["shift"]
-        self.template_drift = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_template/Model"].attrs["drift"]
-        self.template_var = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_template/Model"].attrs["var"]
-        self.template_scale_sd = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_template/Model"].attrs["scale_sd"]
-        self.template_var_sd = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_template/Model"].attrs["var_sd"]
-        self.complement_scale = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Model"].attrs["scale"]
-        self.complement_shift = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Model"].attrs["shift"]
-        self.complement_drift = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Model"].attrs["drift"]
-        self.complement_var = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Model"].attrs["var"]
-        self.complement_scale_sd = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Model"].attrs["scale_sd"]
-        self.complement_var_sd = self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Model"].attrs["var_sd"]
+        template_model_address = "/Analyses/Basecall_2D_000/BaseCalled_template/Model"
+        if template_model_address in self.fastFive:
+            self.template_scale = self.fastFive[template_model_address].attrs["scale"]
+            self.template_shift = self.fastFive[template_model_address].attrs["shift"]
+            self.template_drift = self.fastFive[template_model_address].attrs["drift"]
+            self.template_var = self.fastFive[template_model_address].attrs["var"]
+            self.template_scale_sd = self.fastFive[template_model_address].attrs["scale_sd"]
+            self.template_var_sd = self.fastFive[template_model_address].attrs["var_sd"]
+
+        complement_model_address = "/Analyses/Basecall_2D_000/BaseCalled_complement/Model"
+        if complement_model_address in self.fastFive:
+            self.complement_scale = self.fastFive[complement_model_address].attrs["scale"]
+            self.complement_shift = self.fastFive[complement_model_address].attrs["shift"]
+            self.complement_drift = self.fastFive[complement_model_address].attrs["drift"]
+            self.complement_var = self.fastFive[complement_model_address].attrs["var"]
+            self.complement_scale_sd = self.fastFive[complement_model_address].attrs["scale_sd"]
+            self.complement_var_sd = self.fastFive[complement_model_address].attrs["var_sd"]
 
         self.template_event_map = []
         self.complement_event_map = []
@@ -268,8 +281,8 @@ class ComplementModel(NanoporeModel):
         self.model = self.fastFive['/Analyses/Basecall_2D_000/BaseCalled_complement/Model']
         self.stay_prob = log2(self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Model"].attrs["stay_prob"])
         self.skip_prob_bins = [0.531, 0.478, 0.405, 0.327, 0.257, 0.207, 0.172, 0.154, 0.138, 0.132,
-                          0.127, 0.123, 0.117, 0.115, 0.113, 0.113, 0.115, 0.109, 0.109, 0.107,
-                          0.104, 0.105, 0.108, 0.106, 0.111, 0.114, 0.118, 0.119, 0.110, 0.119]
+                               0.127, 0.123, 0.117, 0.115, 0.113, 0.113, 0.115, 0.109, 0.109, 0.107,
+                               0.104, 0.105, 0.108, 0.106, 0.111, 0.114, 0.118, 0.119, 0.110, 0.119]
         self.parse_model_name()
 
     def parse_model_name(self):

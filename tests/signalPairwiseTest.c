@@ -219,8 +219,7 @@ static void test_signal_diagonalDPCalculations(CuTest *testCase) {
         stIntTuple *pair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
         st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
-        st_uglyf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
-        //CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
+        CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
     CuAssertIntEquals(testCase, 4, (int) stList_length(alignedPairs));
 
@@ -397,8 +396,8 @@ CuSuite *signalPairwiseTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
     SUITE_ADD_TEST(suite, test_testBivariateGaussPdfMatchProb);
-    //SUITE_ADD_TEST(suite, test_signal_cell);
-    //SUITE_ADD_TEST(suite, test_signal_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_signal_cell);
+    SUITE_ADD_TEST(suite, test_signal_diagonalDPCalculations);
     //SUITE_ADD_TEST(suite, test_scaleModel);
     //SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding2);
     //SUITE_ADD_TEST(suite, test_signal_getAlignedPairsWithBanding);
