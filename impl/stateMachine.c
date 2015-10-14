@@ -316,7 +316,7 @@ double emissions_signal_getKmerSkipProb(StateMachine *sM, void *kmers) {
     bin = bin >= 30 ? 29 : bin;
 
     // for debugging
-    //double pSkip = sM3v->model.EMISSION_GAP_X_PROBS[bin];
+    double pSkip = sM3v->model.EMISSION_GAP_X_PROBS[bin];
     //st_uglyf("SENTINAL - getKmerSkipProb; kmer_i: %s (index: %lld, model u=%f), kmer_im1: %s (index: %lld, model u=%f),\n d: %f, bin: %lld, pSkip: %f\n",
     //         kmer_i, k_i, u_ki, kmer_im1, k_im1, u_kim1, d, bin, pSkip);
 
@@ -326,7 +326,7 @@ double emissions_signal_getKmerSkipProb(StateMachine *sM, void *kmers) {
     return sM3v->model.EMISSION_GAP_X_PROBS[bin];
 }
 
-double emissions_signal_getlogGaussPDFMatchProb(const double *eventModel, void *kmer, void *event) {
+double emissions_signal_getLogGaussPdfMatchProb(const double *eventModel, void *kmer, void *event) {
     // make temp kmer
     char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
     for (int64_t x = 0; x < KMER_LENGTH; x++) {
@@ -1041,8 +1041,8 @@ StateMachine *getSignalStateMachine3(const char *modelFile) {
     StateMachine *sM3v = stateMachine3Vanilla_construct(threeState, NUM_OF_KMERS,
                                                         emissions_signal_initEmissionsToZero,
                                                         emissions_signal_getKmerSkipProb,
-                                                        emissions_signal_getlogGaussPDFMatchProb,
-                                                        emissions_signal_getlogGaussPDFMatchProb);
+                                                        emissions_signal_getLogGaussPdfMatchProb,
+                                                        emissions_signal_getLogGaussPdfMatchProb);
 
     emissions_signal_loadPoreModel(sM3v, modelFile);
     return sM3v;

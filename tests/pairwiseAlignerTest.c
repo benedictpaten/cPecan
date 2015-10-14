@@ -150,7 +150,7 @@ static void test_logAdd(CuTest *testCase) {
 
 static void test_sequenceConstruct(CuTest* testCase) {
     char *tS = getRandomSequence(100);
-    Sequence* testSequence = sequence_sequenceConstruct(100, tS, sequence_getBase);
+    Sequence* testSequence = sequence_construct(100, tS, sequence_getBase);
     CuAssertIntEquals(testCase, 100, testSequence->length);
     CuAssertStrEquals(testCase, tS, testSequence->elements);
     free(tS);
@@ -163,7 +163,7 @@ static void test_getSubSequence(CuTest* testCase) {
         char* cS = getRandomSequence(lS);
         int64_t offset = st_randomInt(0, lS);
         int64_t sliceLength = st_randomInt(1, (lS-offset));
-        Sequence* wholeSequence = sequence_sequenceConstruct(lS, cS, sequence_getBase);
+        Sequence* wholeSequence = sequence_construct(lS, cS, sequence_getBase);
         Sequence* seqSlice = sequence_getSubSequence(wholeSequence, offset, sliceLength, sequence_getBase);
         for (int i = 0; i < seqSlice->length; i++) {
             void* b = seqSlice->get(seqSlice->elements, i);
@@ -199,8 +199,8 @@ static void test_cell(CuTest *testCase) {
 
     char *charXseq = "AGCG";
     char *charYseq = "AGTTCG";
-    Sequence* SsX = sequence_sequenceConstruct(4, charXseq, sequence_getBase);
-    Sequence* SsY = sequence_sequenceConstruct(6, charYseq, sequence_getBase);
+    Sequence* SsX = sequence_construct(4, charXseq, sequence_getBase);
+    Sequence* SsY = sequence_construct(6, charYseq, sequence_getBase);
     void* cX = SsX->get(SsX->elements, 0);
     void* cY = SsY->get(SsY->elements, 0);
 
@@ -243,8 +243,8 @@ static void test_kmer_cell(CuTest *testCase) {
 
     char *charXseq = "AGCG";
     char *charYseq = "AGTTCG";
-    Sequence* SsX = sequence_sequenceConstruct(4, charXseq, sequence_getKmer);
-    Sequence* SsY = sequence_sequenceConstruct(6, charYseq, sequence_getKmer);
+    Sequence* SsX = sequence_construct(4, charXseq, sequence_getKmer);
+    Sequence* SsY = sequence_construct(6, charYseq, sequence_getKmer);
     void* cX = SsX->get(SsX->elements, 2);
     void* cY = SsY->get(SsY->elements, 2);
 
@@ -348,8 +348,8 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     int64_t lY = strlen(sY);
 
     // construct a sequence from those sequences
-    Sequence* sX2 = sequence_sequenceConstruct(lX, sX, sequence_getBase);
-    Sequence* sY2 = sequence_sequenceConstruct(lY, sY, sequence_getBase);
+    Sequence* sX2 = sequence_construct(lX, sX, sequence_getBase);
+    Sequence* sY2 = sequence_construct(lY, sY, sequence_getBase);
 
     // construct a 5-state state machine, the forward and reverse DP Matrices, the band, the band
     // iterators and the anchor pairs
@@ -453,8 +453,8 @@ static void test_kmer_diagonalDPCalculations(CuTest *testCase) {
     int64_t slY = sequence_correctSeqLength(strlen(sY), kmer);
 
     // construct a sequence struct from those sequences
-    Sequence* sX2 = sequence_sequenceConstruct(slX, sX, sequence_getKmer);
-    Sequence* sY2 = sequence_sequenceConstruct(slY, sY, sequence_getKmer);
+    Sequence* sX2 = sequence_construct(slX, sX, sequence_getKmer);
+    Sequence* sY2 = sequence_construct(slY, sY, sequence_getKmer);
     int64_t lX = sX2->length;
     int64_t lY = sY2->length;
 
@@ -630,8 +630,8 @@ static void test_getAlignedPairsWithBanding(CuTest *testCase) {
         st_logInfo("Sequence X to align: %s END\n", sX);
         st_logInfo("Sequence Y to align: %s END\n", sY);
 
-        Sequence* sX2 = sequence_sequenceConstruct(lX, sX, sequence_getBase);
-        Sequence* sY2 = sequence_sequenceConstruct(lY, sY, sequence_getBase);
+        Sequence* sX2 = sequence_construct(lX, sX, sequence_getBase);
+        Sequence* sY2 = sequence_construct(lY, sY, sequence_getBase);
 
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -682,8 +682,8 @@ static void test_kmer_getAlignedPairsWithBanding(CuTest *testCase) {
         st_logInfo("Sequence Y to align: %s END\n", sY);
 
         // Make sequence objects
-        Sequence* sX2 = sequence_sequenceConstruct(lX, sX, sequence_getKmer);
-        Sequence* sY2 = sequence_sequenceConstruct(lY, sY, sequence_getKmer);
+        Sequence* sX2 = sequence_construct(lX, sX, sequence_getKmer);
+        Sequence* sY2 = sequence_construct(lY, sY, sequence_getKmer);
 
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -841,8 +841,8 @@ static void test_getBlastPairsWithRecursion(CuTest *testCase) {
         char *seqX = getRandomSequence(st_randomInt(0, 10000));
         char *seqY = evolveSequence(seqX); //stString_copy(seqX);
         int64_t lX = strlen(seqX), lY = strlen(seqY);
-        //Sequence* SsX = sequence_sequenceConstruct(lX, seqX, nucleotide);
-        //Sequence* SsY = sequence_sequenceConstruct(lY, seqY, nucleotide);
+        //Sequence* SsX = sequence_construct(lX, seqX, nucleotide);
+        //Sequence* SsY = sequence_construct(lY, seqY, nucleotide);
         //st_logInfo("Sequence X to align: %s END, seq length %" PRIi64 "\n", SsX->repr, SsX->length);
         //st_logInfo("Sequence Y to align: %s END, seq length %" PRIi64 "\n", SsY->repr, SsY->length);
 
@@ -936,8 +936,8 @@ static void test_getAlignedPairs(CuTest *testCase) {
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
 
-        //Sequence* SsX = sequence_sequenceConstruct(lX, sX, sequence_getBase);
-        //Sequence* SsY = sequence_sequenceConstruct(lY, sY, sequence_getBase);
+        //Sequence* SsX = sequence_construct(lX, sX, sequence_getBase);
+        //Sequence* SsY = sequence_construct(lY, sY, sequence_getBase);
         //st_logInfo("Sequence X to align: %s END\n", SsX->repr);
         //st_logInfo("Sequence Y to align: %s END\n", SsY->repr);
 
@@ -975,8 +975,8 @@ static void test_kmer_getAlignedPairs(CuTest *testCase) {
         int64_t lY = strlen(sY);
         int64_t lX2 = sequence_correctSeqLength(lX, kmer);
         int64_t lY2 = sequence_correctSeqLength(lY, kmer);
-        //Sequence* SsX = sequence_sequenceConstruct(slX, sX, sequence_getKmer);
-        //Sequence* SsY = sequence_sequenceConstruct(slY, sY, sequence_getKmer);
+        //Sequence* SsX = sequence_construct(slX, sX, sequence_getKmer);
+        //Sequence* SsY = sequence_construct(slY, sY, sequence_getKmer);
         //st_logInfo("Sequence X to align: %s END\n", sX);
         //st_logInfo("Sequence Y to align: %s END\n", sY);
 
@@ -1015,8 +1015,8 @@ static void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
 
-        //Sequence* SsX = sequence_sequenceConstruct(lX, sX, sequence_getBase);
-        //Sequence* SsY = sequence_sequenceConstruct(lY, sY, sequence_getBase);
+        //Sequence* SsX = sequence_construct(lX, sX, sequence_getBase);
+        //Sequence* SsY = sequence_construct(lY, sY, sequence_getBase);
 
         //st_logInfo("Sequence X to align: %s END\n", SsX->repr);
         //st_logInfo("Sequence Y to align: %s END\n", SsY->repr);
@@ -1071,8 +1071,8 @@ static void test_kmer_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         int64_t lX2 = sequence_correctSeqLength(lX, kmer);
         int64_t lY2 = sequence_correctSeqLength(lY, kmer);
         int64_t coreLengthInKmers = sequence_correctSeqLength(coreLength, kmer);
-        //Sequence* SsX = sequence_sequenceConstruct(slX, sX, sequence_getKmer);
-        //Sequence* SsY = sequence_sequenceConstruct(slY, sY, sequence_getKmer);
+        //Sequence* SsX = sequence_construct(slX, sX, sequence_getKmer);
+        //Sequence* SsY = sequence_construct(slY, sY, sequence_getKmer);
 
         st_logInfo("Sequence X to align: %s END\n", sX);
         st_logInfo("Sequence Y to align: %s END\n", sY);

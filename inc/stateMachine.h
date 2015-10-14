@@ -208,7 +208,7 @@ double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, vo
 
 double emissions_signal_getKmerSkipProb(StateMachine *sM, void *kmers);
 
-double emissions_signal_getlogGaussPDFMatchProb(const double *eventModel, void *kmer, void *event);
+double emissions_signal_getLogGaussPdfMatchProb(const double *eventModel, void *kmer, void *event);
 
 // returns log of the probability density function for a Gaussian distribution
 double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, void *kmer, void *event);

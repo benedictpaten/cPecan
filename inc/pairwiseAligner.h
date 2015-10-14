@@ -39,8 +39,14 @@ typedef struct sequence {
     void* (*get)(void *elements, int64_t index);
 } Sequence;
 
-// Sequence handling functions
-Sequence *sequence_sequenceConstruct(int64_t length, void *elements, void (*getFcn));
+
+/*
+ * Sequence constructor function
+ * stringLength should be the length of the sequence in bases ie ATGAC has
+ * length 5.  *elements is a pointer to the char array, typically.  The
+ * SequenceType is 0-nucleotide, 1-kmer, 2-event
+*/
+Sequence *sequence_construct(int64_t length, void *elements, void (*getFcn));
 
 Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength, void (*getFcn));
 
@@ -50,6 +56,7 @@ void *sequence_getBase(void *elements, int64_t index);
 
 void *sequence_getKmer(void *elements, int64_t index);
 
+//get the kmer at index and the previous kmer
 void *sequence_getKmer2(void *elements, int64_t index);
 
 void *sequence_getEvent(void *elements, int64_t index);
@@ -103,7 +110,8 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM, Sequence *SsX, Sequence *S
  * Expectation calculation functions for EM algorithms.
  */
 
-void updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP, void *extraArgs);
+void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
+                             void *extraArgs);
 
 void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                  Sequence *sX, Sequence *sY, //SequenceType t,

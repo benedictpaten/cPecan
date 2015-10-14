@@ -23,13 +23,11 @@
 #include "stateMachine.h"
 #include "emissionMatrix.h"
 
-///////////////////////////////////
-///////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Diagonal
-//
 //Structure for working with x-y diagonal of dp matrix
-///////////////////////////////////
-///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID = "PAIRWISE_ALIGNMENT_EXCEPTION";
 
@@ -83,14 +81,12 @@ inline char *diagonal_getString(Diagonal diagonal) {
             diagonal_getMinXmy(diagonal), diagonal_getMaxXmy(diagonal));
 }
 
-///////////////////////////////////
-///////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Band Iterator
-//
 //Iterator for walking along x+y diagonals in banded fashion
 //(using a set of anchor constraints)
-///////////////////////////////////
-///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct _band {
     Diagonal *diagonals;
@@ -228,13 +224,11 @@ Diagonal bandIterator_getPrevious(BandIterator *bandIterator) {
     return bandIterator->band->diagonals[bandIterator->index];
 }
 
-///////////////////////////////////
-///////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Log Add functions
-//
 //Interpolation function for doing log add
-///////////////////////////////////
-///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #define logUnderflowThreshold 7.5
 #define posteriorMatchThreshold 0.01
@@ -258,21 +252,11 @@ double logAdd(double x, double y) {
     return (y == LOG_ZERO || x - y >= logUnderflowThreshold) ? x : lookup(x - y) + y;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+//Sequence Object generalized way to represent a sequence of symbols or measurements (events)
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-///////////////////////////////////
-///////////////////////////////////
-//Sequence Object
-//Emissions probs/functions to convert to symbol sequence
-///////////////////////////////////
-///////////////////////////////////
-
-Sequence *sequence_sequenceConstruct(int64_t length, void *elements, void (*getFcn)) {
-    /*
-     * Sequence constructor function
-     * stringLength should be the length of the sequence in bases ie ATGAC has
-     * length 5.  *elements is a pointer to the char array, typically.  The
-     * SequenceType is 0-nucleotide, 1-kmer, 2-event
-     */
+Sequence *sequence_construct(int64_t length, void *elements, void (*getFcn)) {
     Sequence *self = malloc(sizeof(Sequence));
 
     self->length = length;
@@ -280,17 +264,6 @@ Sequence *sequence_sequenceConstruct(int64_t length, void *elements, void (*getF
     self->get = getFcn;
     return self;
 }
-/* half baked
-Sequence **sequence_sequenceConstructFromNanoporeRead(int64_t length, void *elements, void (*getFcn)) {
-    NanoporeRead *npRead = (NanoporeRead *) elements;
-    Sequence *template = sequence_sequenceConstruct(npRead->nbTemplateEvents, npRead->templateEvents,
-                                                    getFcn);
-    Sequence *complement = sequence_sequenceConstruct(npRead->nbComplementEvents, npRead->complementEvents,
-                                                      getFcn);
-    void *templateAndComplement[2] = { template, complement };
-    return templateAndComplement;
-}
-*/
 
 Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength, void (*getFcn)) {
     /*
@@ -299,7 +272,7 @@ Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_
     //size_t elementSize = sizeof(inputSequence->elements)/inputSequence->length;
     void *elementSlice; // = malloc(elementSize* sliceLength);
     elementSlice = &inputSequence->elements[start];
-    Sequence* newSequence = sequence_sequenceConstruct(sliceLength, elementSlice, getFcn);
+    Sequence* newSequence = sequence_construct(sliceLength, elementSlice, getFcn);
     return newSequence;
 }
 
@@ -338,12 +311,7 @@ void *sequence_getKmer(void *elements, int64_t index) {
 }
 
 void *sequence_getKmer2(void *elements, int64_t index) {
-    /*
-     * get the kmer at index and the previous kmer
-     */
-    //index = index > 0 ? index-1 : index;
-    //return index < 0 ? NULL : &(((char *)elements)[index]); // TODO figure out what to do with index < 0
-    return index > 0 ? &(((char *)elements)[index-1]) : &(((char *)elements)[index]);
+    return index > 0 ? &(((char *) elements)[index - 1]) : &(((char *) elements)[index]);
 }
 
 void *sequence_getEvent(void *elements, int64_t index) {
@@ -371,15 +339,13 @@ int64_t sequence_correctSeqLength(int64_t length, SequenceType type) {
     }
 }
 
-///////////////////////////////////
-///////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Cell calculations
-//
 //A cell is a set of states associated with an x, y coordinate.
 //These functions do the forward/backward calculations for the pairwise
 //alignment model.
-///////////////////////////////////
-///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static inline void doTransitionForward(double *fromCells, double *toCells,
                                        int64_t from, int64_t to,
@@ -423,8 +389,8 @@ double cell_dotProduct2(double *cell, StateMachine *sM, double (*getStateValue)(
     return totalProb;
 }
 
-void updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
-                        void *extraArgs) {
+void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
+                             void *extraArgs) {
 
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
@@ -450,16 +416,16 @@ static void cell_calculateExpectation(StateMachine *sM,
                             ((void **)extraArgs)[1], // &totalProbabability
                             cX,
                             cY };
-    sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, updateExpectations, extraArgs2);
+    sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, cell_updateExpectations, extraArgs2);
 }
 
-///////////////////////////////////
-///////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //DpDiagonal
 //
 //Structure for storing a x-y diagonal of the dp matrix
-///////////////////////////////////
-///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 struct _dpDiagonal {
     Diagonal diagonal;
@@ -539,13 +505,12 @@ double dpDiagonal_dotProduct(DpDiagonal *diagonal1, DpDiagonal *diagonal2) {
     return totalProbability;
 }
 
-///////////////////////////////////
-///////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //DpMatrix
 //
 //Structure for storing dp-matrix
-///////////////////////////////////
-///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct _dpMatrix {
     DpDiagonal **diagonals;
@@ -602,32 +567,14 @@ void dpMatrix_deleteDiagonal(DpMatrix *dpMatrix, int64_t xay) {
     }
 }
 
-///////////////////////////////////
-///////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Diagonal DP Calculations
 //
 //Functions which do forward/backward/posterior calculations
 //between diagonal rows of a dp-matrix
-///////////////////////////////////
-///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*
-static Symbol getXCharacter(const SymbolString sX, int64_t xay, int64_t xmy) {
-    int64_t x = diagonal_getXCoordinate(xay, xmy);
-    assert(x >= 0 && x <= sX.length);
-    return x > 0 ? sX.sequence[x - 1] : n;
-}
-
-static Symbol getYCharacter(const SymbolString sY, int64_t xay, int64_t xmy) {
-    int64_t y = diagonal_getYCoordinate(xay, xmy);
-    assert(y >= 0 && y <= sY.length);
-    return y > 0 ? sY.sequence[y - 1] : n;
-}
-*/
-
-/*
- * Functions for indexing through Sequence objects
- */
 static int64_t getXposition(Sequence *sX, int64_t xay, int64_t xmy) {
     int64_t x = diagonal_getXCoordinate(xay, xmy);
     assert(x >= 0 && x <= sX->length);
@@ -671,9 +618,7 @@ static void diagonalCalculation(StateMachine *sM,
         xmy += 2;
     }
 }
-/*
- * diagonalCalculationForward/Backward now take Sequence objects as arguments
- */
+
 void diagonalCalculationForward(StateMachine *sM, int64_t xay, DpMatrix *dpMatrix,
                                 Sequence* sX, Sequence* sY) {
     diagonalCalculation(sM,
@@ -695,10 +640,7 @@ void diagonalCalculationBackward(StateMachine *sM, int64_t xay, DpMatrix *dpMatr
                         cell_calculateBackward,
                         NULL);
 }
-/*
- * These two functions now take Sequence objects also.  I left some debugging lines in
- * diagonalCalculationPosteriorMatchProbs
- */
+
 double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
                                            DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY) {
     //Get the forward and backward diagonals
@@ -786,15 +728,11 @@ static void diagonalCalculationExpectations(StateMachine *sM,
                         sX, sY, cell_calculateExpectation, extraArgs2);
 }
 
-///////////////////////////////////
-///////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Banded alignment routine to calculate posterior match probs
-///////////////////////////////////
-///////////////////////////////////
-/*
- * Now works with Sequence objects when calling diagonal DP calculation functions, otherwise largely
- * left unchanged
- */
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void getPosteriorProbsWithBanding(StateMachine *sM,
                                   stList *anchorPairs,
                                   Sequence* sX, Sequence* sY,
@@ -929,13 +867,10 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
     band_destruct(band);
 }
 
-///////////////////////////////////
-///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Blast anchoring functions
-//
 //Use lastz to get sets of anchors
-///////////////////////////////////
-///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int sortByXPlusYCoordinate(const void *i, const void *j) {
     int64_t k = stIntTuple_get((stIntTuple *) i, 0) + stIntTuple_get((stIntTuple *) i, 1);
@@ -983,10 +918,6 @@ stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignm
     return alignedPairs;
 }
 
-/*
- * the Blast functions were left with char arrays because lastz uses strings, also ignore how I put the path
- * to last on my machine in the command
- */
 stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatMask) {
     /*
      * Uses lastz to compute a bunch of monotonically increasing pairs such that for any pair of consecutive
@@ -1151,7 +1082,7 @@ static void getBlastPairsForPairwiseAlignmentParametersP(
         stList_destruct(bottomLevelAnchorPairs);
     }
 }
-// remake this function to translate anchors
+
 stList *getBlastPairsForPairwiseAlignmentParameters(void *sX, void *sY, PairwiseAlignmentParameters *p) {
 
     // cast to char arrays for lastz
@@ -1205,13 +1136,12 @@ stList *getBlastPairsForPairwiseAlignmentParameters(void *sX, void *sY, Pairwise
     return combinedAnchorPairs;
 }
 
-///////////////////////////////////
-///////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Split large gap functions
-//
 //Functions to split up alignment around gaps in the anchors that are too large.
-///////////////////////////////////
-///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 static bool getSplitPointsP(int64_t *x1, int64_t *y1, int64_t x2, int64_t y2, int64_t x3, int64_t y3,
         stList *splitPoints, int64_t splitMatrixBiggerThanThis, bool skipBlock) {
@@ -1279,10 +1209,7 @@ static void convertAlignedPairs(stList *alignedPairs2, int64_t offsetX, int64_t 
         stIntTuple_destruct(i);
     }
 }
-/*
- * This function now passes Sequence objects around, uses the string length of the sequence (which is
- * different than the kmer-sequence-length to make split points
- */
+
 void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         StateMachine *sM, stList *anchorPairs, Sequence *SsX, Sequence *SsY,
         PairwiseAlignmentParameters *p,
@@ -1348,11 +1275,9 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
     stList_destruct(splitPoints);
 }
 
-///////////////////////////////////
-///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Core public functions
-///////////////////////////////////
-///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 PairwiseAlignmentParameters *pairwiseAlignmentBandingParameters_construct() {
     PairwiseAlignmentParameters *p = st_malloc(sizeof(PairwiseAlignmentParameters));
@@ -1381,9 +1306,7 @@ static void alignedPairCoordinateCorrectionFn(int64_t offsetX, int64_t offsetY, 
         stList_append(alignedPairs, stList_pop(subListOfAlignedPairs));
     }
 }
-/*
- * adapted to use Sequences
- */
+
 stList *getAlignedPairsUsingAnchors(StateMachine *sM,
                                     Sequence *SsX, Sequence *SsY,
                                     stList *anchorPairs,
@@ -1421,8 +1344,8 @@ stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_
     //stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(cX, cY, p);
     stList *anchorPairs = getAnchorPairFcn(cX, cY, p);
 
-    Sequence *SsX = sequence_sequenceConstruct(lX, cX, getXFcn);
-    Sequence *SsY = sequence_sequenceConstruct(lY, cY, getYFcn);
+    Sequence *SsX = sequence_construct(lX, cX, getXFcn);
+    Sequence *SsY = sequence_construct(lY, cY, getYFcn);
 
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, SsX, SsY,
                                                        anchorPairs, p, alignmentHasRaggedLeftEnd,
@@ -1439,8 +1362,8 @@ stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int6
                                       void *(*getYFcn)(void *, int64_t),
                                       bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
     // make sequence objects
-    Sequence *ScX = sequence_sequenceConstruct(lX, cX, getXFcn);
-    Sequence *ScY = sequence_sequenceConstruct(lY, cY, getYFcn);
+    Sequence *ScX = sequence_construct(lX, cX, getXFcn);
+    Sequence *ScY = sequence_construct(lY, cY, getYFcn);
 
     // make matrices and bands
     int64_t diagonalNumber = ScX->length + ScY->length;
@@ -1482,16 +1405,12 @@ stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int6
     return alignedPairs;
 }
 
-
 void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                  Sequence *SsX, Sequence *SsY,
                                  stList *anchorPairs,
                                  PairwiseAlignmentParameters *p,
                                  bool alignmentHasRaggedLeftEnd,
                                  bool alignmentHasRaggedRightEnd) {
-    /*
-     * TODO documentation
-     */
     getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(sM, anchorPairs,
                                                                SsX, SsY,
                                                                p,
@@ -1506,15 +1425,11 @@ void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
                      void *(getFcn)(void *, int64_t),
                      stList *(*getAnchorPairFcn)(void *, void *, PairwiseAlignmentParameters *),
                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
-    /*
-     * TODO DOCUMENTATION!
-     */
-    //stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(sX, sY, p);
+    // get anchors
     stList *anchorPairs = getAnchorPairFcn(sX, sY, p);
-    // Make Sequence objects
-
-    Sequence *SsX = sequence_sequenceConstruct(lX, sX, getFcn);
-    Sequence *SsY = sequence_sequenceConstruct(lY, sY, getFcn);
+    // make Sequence objects
+    Sequence *SsX = sequence_construct(lX, sX, getFcn);
+    Sequence *SsY = sequence_construct(lY, sY, getFcn);
 
     getExpectationsUsingAnchors(sM, hmmExpectations, SsX, SsY,
                                 anchorPairs, p,

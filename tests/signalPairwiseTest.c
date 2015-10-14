@@ -4,17 +4,71 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <assert.h>
-#include <discreteHmm.h>
 #include <nanopore.h>
-#include "randomSequences.h"
 #include "stateMachine.h"
 #include "CuTest.h"
 #include "sonLib.h"
 #include "pairwiseAligner.h"
 #include "multipleAligner.h"
-#include "emissionMatrix.h"
 
+static double test_standardNormalPdf(double x) {
+    double pi = 3.141592653589793;
+    double inv_sqTwoPi = 1 / (sqrt(2*pi));
+    double result = inv_sqTwoPi * exp(-(x * x) / 2);
+    return result;
+}
 
+static double test_normalPdf(double x, double mu, double sigma) {
+    double pi = 3.141592653589793;
+    double inv_sqTwoPi = 1 / (sqrt(2*pi));
+    double c = inv_sqTwoPi * (1/sigma);
+    double a = (x - mu) / sigma;
+    double result = c * exp(-0.5f * a * a);
+    return result;
+}
+
+static void test_getLogGaussPdfMatchProb(CuTest *testCase) {
+    // standard normal distribution
+    double eventModel[] = {0, 0, 1.0};
+    double control = test_standardNormalPdf(0);
+    char *kmer1 = "AAAAAA";
+    double event1[] = {0};
+    double test = emissions_signal_getLogGaussPdfMatchProb(eventModel, kmer1, event1);
+    double expTest = exp(test);
+    CuAssertDblEquals(testCase, expTest, control, 0.001);
+    CuAssertDblEquals(testCase, test, log(control), 0.001);
+
+    char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    StateMachine *sM = getSignalStateMachine3(modelFile);
+    double event2[] = {62.784241};
+    double control2 = test_normalPdf(62.784241, sM->EMISSION_MATCH_PROBS[1], sM->EMISSION_MATCH_PROBS[2]);
+    double test2 = emissions_signal_getLogGaussPdfMatchProb(sM->EMISSION_MATCH_PROBS, kmer1, event2);
+    CuAssertDblEquals(testCase, test2, log(control2), 0.001);
+    stateMachine_destruct(sM);
+}
+
+static void test_testBivariateGaussPdfMatchProb(CuTest *testCase) {
+    // standard normal distribution
+    double eventModel[] = {0, 0, 1.0, 0, 1.0};
+    double control = test_standardNormalPdf(0);
+    double controlSq = control * control;
+    char *kmer1 = "AAAAAA";
+    double event1[] = {0, 0}; // mean noise
+    double test = emissions_signal_getBivariateGaussPdfMatchProb(eventModel, kmer1, event1);
+    double eTest = exp(test);
+    CuAssertDblEquals(testCase, controlSq, eTest, 0.001);
+
+    char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    StateMachine *sM = getSignalStateMachine3(modelFile);
+    double event2[] = {62.784241, 0.664989};
+    double control2a = test_normalPdf(62.784241, sM->EMISSION_MATCH_PROBS[1], sM->EMISSION_MATCH_PROBS[2]);
+    double control2b = test_normalPdf(0.664989, sM->EMISSION_MATCH_PROBS[3], sM->EMISSION_MATCH_PROBS[4]);
+    double control2Sq = control2a * control2b;
+    double test2 = emissions_signal_getBivariateGaussPdfMatchProb(sM->EMISSION_MATCH_PROBS, kmer1, event2);
+    double eTest2 = exp(test2);
+    CuAssertDblEquals(testCase, eTest2, control2Sq, 0.001);
+    stateMachine_destruct(sM);
+}
 
 static void test_signal_cell(CuTest *testCase) {
     char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
@@ -45,8 +99,8 @@ static void test_signal_cell(CuTest *testCase) {
     CuAssertIntEquals(testCase, testLength, correctedLength);
 
     // make sequence objects
-    Sequence *eventSeq = sequence_sequenceConstruct(testLength, fakeEventSeq, sequence_getEvent);
-    Sequence *referSeq = sequence_sequenceConstruct(correctedLength, referenceSeq, sequence_getKmer2);
+    Sequence *eventSeq = sequence_construct(testLength, fakeEventSeq, sequence_getEvent);
+    Sequence *referSeq = sequence_construct(correctedLength, referenceSeq, sequence_getKmer2);
 
     // test sequence_getEvent
     for (int64_t i = 0; i < testLength; i++) {
@@ -74,7 +128,6 @@ static void test_signal_cell(CuTest *testCase) {
 
 static void test_signal_diagonalDPCalculations(CuTest *testCase) {
     // make some DNA sequences
-    //char *sX = "ATGACACATT";
     char *sX = "ATGACACATT";
     double sY[12] = {
             60.032615, 0.791316, 0.005, //ATGACA
@@ -87,8 +140,8 @@ static void test_signal_diagonalDPCalculations(CuTest *testCase) {
     int64_t lX = sequence_correctSeqLength(strlen(sX), event);
     int64_t lY = 4;
     // make Sequence objects
-    Sequence *SsX = sequence_sequenceConstruct(lX, sX, sequence_getKmer2);
-    Sequence *SsY = sequence_sequenceConstruct(lY, sY, sequence_getEvent);
+    Sequence *SsX = sequence_construct(lX, sX, sequence_getKmer2);
+    Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent);
 
     // make stateMachine, forward and reverse DP matrices and banding stuff
     char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
@@ -323,8 +376,8 @@ static void test_signal_getAlignedPairsWithBanding(CuTest *testCase) {
     stList *filteredRemappedAnchors = filterToRemoveOverlap(anchorPairs);
 
     // make Sequences
-    Sequence *refSeq = sequence_sequenceConstruct(lX, ZymoReferenceSeq, sequence_getKmer);
-    Sequence *templateSeq = sequence_sequenceConstruct(lY, npRead->templateEvents, sequence_getEvent);
+    Sequence *refSeq = sequence_construct(lX, ZymoReferenceSeq, sequence_getKmer);
+    Sequence *templateSeq = sequence_construct(lY, npRead->templateEvents, sequence_getEvent);
 
     // do alignment
     stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p, 0, 0);
@@ -342,8 +395,10 @@ static void test_signal_getAlignedPairsWithBanding(CuTest *testCase) {
 
 CuSuite *signalPairwiseTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
+    SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
+    SUITE_ADD_TEST(suite, test_testBivariateGaussPdfMatchProb);
     //SUITE_ADD_TEST(suite, test_signal_cell);
-    SUITE_ADD_TEST(suite, test_signal_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_signal_diagonalDPCalculations);
     //SUITE_ADD_TEST(suite, test_scaleModel);
     //SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding2);
     //SUITE_ADD_TEST(suite, test_signal_getAlignedPairsWithBanding);
