@@ -208,6 +208,9 @@ class NanoporeRead(object):
             event[0] -= (delta_time * drift)
         return
 
+    def close(self):
+        self.fastFive.close()
+
 
 class NanoporeModel(object):
     def __init__(self, fast5File):
