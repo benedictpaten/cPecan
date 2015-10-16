@@ -33,7 +33,7 @@ static void test_getLogGaussPdfMatchProb(CuTest *testCase) {
     double control = test_standardNormalPdf(0);
     char *kmer1 = "AAAAAA";
     double event1[] = {0};
-    double test = emissions_signal_getLogGaussPdfMatchProb(eventModel, kmer1, event1);
+    double test = emissions_signal_logGaussPdf(eventModel, kmer1, event1);
     double expTest = exp(test);
     CuAssertDblEquals(testCase, expTest, control, 0.001);
     CuAssertDblEquals(testCase, test, log(control), 0.001);
@@ -42,7 +42,7 @@ static void test_getLogGaussPdfMatchProb(CuTest *testCase) {
     StateMachine *sM = getSignalStateMachine3(modelFile);
     double event2[] = {62.784241};
     double control2 = test_normalPdf(62.784241, sM->EMISSION_MATCH_PROBS[1], sM->EMISSION_MATCH_PROBS[2]);
-    double test2 = emissions_signal_getLogGaussPdfMatchProb(sM->EMISSION_MATCH_PROBS, kmer1, event2);
+    double test2 = emissions_signal_logGaussPdf(sM->EMISSION_MATCH_PROBS, kmer1, event2);
     CuAssertDblEquals(testCase, test2, log(control2), 0.001);
     stateMachine_destruct(sM);
 }
@@ -239,14 +239,27 @@ static void test_scaleModel(CuTest *testCase) {
                                 npRead->templateParams.var, npRead->templateParams.scale_sd,
                                 npRead->templateParams.var_sd);
 
+    // unpack npRead to make things easier
+    double scale = npRead->templateParams.scale, shift = npRead->templateParams.shift,
+        var = npRead->templateParams.var, scale_sd = npRead->templateParams.scale_sd,
+        var_sd = npRead->templateParams.var_sd;
+
+
     StateMachine *sM2 = getSignalStateMachine3(modelFile); // unscaled model
     // TODO build this out to check everything
-    for (int64_t i = 1; i < 1 + (sM->parameterSetSize * MODEL_PARAMS); i += 4) {
+    for (int64_t i = 1; i < 1 + (sM->parameterSetSize * MODEL_PARAMS); i += 5) {
         CuAssertDblEquals(testCase, sM->EMISSION_MATCH_PROBS[i],
-                          (sM2->EMISSION_MATCH_PROBS[i] * npRead->templateParams.scale + npRead->templateParams.shift),
+                          (sM2->EMISSION_MATCH_PROBS[i] * scale + shift), 0.0);
+        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_PROBS[i+1],
+                          sM2->EMISSION_MATCH_PROBS[i+1] * var, 0.0);
+        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_PROBS[i+2],
+                          sM2->EMISSION_MATCH_PROBS[i+2] * scale_sd, 0.0);
+        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_PROBS[i+4],
+                          sM2->EMISSION_MATCH_PROBS[i+4] * var_sd, 0.0);
+        CuAssertDblEquals(testCase, sM->EMISSION_MATCH_PROBS[i+3],
+                          sqrt(pow(sM->EMISSION_MATCH_PROBS[i+2], 3.0) / sM->EMISSION_MATCH_PROBS[i+4]),
                           0.0);
     }
-
 }
 
 static stList *compareAlignedPairs(stList *pairs1, stList *pairs2) {
@@ -262,7 +275,7 @@ static stList *compareAlignedPairs(stList *pairs1, stList *pairs2) {
 
 static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY) {
     st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
-    st_uglyf("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
+    //st_uglyf("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
     stSortedSet *pairs = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
                                                 (void (*)(void *)) stIntTuple_destruct);
     for (int64_t i = 0; i < stList_length(blastPairs); i++) {
@@ -309,10 +322,11 @@ static void test_signal_strandAlignmentNoBanding2(CuTest *testCase) {
                                 npRead->templateParams.var_sd); // clunky
 
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-    p->threshold = 0.4;
+    p->threshold = 0.5; //0.4;
 
     stList *alignedPairs = getAlignedPairsWithoutBanding(sM, ZymoReferenceSeq, npRead->templateEvents, lX, lY, p,
-                                                         sequence_getKmer, sequence_getEvent, 0, 0);
+                                                         sequence_getKmer2, sequence_getEvent, 0, 0);
+    st_uglyf("there are %lld aligned pairs without banding, first time\n", stList_length(alignedPairs));
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
 }
 
@@ -366,7 +380,7 @@ static void test_signal_getAlignedPairsWithBanding(CuTest *testCase) {
                                 npRead->templateParams.var_sd); // clunky
 
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-    p->threshold = 0.4;
+    p->threshold = 0.5;
 
     // get anchors
     stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
@@ -375,21 +389,18 @@ static void test_signal_getAlignedPairsWithBanding(CuTest *testCase) {
     stList *filteredRemappedAnchors = filterToRemoveOverlap(anchorPairs);
 
     // make Sequences
-    Sequence *refSeq = sequence_construct(lX, ZymoReferenceSeq, sequence_getKmer);
+    Sequence *refSeq = sequence_construct(lX, ZymoReferenceSeq, sequence_getKmer2);
     Sequence *templateSeq = sequence_construct(lY, npRead->templateEvents, sequence_getEvent);
 
     // do alignment
     stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p, 0, 0);
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
-
+    st_uglyf("there are %lld aligned pairs using anchors\n", stList_length(alignedPairs));
     // do alignment without banding
     stList *alignedPairs2 = getAlignedPairsWithoutBanding(sMt, ZymoReferenceSeq, npRead->templateEvents, lX, lY, p,
-                                                          sequence_getKmer, sequence_getEvent, 0, 0);
-
-    stList *commonAlignedPairs = scoreAnchorPairs(alignedPairs, alignedPairs2); //TODO double check this
-    CuAssertIntEquals(testCase, stList_length(commonAlignedPairs), stList_length(alignedPairs));
-    st_uglyf("there are %lld aligned pairs in the banded alignment that are also in the non-banded one\n",
-             stList_length(commonAlignedPairs));
+                                                          sequence_getKmer2, sequence_getEvent, 0, 0);
+    st_uglyf("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
+    checkAlignedPairs(testCase, alignedPairs2, lX, lY);
 }
 
 CuSuite *signalPairwiseTestSuite(void) {
@@ -398,8 +409,8 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_testBivariateGaussPdfMatchProb);
     SUITE_ADD_TEST(suite, test_signal_cell);
     SUITE_ADD_TEST(suite, test_signal_diagonalDPCalculations);
-    //SUITE_ADD_TEST(suite, test_scaleModel);
-    //SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding2);
-    //SUITE_ADD_TEST(suite, test_signal_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_scaleModel);
+    SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding2);
+    SUITE_ADD_TEST(suite, test_signal_getAlignedPairsWithBanding);
     return suite;
 }

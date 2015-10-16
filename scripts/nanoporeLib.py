@@ -3,7 +3,7 @@
 """
 
 from __future__ import print_function
-from numpy import log2
+from numpy import log2, power
 from itertools import islice, izip
 import h5py
 import sys
@@ -222,10 +222,15 @@ class NanoporeModel(object):
 
     def export_model(self, destination_path):
         """Exports the model to a file. Format:
-        line 1: [correlation coefficient] [level_mean] [level_sd] [noise_mean] [noise_sd] (.../kmer) \n
+        line 1: [correlation coefficient] [level_mean] [level_sd] [noise_mean] 
+                    [noise_sd] [noise_lambda ] (.../kmer) \n
         line 2: skip bins \n
-        line 3: [correlation coefficient] [level_mean] [level_sd, scaled] [noise_mean] [noise_sd] (.../kmer) \n
+        line 3: [correlation coefficient] [level_mean] [level_sd, scaled] 
+                    [noise_mean] [noise_sd] [noise_lambda ] (.../kmer) \n
         """
+        def calculate_lambda(noise_mean, noise_stdev):
+            return (power(noise_mean, 3)) / (power(noise_stdev, 2))
+
         if self.model is None:
             print("This method is meant to be used as part of the child class TemplateModel or ComplementModel",
                   file=sys.stderr)
@@ -236,7 +241,8 @@ class NanoporeModel(object):
         # line 1
         print("0", end=' ', file=out_file) # placeholder for correlation parameter
         for kmer, level_mean, level_stdev, sd_mean, sd_stdev, weight in self.model:
-            print(level_mean, level_stdev, sd_mean, sd_stdev, end=' ', file=out_file)
+            lam = calculate_lambda(sd_mean, sd_stdev)
+            print(level_mean, level_stdev, sd_mean, sd_stdev, lam, end=' ', file=out_file)
         print("", end="\n", file=out_file)
         # line 2
         for _ in self.skip_prob_bins:
@@ -245,7 +251,8 @@ class NanoporeModel(object):
         # line 3
         print("0", end=' ', file=out_file) # placeholder for correlation parameter
         for kmer, level_mean, level_stdev, sd_mean, sd_stdev, weight in self.model:
-            print(level_mean, (level_stdev*1.75), sd_mean, sd_stdev, end=' ', file=out_file)
+            lam = calculate_lambda(sd_mean, sd_stdev)
+            print(level_mean, (level_stdev*1.75), sd_mean, sd_stdev, lam, end=' ', file=out_file)
         print("", end="\n", file=out_file)
         return
 

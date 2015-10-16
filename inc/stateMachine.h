@@ -12,7 +12,7 @@
 
 #define SYMBOL_NUMBER 5
 #define SYMBOL_NUMBER_NO_N 4
-#define MODEL_PARAMS 4 // we record the the mean and standard deviation for the level and the noise for each kmer
+#define MODEL_PARAMS 5 // level_mean, level_sd, fluctuation_mean, fluctuation_noise, fluctuation_lambda
 #define SQRT_TWO 1.4142135623730951
 /*
  * The statemachine object for computing pairwise alignments with.
@@ -208,7 +208,7 @@ double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, vo
 
 double emissions_signal_getKmerSkipProb(StateMachine *sM, void *kmers);
 
-double emissions_signal_getLogGaussPdfMatchProb(const double *eventModel, void *kmer, void *event);
+double emissions_signal_logGaussPdf(const double *eventModel, void *kmer, void *event);
 
 // returns log of the probability density function for a Gaussian distribution
 double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, void *kmer, void *event);

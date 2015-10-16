@@ -204,12 +204,18 @@ static inline double emissions_signal_getModelFluctuationSd(const double *eventM
     return kmerIndex > NUM_OF_KMERS ? 0.0 : eventModel[1 + (kmerIndex * MODEL_PARAMS + 3)];
 }
 
+static inline double emissions_signal_getModelFluctuationLambda(const double *eventModel, int64_t kmerIndex) {
+    return kmerIndex > NUM_OF_KMERS ? 0.0 : eventModel[1 + (kmerIndex * MODEL_PARAMS + 4)];
+}
+
 static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFile) {
     /*
      *  the model file has the format:
-     *  line 1: [correlation coefficient] [level_mean] [level_sd] [noise_mean] [noise_sd] (.../kmer) \n
+     *  line 1: [correlation coefficient] [level_mean] [level_sd] [noise_mean]
+     *              [noise_sd] [noise_lambda ](.../kmer) \n
      *  line 2: skip bins \n
-     *  line 3: [correlation coefficient] [level_mean] [level_sd, scaled] [noise_mean] [noise_sd] (.../kmer) \n
+     *  line 3: [correlation coefficient] [level_mean] [level_sd, scaled]
+     *              [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
      */
 
     FILE *fH = fopen(modelFile, "r");
@@ -272,6 +278,16 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
     fclose(fH);
 }
 
+static double emissions_signal_logInvGaussPdf(double eventNoise, double modelNoiseMean, double modelNoiseLambda) {
+    double l_twoPi = 1.8378770664093453;// log(2*pi)
+    double l_eventNoise = log(eventNoise);
+    double a = (eventNoise - modelNoiseMean) / modelNoiseMean;
+    double l_modelNoseLambda = log(modelNoiseLambda);
+
+    // returns Log-space
+    return (l_modelNoseLambda - l_twoPi - 3 * l_eventNoise - modelNoiseLambda * a * a / eventNoise) / 2;
+}
+
 ///////////////////////////////////////////// CORE FUNCTIONS ////////////////////////////////////////////////////////
 
 void emissions_signal_initEmissionsToZero(StateMachine *sM) {
@@ -326,7 +342,7 @@ double emissions_signal_getKmerSkipProb(StateMachine *sM, void *kmers) {
     return sM3v->model.EMISSION_GAP_X_PROBS[bin];
 }
 
-double emissions_signal_getLogGaussPdfMatchProb(const double *eventModel, void *kmer, void *event) {
+double emissions_signal_logGaussPdf(const double *eventModel, void *kmer, void *event) {
     // make temp kmer
     char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
     for (int64_t x = 0; x < KMER_LENGTH; x++) {
@@ -337,33 +353,76 @@ double emissions_signal_getLogGaussPdfMatchProb(const double *eventModel, void *
     // get event mean, and kmer index
     double eventMean = *(double *) event;
     int64_t kmerIndex = emissions_discrete_getKmerIndex(kmer_i);
-    double log_inv_sqrt_2pi = log(0.3989422804014327); // constant
+    double l_inv_sqrt_2pi = log(0.3989422804014327); // constant
     // 1 + because the first element in the array is the covariance of mean and fluctuation
     //double modelMean = eventModel[1 + (kmerIndex * MODEL_PARAMS)];
     double modelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
     //double modelStdDev = eventModel[1 + (kmerIndex * MODEL_PARAMS + 1)];
     double modelStdDev = emissions_signal_getModelLevelSd(eventModel, kmerIndex);
-    double log_modelSD = log(modelStdDev);
+    double l_modelSD = log(modelStdDev);
     double a = (eventMean - modelMean) / modelStdDev;
     // clean up
     free(kmer_i);
 
     /// / debugging
-    //double prob = log_inv_sqrt_2pi - log_modelSD + (-0.5f * a * a);
+    //double prob = l_inv_sqrt_2pi - l_modelSD + (-0.5f * a * a);
     //st_uglyf("MATCHING--kmer:%s (index: %lld), event mean: %f, levelMean: %f, prob: %f\n", kmer_i, kmerIndex, eventMean, modelMean, prob);
 
-    return log_inv_sqrt_2pi - log_modelSD + (-0.5f * a * a);
+    // returns log space
+    return l_inv_sqrt_2pi - l_modelSD + (-0.5f * a * a);
+}
+
+double emissions_signal_getEventMatchProbWithTwoDists(const double *eventModel, void *kmer, void *event) {
+    // make temp kmer
+    char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
+    for (int64_t x = 0; x < KMER_LENGTH; x++) {
+        kmer_i[x] = *((char *)kmer+(x+1));
+    }
+    kmer_i[KMER_LENGTH] = '\0';
+
+    // get event mean, and noise
+    double eventMean = *(double *) event;
+    double eventNoise = *(double *) (event + sizeof(double));
+
+    // get the kmer index
+    int64_t kmerIndex = emissions_discrete_getKmerIndex(kmer_i);
+
+    // first calculate the prob of the level mean
+    double l_inv_sqrt_2pi = log(0.3989422804014327); // constant
+    double expectedLevelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
+    double expectedLevelSd = emissions_signal_getModelLevelSd(eventModel, kmerIndex);
+    double l_expLevelSd = log(expectedLevelSd);
+    double a = (eventMean - expectedLevelMean) / expectedLevelSd;
+    double levelProb = l_inv_sqrt_2pi - l_expLevelSd + (-0.5f * a * a);
+
+    // now calculate the prob of the noise mean
+    double expectedNoiseMean = emissions_signal_getModelFluctuationMean(eventModel, kmerIndex);
+    double modelNoiseLambda = emissions_signal_getModelFluctuationLambda(eventModel, kmerIndex);
+    double noiseProb = emissions_signal_logInvGaussPdf(eventNoise, expectedNoiseMean, modelNoiseLambda);
+
+    // clean up
+    free(kmer_i);
+
+    return levelProb + noiseProb;
 }
 
 double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, void *kmer, void *event) {
+
     // wrangle event data
     double eventMean = *(double *) event;
     double eventNoise = *(double *) (event + sizeof(double)); // aaah pointers
     // correlation coefficient is the 0th member of the event model
     double p = eventModel[0];
     double pSq = p * p;
-    // get model parameters
-    int64_t kmerIndex = emissions_discrete_getKmerIndex(kmer);
+
+    // make temp kmer
+    char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
+    for (int64_t x = 0; x < KMER_LENGTH; x++) {
+        kmer_i[x] = *((char *)kmer+(x+1));
+    }
+    kmer_i[KMER_LENGTH] = '\0';
+
+    int64_t kmerIndex = emissions_discrete_getKmerIndex(kmer_i);
 
     //double levelMean = eventModel[1 + (kmerIndex * MODEL_PARAMS)];
     double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
@@ -381,19 +440,31 @@ double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, 
     double yu = (eventNoise - noiseMean) / noiseStdDev;
     double a = expC * ((xu * xu) + (yu * yu) - (2 * p * xu * yu));
     double c = log_inv_2pi - log(levelStdDev * noiseStdDev * sqrt(1 - pSq));
+
+    free(kmer_i);
+
     return c + a;
 }
 
 void emissions_signal_scaleModel(StateMachine *sM,
                                  double scale, double shift, double var,
                                  double scale_sd, double var_sd) {
-    // model is arranged: level_mean, level_stdev, sd_mean, sd_stdev per kmer
+    // model is arranged: level_mean, level_stdev, sd_mean, sd_stdev, sd_lambda per kmer
     // already been adjusted for correlation coeff.
-    for (int64_t i = 1; i < (sM->parameterSetSize * MODEL_PARAMS) + 1; i += 4) {
-        sM->EMISSION_MATCH_PROBS[i] = sM->EMISSION_MATCH_PROBS[i] * scale + shift; // mean = mean * scale + shift
-        sM->EMISSION_MATCH_PROBS[i+1] = sM->EMISSION_MATCH_PROBS[i+1] * var; // stdev = stdev * var
+    for (int64_t i = 1; i < (sM->parameterSetSize * MODEL_PARAMS) + 1; i += MODEL_PARAMS) {
+        // Level adjustments
+        // level_mean = mean * scale + shift
+        sM->EMISSION_MATCH_PROBS[i] = sM->EMISSION_MATCH_PROBS[i] * scale + shift;
+        // level_stdev = stdev * var
+        sM->EMISSION_MATCH_PROBS[i+1] = sM->EMISSION_MATCH_PROBS[i+1] * var;
+
+        // Fluctuation (noise) adjustments
+        // noise_mean *= * scale_sd
         sM->EMISSION_MATCH_PROBS[i+2] = sM->EMISSION_MATCH_PROBS[i+2] * scale_sd;
-        sM->EMISSION_MATCH_PROBS[i+3] = sM->EMISSION_MATCH_PROBS[i+3] * sqrt(pow(scale_sd, 3.0) / var_sd);
+        // noise_lambda *= var_sd
+        sM->EMISSION_MATCH_PROBS[i+4] = sM->EMISSION_MATCH_PROBS[i+4] * var_sd;
+        // noise_sd = sqrt(adjusted_noise_mean**3 / adjusted_noise_lambda);
+        sM->EMISSION_MATCH_PROBS[i+3] = sqrt(pow(sM->EMISSION_MATCH_PROBS[i+2], 3.0) / sM->EMISSION_MATCH_PROBS[i+4]);
     }
 }
 
@@ -845,11 +916,11 @@ static void stateMachine3Vanilla_cellCalculate(StateMachine *sM,
     // Establish transition probs (all adopted from Nanopolish by JTS)
     // from match
     double a_mx = sM3v->getKmerSkipProb((StateMachine *) sM3v, cX);
-    double a_me = (1 - a_mx) * sM3v->TRANSITION_M_TO_Y_NOT_X; // trans M to Y not X fudge factor
-    double a_mm = 1.0f - a_me - a_mx;
+    double a_my = (1 - a_mx) * sM3v->TRANSITION_M_TO_Y_NOT_X; // trans M to Y not X fudge factor
+    double a_mm = 1.0f - a_my - a_mx;
     // from Y [Extra event state]
-    double a_ee = sM3v->TRANSITION_E_TO_E; //
-    double a_em = 1.0f - a_ee;
+    double a_yy = sM3v->TRANSITION_E_TO_E; //
+    double a_ym = 1.0f - a_yy;
     // from X [Skipped event state]
     double a_xx = a_mx;
     double a_xm = 1.0f - a_xx;
@@ -864,12 +935,12 @@ static void stateMachine3Vanilla_cellCalculate(StateMachine *sM,
         double eP = sM3v->getMatchProbFcn(sM3v->model.EMISSION_MATCH_PROBS, cX, cY);
         doTransition(middle, current, match, match, eP, log(a_mm), extraArgs);
         doTransition(middle, current, shortGapX, match, eP, log(a_xm), extraArgs);
-        doTransition(middle, current, shortGapY, match, eP, log(a_em), extraArgs);
+        doTransition(middle, current, shortGapY, match, eP, log(a_ym), extraArgs);
     }
     if (upper != NULL) {
         double eP = sM3v->getScaledMatchProbFcn(sM3v->model.EMISSION_GAP_Y_PROBS, cX, cY);
-        doTransition(upper, current, match, shortGapY, eP, log(a_me), extraArgs);
-        doTransition(upper, current, shortGapY, shortGapY, eP, log(a_ee), extraArgs);
+        doTransition(upper, current, match, shortGapY, eP, log(a_my), extraArgs);
+        doTransition(upper, current, shortGapY, shortGapY, eP, log(a_yy), extraArgs);
         // Y to X not allowed
         //doTransition(upper, current, shortGapX, shortGapY, eP, sM3->TRANSITION_GAP_SWITCH_TO_Y, extraArgs);
     }
@@ -1038,11 +1109,16 @@ StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
 
 StateMachine *getSignalStateMachine3(const char *modelFile) {
     // construct a stateMachine3Vanilla then load the model
+    //StateMachine *sM3v = stateMachine3Vanilla_construct(threeState, NUM_OF_KMERS,
+    //                                                    emissions_signal_initEmissionsToZero,
+    //                                                    emissions_signal_getKmerSkipProb,
+    //                                                    emissions_signal_logGaussPdf,
+    //                                                    emissions_signal_logGaussPdf);
     StateMachine *sM3v = stateMachine3Vanilla_construct(threeState, NUM_OF_KMERS,
                                                         emissions_signal_initEmissionsToZero,
                                                         emissions_signal_getKmerSkipProb,
-                                                        emissions_signal_getLogGaussPdfMatchProb,
-                                                        emissions_signal_getLogGaussPdfMatchProb);
+                                                        emissions_signal_getBivariateGaussPdfMatchProb,
+                                                        emissions_signal_getBivariateGaussPdfMatchProb);
 
     emissions_signal_loadPoreModel(sM3v, modelFile);
     return sM3v;
