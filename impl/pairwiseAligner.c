@@ -265,6 +265,11 @@ Sequence *sequence_construct(int64_t length, void *elements, void (*getFcn)) {
     return self;
 }
 
+void sequence_padSequence(Sequence *sequence) {
+    char *endPadding = "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnn";
+    sequence->elements = stString_print("%s%s", sequence->elements, endPadding);
+}
+
 Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength, void (*getFcn)) {
     /*
      * slice a sequence object
@@ -607,7 +612,6 @@ static void diagonalCalculation(StateMachine *sM,
         // it could be anything (base, kmer, event, etc.)
         void* x = sX->get(sX->elements, indexX);
         void* y = sY->get(sY->elements, indexY);
-        //st_uglyf("SENTINAL: diagonalCalculation --> got X:%c, Y:%c\n",  *(char*) x, *(char*) y);
 
         // do the calculations
         double *current = dpDiagonal_getCell(dpDiagonal, xmy);

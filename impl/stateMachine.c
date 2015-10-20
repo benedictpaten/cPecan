@@ -111,8 +111,8 @@ int64_t emissions_discrete_getBaseIndex(void *base) {
             return 2;
         case 'T':
             return 3;
-        default: // N
-            return 4;
+        default: // N or n. Hack to make sure that we get a zero model mean
+            return NUM_OF_KMERS;
     }
 }
 
@@ -355,12 +355,13 @@ double emissions_signal_getKmerSkipProb(StateMachine *sM, void *kmers) {
 
     // for debugging
     //double pSkip = sM3v->model.EMISSION_GAP_X_PROBS[bin];
-    //st_uglyf("SENTINAL - getKmerSkipProb; kmer_i: %s (index: %lld, model u=%f), kmer_im1: %s (index: %lld, model u=%f),\n d: %f, bin: %lld, pSkip: %f\n",
+    //st_uglyf("SENTINAL - getKmerSkipProb; kmer_i: %s (index: %lld, model u=%f), kmer_im1: %s (index: %lld, model u=%f), d: %f, bin: %lld, pSkip: %f\n",
     //         kmer_i, k_i, u_ki, kmer_im1, k_im1, u_kim1, d, bin, pSkip);
 
     // clean up
     free(kmer_im1);
     free(kmer_i);
+    // NOT log space
     return sM3v->model.EMISSION_GAP_X_PROBS[bin];
 }
 
@@ -415,8 +416,6 @@ double emissions_signal_getEventMatchProbWithTwoDists(const double *eventModel, 
     double modelNoiseLambda = emissions_signal_getModelFluctuationLambda(eventModel, kmerIndex);
     double noiseProb = emissions_signal_logInvGaussPdf(eventNoise, expectedNoiseMean, modelNoiseLambda);
 
-    st_uglyf("MATCHING--kmer:%s (index: %lld), event mean: %f, levelMean: %f\n", kmer_i,
-             kmerIndex, eventMean, expectedLevelMean);
     // clean up
     free(kmer_i);
 
@@ -424,31 +423,28 @@ double emissions_signal_getEventMatchProbWithTwoDists(const double *eventModel, 
 }
 
 double emissions_signal_multipleKmerMatchProb(const double *eventModel, void *kmers, void *event, int64_t n) {
-    st_uglyf("SENTINAL - starting multipleKmerMatchProb function\n");
     double p = 0.0;
     for (int64_t i = 0; i < n; i++) {
         // check if we're going to run off the end of the sequence
         int64_t l = (KMER_LENGTH * n);
         char lastBase = *(char *) (kmers + l);
-        st_uglyf("SENTINAL - checking last base: %c for n: %lld ", lastBase, n);
         // if we're not, logAdd up all the probs for the next n kmers
         if (isupper(lastBase)) {
-            st_uglyf("still in the sequence\n");
-            char *x_i = &kmers[i]; // +1 because the first kmer at the address is used to calculate skip prob
+            char *x_i = &kmers[i];
             p = logAdd(p, emissions_signal_getEventMatchProbWithTwoDists(eventModel, x_i, event));
         } else { // otherwise return zero prob of emitting this many kmers from this event
-            st_uglyf("not in the sequence\n");
             return LOG_ZERO;
         }
     }
-    return p;
+    // todo make this a pre-calculated thing
+    return p - log(n);
 }
 
 double emissions_signal_meanEventMatchProb(const double *eventModel, void *kmers, void *event) {
     // first go though and add up all of the event/kmer match probs
     double totalMatchProb = 0.0;
     double totalDurationProb = 0.0;
-    double duration = *(double *) (event + (2*sizeof(double)));
+    double duration = *(double *) (event + (2 * sizeof(double)));
     int64_t n = 0;
     for (int64_t i = 1; i > 6; i++) {
         char *kmer_xi = &kmers[i]; // todo need a check here for ending kmers
@@ -466,7 +462,7 @@ double emissions_signal_meanEventMatchProb(const double *eventModel, void *kmers
 }
 
 double emissions_signal_getDurationProb(void *event, int64_t n) {
-    double duration = *(double *) (event + (2*sizeof(double)));
+    double duration = *(double *) (event + (2 * sizeof(double)));
     return emissions_signal_poissonPosteriorProb(n, duration);
 }
 
@@ -927,14 +923,30 @@ static double stateMachine3Vanilla_endStateProb(StateMachine *sM, int64_t state)
     return 0.0;
 }
 
+static double stateMachineEchelon_startStateProb(StateMachine *sM, int64_t state) {
+    //Match state is like going to a match.
+    state_check(sM, state);
+    return state == match1 ? 0 : LOG_ZERO;
+}
+
+static double stateMachineEchelon_raggedStartStateProb(StateMachine *sM, int64_t state) {
+    state_check(sM, state);
+    return state == gapX ? 0 : LOG_ZERO;
+}
+
 static double stateMachineEchelon_endStateProb(StateMachine *sM, int64_t state) {
-    StateMachine2Echelon *sM2e = (StateMachine2Echelon *) sM;
+    StateMachineEchelon *sMe = (StateMachineEchelon *) sM;
     state_check(sM, state);
     switch (state) {
-        case match:
-            return sM2e->DEFAULT_END_MATCH_PROB;
-        case shortGapX:
-            return sM2e->DEFAULT_END_FROM_X_PROB;
+        case match0:
+        case match1:
+        case match2:
+        case match3:
+        case match4:
+        case match5:
+            return sMe->DEFAULT_END_MATCH_PROB;
+        case gapX:
+            return sMe->DEFAULT_END_FROM_X_PROB;
     }
     return 0.0;
 }
@@ -1035,7 +1047,7 @@ static void stateMachineEchelon_cellCalculate(StateMachine *sM,
                                               void (*doTransition)(double *, double *, int64_t, int64_t,
                                                                    double, double, void *),
                                               void *extraArgs) {
-    StateMachine2Echelon *sMe = (StateMachine2Echelon *) sM;
+    StateMachineEchelon *sMe = (StateMachineEchelon *) sM;
     // transitions
     // from M
     double a_mx = sMe->getKmerSkipProb((StateMachine *) sMe, cX), la_mx = log(a_mx); // beta
@@ -1169,7 +1181,7 @@ StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t param
                                             double (*skipProbFcn)(StateMachine *sM, void *kmerList),
                                             double (*matchProbFcn)(const double *, void *, void *, int64_t n),
                                             double (*scaledMatchProbFcn)(const double *, void *, void *)) {
-    StateMachine2Echelon *sMe = st_malloc(sizeof(StateMachine2Echelon));
+    StateMachineEchelon *sMe = st_malloc(sizeof(StateMachineEchelon));
 
     // setup end state probabilities
     sMe->DEFAULT_END_MATCH_PROB = 0.79015888282447311; // stride_prb
@@ -1179,10 +1191,10 @@ StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t param
     // parent class setup
     sMe->model.type = type;
     sMe->model.parameterSetSize = parameterSetSize;
-    sMe->model.stateNumber = 6;
-    sMe->model.matchState = match; // take a look at this, might need to change
-    sMe->model.startStateProb = stateMachine3_startStateProb;
-    sMe->model.raggedStartStateProb = stateMachine3_raggedStartStateProb;
+    sMe->model.stateNumber = 7;
+    sMe->model.matchState = match1; // take a look at this, might need to change
+    sMe->model.startStateProb = stateMachineEchelon_startStateProb;
+    sMe->model.raggedStartStateProb = stateMachineEchelon_raggedStartStateProb;
     sMe->model.endStateProb = stateMachineEchelon_endStateProb;
     sMe->model.raggedEndStateProb = stateMachineEchelon_endStateProb;
     sMe->model.cellCalculate = stateMachineEchelon_cellCalculate;

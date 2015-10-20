@@ -48,6 +48,8 @@ typedef struct sequence {
 */
 Sequence *sequence_construct(int64_t length, void *elements, void (*getFcn));
 
+void sequence_padSequence(Sequence *sequence);
+
 Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength, void (*getFcn));
 
 void sequence_sequenceDestroy(Sequence *seq);

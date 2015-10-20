@@ -167,7 +167,7 @@ typedef struct _StateMachine2echelon {
     double (*getMatchProbFcn)(const double *eventModel, void *kmers, void *event, int64_t n); // P(ej|xi..xn)
     double (*getScaledMatchProbFcn)(const double *scaledEventModel, void *kmer, void *event);
 
-} StateMachine2Echelon;
+} StateMachineEchelon;
 
 typedef struct _stateMachineFunctions { // TODO rename these to be more general or might remove them all together
     double (*gapXProbFcn)(const double *, void *);

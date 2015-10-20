@@ -99,7 +99,7 @@ static void test_twoDistributionPdf(CuTest *testCase) {
 }
 
 
-static void test_signal_cell(CuTest *testCase) {
+static void test_vanilla_cell(CuTest *testCase) {
     char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
     StateMachine *sM = getSignalStateMachine3(modelFile);
     double lowerF[sM->stateNumber], middleF[sM->stateNumber], upperF[sM->stateNumber], currentF[sM->stateNumber];
@@ -222,7 +222,7 @@ static void test_echelon_cell(CuTest *testCase) {
 }
 
 
-static void test_signal_diagonalDPCalculations(CuTest *testCase) {
+static void test_vanilla_diagonalDPCalculations(CuTest *testCase) {
     // make some DNA sequences
     char *sX = "ATGACACATT";
     double sY[12] = {
@@ -315,9 +315,170 @@ static void test_signal_diagonalDPCalculations(CuTest *testCase) {
         stIntTuple *pair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
         st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
+        st_uglyf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
         CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
     CuAssertIntEquals(testCase, 4, (int) stList_length(alignedPairs));
+
+    // clean up
+    sequence_sequenceDestroy(SsX);
+    sequence_sequenceDestroy(SsY);
+}
+
+static void test_echelon_dpDiagonal(CuTest *testCase) {
+
+    // make stateMachine, forward and reverse DP matrices and banding stuff
+    char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    StateMachine *sM = getEchelonStateMachine(modelFile);
+
+    Diagonal diagonal = diagonal_construct(3, -1, 1);
+
+    DpDiagonal *dpDiagonal = dpDiagonal_construct(diagonal, sM->stateNumber);
+
+    //Get cell
+    double *c1 = dpDiagonal_getCell(dpDiagonal, -1);
+    CuAssertTrue(testCase, c1 != NULL);
+
+    double *c2 = dpDiagonal_getCell(dpDiagonal, 1);
+    CuAssertTrue(testCase, c2 != NULL);
+
+    CuAssertTrue(testCase, dpDiagonal_getCell(dpDiagonal, 3) == NULL);
+    CuAssertTrue(testCase, dpDiagonal_getCell(dpDiagonal, -3) == NULL);
+
+    dpDiagonal_initialiseValues(dpDiagonal, sM, sM->endStateProb); //Test initialise values
+    double totalProb = LOG_ZERO;
+    for (int64_t i = 0; i < sM->stateNumber; i++) {
+        CuAssertDblEquals(testCase, c1[i], sM->endStateProb(sM, i), 0.0);
+        CuAssertDblEquals(testCase, c2[i], sM->endStateProb(sM, i), 0.0);
+        totalProb = logAdd(totalProb, 2 * c1[i]);
+        totalProb = logAdd(totalProb, 2 * c2[i]);
+    }
+
+    DpDiagonal *dpDiagonal2 = dpDiagonal_clone(dpDiagonal);
+    CuAssertTrue(testCase, dpDiagonal_equals(dpDiagonal, dpDiagonal2));
+
+    //Check it runs
+    CuAssertDblEquals(testCase, totalProb, dpDiagonal_dotProduct(dpDiagonal, dpDiagonal2), 0.001);
+
+    dpDiagonal_destruct(dpDiagonal);
+    dpDiagonal_destruct(dpDiagonal2);
+}
+
+static void test_echelon_diagonalDPCalculations(CuTest *testCase) {
+    // make some DNA sequences
+    //char *sX = "ATGACACATT"; old one
+    //          01234567
+    char *sX = "ACGATACGGACAT";
+
+    double sY[21] = {
+            58.743435, 0.887833, 0.0571, //ACGATA 0
+            53.604965, 0.816836, 0.0571, //CGATAC 1
+            58.432015, 0.735143, 0.0571, //GATACG 2
+            63.684352, 0.795437, 0.0571, //ATACGG 3
+            //63.520262, 0.757803, 0.0571, //TACGGA 4
+            58.921430, 0.812959, 0.0571, //ACGGAC 5 (4)
+            59.895882, 0.740952, 0.0571, //CGGACA 6 (5)
+            61.684303, 0.722332, 0.0571, //GGACAT 7 (6)
+    };
+    // make variables for the (corrected) length of the sequences
+    int64_t lX = sequence_correctSeqLength(strlen(sX), event);
+    int64_t lY = 7;
+
+    /*
+    // padding sequence testing
+    st_uglyf("sX before padding: %s \n", sX);
+    char *endPadding = "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnn";
+    //sX = stString_print("%s%s%s", endPadding, sX, endPadding);
+    sX = stString_print("%s%s", sX, endPadding);
+    st_uglyf("sX after padding: %s \n", sX);
+    //sX = sX+(6*5);
+    st_uglyf("sX after padding and adjustment: %s \n", sX);
+    */
+
+    Sequence *SsX = sequence_construct(lX, sX, sequence_getKmer2);
+    sequence_padSequence(SsX);
+    Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent);
+
+    // make stateMachine, forward and reverse DP matrices and banding stuff
+    char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    StateMachine *sM = getEchelonStateMachine(modelFile);
+
+    DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
+    DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
+    stList *anchorPairs = stList_construct();
+    Band *band = band_construct(anchorPairs, SsX->length, SsY->length, 2);
+    BandIterator *bandIt = bandIterator_construct(band);
+
+    // Initialize Matrices
+    for (int64_t i = 0; i <= lX + lY; i++) {
+        Diagonal d = bandIterator_getNext(bandIt);
+        //initialisation
+        dpDiagonal_zeroValues(dpMatrix_createDiagonal(dpMatrixBackward, d));
+        dpDiagonal_zeroValues(dpMatrix_createDiagonal(dpMatrixForward, d));
+    }
+    dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixForward, 0), sM, sM->startStateProb);
+    dpDiagonal_initialiseValues(dpMatrix_getDiagonal(dpMatrixBackward, lX + lY), sM, sM->endStateProb);
+
+    //Forward algorithm
+
+    for (int64_t i = 1; i <= lX + lY; i++) {
+        //Do the forward calculation
+        diagonalCalculationForward(sM, i, dpMatrixForward, SsX, SsY);
+    }
+    //Backward algorithm
+    for (int64_t i = lX + lY; i > 0; i--) {
+        //Do the backward calculation
+        diagonalCalculationBackward(sM, i, dpMatrixBackward, SsX, SsY);
+    }
+
+    //Calculate total probabilities
+    double totalProbForward = cell_dotProduct2(
+            dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY), sM, sM->endStateProb);
+    double totalProbBackward = cell_dotProduct2(
+            dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
+    st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
+
+    // Test the posterior probabilities along the diagonals of the matrix.
+    for (int64_t i = 0; i <= lX + lY; i++) {
+        double totalDiagonalProb = diagonalCalculationTotalProbability(sM, i,
+                                                                       dpMatrixForward,
+                                                                       dpMatrixBackward,
+                                                                       SsX, SsY);
+        //Check the forward and back probabilities are about equal
+        CuAssertDblEquals(testCase, totalProbForward, totalDiagonalProb, 0.01);
+    }
+
+    // Now do the posterior probabilities, get aligned pairs with posterior match probs above threshold
+    stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
+    void *extraArgs[1] = { alignedPairs };
+    // Perform alignment
+    for (int64_t i = 1; i <= lX + lY; i++) {
+        PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+        p->threshold = 0.1;
+        diagonalCalculationPosteriorMatchProbs(sM, i, dpMatrixForward, dpMatrixBackward, SsX, SsY,
+                                               totalProbForward, p, extraArgs);
+        pairwiseAlignmentBandingParameters_destruct(p);
+    }
+
+    // Make a list of the correct anchor points
+    stSortedSet *alignedPairsSet = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
+                                                          (void (*)(void *)) stIntTuple_destruct);
+
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 2));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 3));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(5, 4));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(6, 5));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(7, 6));
+
+    // make sure alignedPairs is correct
+    for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
+        stIntTuple *pair = stList_get(alignedPairs, i);
+        int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
+        st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
+        st_uglyf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
+        //CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
+    }
+    //CuAssertIntEquals(testCase, 5, (int) stList_length(alignedPairs));
 
     // clean up
     sequence_sequenceDestroy(SsX);
@@ -501,12 +662,14 @@ static void test_signal_getAlignedPairsWithBanding(CuTest *testCase) {
 
 CuSuite *signalPairwiseTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
-    SUITE_ADD_TEST(suite, test_bivariateGaussPdfMatchProb);
-    SUITE_ADD_TEST(suite, test_twoDistributionPdf);
-    //SUITE_ADD_TEST(suite, test_signal_cell);
-    SUITE_ADD_TEST(suite, test_echelon_cell);
-    //SUITE_ADD_TEST(suite, test_signal_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
+    //SUITE_ADD_TEST(suite, test_bivariateGaussPdfMatchProb);
+    //SUITE_ADD_TEST(suite, test_twoDistributionPdf);
+    //SUITE_ADD_TEST(suite, test_vanilla_cell);
+    //SUITE_ADD_TEST(suite, test_echelon_cell);
+    //SUITE_ADD_TEST(suite, test_echelon_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_vanilla_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_echelon_diagonalDPCalculations);
     //SUITE_ADD_TEST(suite, test_scaleModel);
     //SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding2);
     //SUITE_ADD_TEST(suite, test_signal_getAlignedPairsWithBanding);
