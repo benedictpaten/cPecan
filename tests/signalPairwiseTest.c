@@ -11,6 +11,8 @@
 #include "pairwiseAligner.h"
 #include "multipleAligner.h"
 
+
+// brute force probability formulae
 static double test_standardNormalPdf(double x) {
     double pi = 3.141592653589793;
     double inv_sqTwoPi = 1 / (sqrt(2*pi));
@@ -27,13 +29,23 @@ static double test_normalPdf(double x, double mu, double sigma) {
     return result;
 }
 
+static double test_inverseGaussianPdf(double x, double mu, double lambda) {
+    double pi = 3.141592653589793;
+    double c = lambda / (2 * pi * pow(x, 3.0));
+    double sqt_c = sqrt(c);
+    double xmmu = x - mu;
+    double result = sqt_c * exp((-lambda * xmmu * xmmu)/
+                                (2 * mu * mu * x));
+    return result;
+}
+
 static void test_getLogGaussPdfMatchProb(CuTest *testCase) {
     // standard normal distribution
     double eventModel[] = {0, 0, 1.0};
     double control = test_standardNormalPdf(0);
     char *kmer1 = "AAAAAA";
     double event1[] = {0};
-    double test = emissions_signal_logGaussPdf(eventModel, kmer1, event1);
+    double test = emissions_signal_logGaussMatchProb(eventModel, kmer1, event1);
     double expTest = exp(test);
     CuAssertDblEquals(testCase, expTest, control, 0.001);
     CuAssertDblEquals(testCase, test, log(control), 0.001);
@@ -42,12 +54,12 @@ static void test_getLogGaussPdfMatchProb(CuTest *testCase) {
     StateMachine *sM = getSignalStateMachine3(modelFile);
     double event2[] = {62.784241};
     double control2 = test_normalPdf(62.784241, sM->EMISSION_MATCH_PROBS[1], sM->EMISSION_MATCH_PROBS[2]);
-    double test2 = emissions_signal_logGaussPdf(sM->EMISSION_MATCH_PROBS, kmer1, event2);
+    double test2 = emissions_signal_logGaussMatchProb(sM->EMISSION_MATCH_PROBS, kmer1, event2);
     CuAssertDblEquals(testCase, test2, log(control2), 0.001);
     stateMachine_destruct(sM);
 }
 
-static void test_testBivariateGaussPdfMatchProb(CuTest *testCase) {
+static void test_bivariateGaussPdfMatchProb(CuTest *testCase) {
     // standard normal distribution
     double eventModel[] = {0, 0, 1.0, 0, 1.0};
     double control = test_standardNormalPdf(0);
@@ -69,6 +81,23 @@ static void test_testBivariateGaussPdfMatchProb(CuTest *testCase) {
     CuAssertDblEquals(testCase, eTest2, control2Sq, 0.001);
     stateMachine_destruct(sM);
 }
+
+static void test_twoDistributionPdf(CuTest *testCase) {
+    // load up a stateMachine
+    char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    StateMachine *sM = getSignalStateMachine3(modelFile);
+
+    double event[] = {62.784241, 0.664989}; // level_mean and noise_mean for AAAAAA
+    char *kmer1 = "AAAAAA";
+
+    // get a sample match prob
+    double test = emissions_signal_getEventMatchProbWithTwoDists(sM->EMISSION_MATCH_PROBS, kmer1, event);
+    double control_level = test_normalPdf(62.784241, sM->EMISSION_MATCH_PROBS[1], sM->EMISSION_MATCH_PROBS[2]);
+    double control_noise = test_inverseGaussianPdf(0.664989, sM->EMISSION_MATCH_PROBS[3], sM->EMISSION_MATCH_PROBS[5]);
+    double control_prob = log(control_level) + log(control_noise);
+    CuAssertDblEquals(testCase, test, control_prob, 0.001);
+}
+
 
 static void test_signal_cell(CuTest *testCase) {
     char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
@@ -125,6 +154,73 @@ static void test_signal_cell(CuTest *testCase) {
     st_logInfo("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.00001); //Check the forward and back probabilities are about equal
 }
+
+static void test_echelon_cell(CuTest *testCase) {
+    char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    st_uglyf("SENTINAL - about to construct stateMachine\n");
+    StateMachine *sM = getEchelonStateMachine(modelFile);
+    st_uglyf("SENTINAL - stateMachine constructed and poreModel loaded\n");
+    double lowerF[sM->stateNumber], middleF[sM->stateNumber], upperF[sM->stateNumber], currentF[sM->stateNumber];
+    double lowerB[sM->stateNumber], middleB[sM->stateNumber], upperB[sM->stateNumber], currentB[sM->stateNumber];
+    for (int64_t i = 0; i < sM->stateNumber; i++) {
+        middleF[i] = sM->startStateProb(sM, i);
+        middleB[i] = LOG_ZERO;
+        lowerF[i] = LOG_ZERO;
+        lowerB[i] = LOG_ZERO;
+        upperF[i] = LOG_ZERO;
+        upperB[i] = LOG_ZERO;
+        currentF[i] = LOG_ZERO;
+        currentB[i] = sM->endStateProb(sM, i);
+    }
+    int64_t testLength = 5;
+
+    double fakeEventSeq[15] = {
+            60.032615, 0.791316, 0.005, //ATGACA
+            60.332089, 0.620198, 0.012, //TGACAC
+            61.618848, 0.747567, 0.008, //GACACA
+            66.015805, 0.714290, 0.021, //ACACAT
+            59.783408, 1.128591, 0.002, //CACATT
+    };
+    char *referenceSeq = "ATGACACATT";
+    char *endPadding = "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn";
+    int64_t correctedLength = sequence_correctSeqLength(strlen(referenceSeq), event);
+    CuAssertIntEquals(testCase, testLength, correctedLength);
+    referenceSeq = stString_print("%s%s", referenceSeq, endPadding);
+    st_uglyf("SENTINAL - padded sequence %s\n", referenceSeq);
+
+    // make sequence objects
+    Sequence *referSeq = sequence_construct(correctedLength, referenceSeq, sequence_getKmer2);
+    Sequence *eventSeq = sequence_construct(testLength, fakeEventSeq, sequence_getEvent);
+
+    // test sequence_getEvent
+    for (int64_t i = 0; i < testLength; i++) {
+        st_uglyf("SENTINAL - testing getEvent %lld\n", i);
+        CuAssertDblEquals(testCase, *(double *)eventSeq->get(eventSeq->elements, i),
+                          fakeEventSeq[i * NB_EVENT_PARAMS], 0.0);
+    }
+
+    // get one element from each sequence
+    void *kX = referSeq->get(referSeq->elements, 1);
+    void *eY = eventSeq->get(eventSeq->elements, 1);
+
+    st_uglyf("SENTINAL - got elements kX: %s, eY: %f\n", (char *) kX, *(double *) eY);
+
+
+    //Do forward
+    cell_calculateForward(sM, lowerF, NULL, NULL, middleF, kX, eY, NULL);
+    cell_calculateForward(sM, upperF, middleF, NULL, NULL, kX, eY, NULL);
+    cell_calculateForward(sM, currentF, lowerF, middleF, upperF, kX, eY, NULL);
+    //Do backward
+    cell_calculateBackward(sM, currentB, lowerB, middleB, upperB, kX, eY, NULL);
+    cell_calculateBackward(sM, upperB, middleB, NULL, NULL, kX, eY, NULL);
+    cell_calculateBackward(sM, lowerB, NULL, NULL, middleB, kX, eY, NULL);
+    double totalProbForward = cell_dotProduct2(currentF, sM, sM->endStateProb);
+    double totalProbBackward = cell_dotProduct2(middleB, sM, sM->startStateProb);
+    st_logInfo("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
+    st_uglyf("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
+    CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.00001); //Check the forward and back probabilities are about equal
+}
+
 
 static void test_signal_diagonalDPCalculations(CuTest *testCase) {
     // make some DNA sequences
@@ -406,11 +502,13 @@ static void test_signal_getAlignedPairsWithBanding(CuTest *testCase) {
 CuSuite *signalPairwiseTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
-    SUITE_ADD_TEST(suite, test_testBivariateGaussPdfMatchProb);
-    SUITE_ADD_TEST(suite, test_signal_cell);
-    SUITE_ADD_TEST(suite, test_signal_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_scaleModel);
-    SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding2);
-    SUITE_ADD_TEST(suite, test_signal_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_bivariateGaussPdfMatchProb);
+    SUITE_ADD_TEST(suite, test_twoDistributionPdf);
+    //SUITE_ADD_TEST(suite, test_signal_cell);
+    SUITE_ADD_TEST(suite, test_echelon_cell);
+    //SUITE_ADD_TEST(suite, test_signal_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_scaleModel);
+    //SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding2);
+    //SUITE_ADD_TEST(suite, test_signal_getAlignedPairsWithBanding);
     return suite;
 }

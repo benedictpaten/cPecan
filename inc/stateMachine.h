@@ -13,7 +13,7 @@
 #define SYMBOL_NUMBER 5
 #define SYMBOL_NUMBER_NO_N 4
 #define MODEL_PARAMS 5 // level_mean, level_sd, fluctuation_mean, fluctuation_noise, fluctuation_lambda
-#define SQRT_TWO 1.4142135623730951
+
 /*
  * The statemachine object for computing pairwise alignments with.
  */
@@ -23,7 +23,8 @@ typedef enum {
     fiveState=0,
     fiveStateAsymmetric=1,
     threeState=2,
-    threeStateAsymmetric=3
+    threeStateAsymmetric=3,
+    echelon=4
 } StateMachineType;
 
 typedef struct _stateMachine StateMachine;
@@ -149,7 +150,26 @@ typedef struct _StateMachine3vanilla {
     double (*getMatchProbFcn)(const double *eventModel, void *kmer, void *event);
 } StateMachine3Vanilla;
 
-typedef struct _stateMachineFunctions { // TODO rename these to be more general
+typedef struct _StateMachine2echelon {
+    // pseudo 8-state general hmm
+    StateMachine model;
+
+    // from stateMachine3Vanilla..
+    //double TRANSITION_M_TO_Y_NOT_X;
+    //double TRANSITION_E_TO_E;
+    double BACKGROUND_EVENT_PROB;
+    double DEFAULT_END_MATCH_PROB; //0.79015888282447311; // stride_prb
+    double DEFAULT_END_FROM_X_PROB; //0.19652425498269727; // skip_prob
+    //double DEFAULT_END_FROM_Y_PROB; //0.013316862192910478; // stay_prob prob don't need
+
+    double (*getKmerSkipProb)(StateMachine *sM, void *kmerList); // beta
+    double (*getDurationProb)(void *event, int64_t n); // P(dj|n)
+    double (*getMatchProbFcn)(const double *eventModel, void *kmers, void *event, int64_t n); // P(ej|xi..xn)
+    double (*getScaledMatchProbFcn)(const double *scaledEventModel, void *kmer, void *event);
+
+} StateMachine2Echelon;
+
+typedef struct _stateMachineFunctions { // TODO rename these to be more general or might remove them all together
     double (*gapXProbFcn)(const double *, void *);
     double (*gapYProbFcn)(const double *, void *);
     double (*matchProbFcn)(const double *, void *, void *);
@@ -178,6 +198,13 @@ StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t para
                                              double (*scaledMatchProbFcn)(const double *, void *, void *),
                                              double (*matchProbFcn)(const double *, void *, void *));
 
+StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t parameterSetSize,
+                                            void (*setEmissionsToDefaults)(StateMachine *sM),
+                                            double (*durationProbFcn)(void *event, int64_t n),
+                                            double (*skipProbFcn)(StateMachine *sM, void *kmerList),
+                                            double (*matchProbFcn)(const double *, void *, void *, int64_t n),
+                                            double (*scaledMatchProbFcn)(const double *, void *, void *));
+
 // indexing functions //
 //Returns the index for a base, for use with matrices and emissions_discrete_getKmerIndex
 int64_t emissions_discrete_getBaseIndex(void *base);
@@ -197,7 +224,6 @@ void emissions_symbol_setEmissionsToDefaults(StateMachine *sM);
 */
 void emissions_signal_initEmissionsToZero(StateMachine *sM);
 
-// get prob
 double emissions_symbol_getGapProb(const double *emissionGapProbs, void *base);
 
 double emissions_symbol_getMatchProb(const double *emissionMatchProbs, void *x, void *y);
@@ -208,19 +234,23 @@ double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, vo
 
 double emissions_signal_getKmerSkipProb(StateMachine *sM, void *kmers);
 
-double emissions_signal_logGaussPdf(const double *eventModel, void *kmer, void *event);
+double emissions_signal_logGaussMatchProb(const double *eventModel, void *kmer, void *event);
 
 // returns log of the probability density function for a Gaussian distribution
 double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, void *kmer, void *event);
 
-//void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFile);
-
-double emissions_signal_getModelEntry(const double *model, void *kmer);
+double emissions_signal_getEventMatchProbWithTwoDists(const double *eventModel, void *kmer, void *event);
 
 void emissions_signal_scaleModel(StateMachine *sM, double scale, double shift, double var,
                                  double scale_sd, double var_sd);
 
+double emissions_signal_meanEventMatchProb(const double *eventModel, void *kmers, void *event);
+
+double emissions_signal_getDurationProb(void *event, int64_t n);
+
 StateMachine *getSignalStateMachine3(const char *modelFile);
+
+StateMachine *getEchelonStateMachine(const char *modelFile);
 
 // EM
 StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs);

@@ -56,7 +56,8 @@ void usage() {
 }
 
 struct PairwiseAlignment *convertAlignedPairsToPairwiseAlignment(char *seqName1, char *seqName2, double score,
-        int64_t length1, int64_t length2, stList *alignedPairs) {
+                                                                 int64_t length1, int64_t length2,
+                                                                 stList *alignedPairs) {
     //Make pairwise alignment
     int64_t pX = -1, pY = -1, mL = 0;
     //Create an end matched pair, which is used to ensure the alignment has the correct end indels.

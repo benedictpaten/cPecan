@@ -38,7 +38,7 @@ def getKmerIndex(kmer):
 
 # Main program
 kmers = []
-alphabet = 'ACGT'
+alphabet = 'ACGTN'
 
 for kmer in product(alphabet, repeat=6): #change repeat for longer kmers
     kmers.append(''.join(kmer))

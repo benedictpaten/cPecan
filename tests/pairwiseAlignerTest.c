@@ -159,17 +159,20 @@ static void test_sequenceConstruct(CuTest* testCase) {
 
 static void test_getSubSequence(CuTest* testCase) {
     for (int64_t test = 0; test < 10; test++) {
-        int64_t lS = 100;
+        int64_t lS = 10;
         char* cS = getRandomSequence(lS);
-        int64_t offset = st_randomInt(0, lS);
-        int64_t sliceLength = st_randomInt(1, (lS-offset));
-        Sequence* wholeSequence = sequence_construct(lS, cS, sequence_getBase);
-        Sequence* seqSlice = sequence_getSubSequence(wholeSequence, offset, sliceLength, sequence_getBase);
-        for (int i = 0; i < seqSlice->length; i++) {
-            void* b = seqSlice->get(seqSlice->elements, i);
-            void* B = wholeSequence->get(wholeSequence->elements, i+offset);
-            CuAssertPtrEquals(testCase, b, B);
-        }
+        //int64_t offset = st_randomInt(0, lS);
+        int64_t offset = 1;
+        //int64_t sliceLength = st_randomInt(1, (lS-offset));
+        int64_t sliceLength = 4;
+        st_uglyf("Original sequence %s\n", cS);
+        Sequence* wholeSequence = sequence_construct(lS, cS, sequence_getKmer2);
+        Sequence* seqSlice = sequence_getSubSequence(wholeSequence, offset, sliceLength, sequence_getKmer2);
+        void *wSx = wholeSequence->get(wholeSequence->elements, offset);
+        void *sSx = seqSlice->get(seqSlice->elements, 0);
+        st_uglyf("whole sequence index offset: %s\n", (char *) wSx);
+        st_uglyf("slice sequence at index 0: %s\n", (char *) sSx);
+
     }
 }
 
@@ -1324,34 +1327,34 @@ static void test_hmmDiscrete_EM_5State_symbols(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-/*
-    SUITE_ADD_TEST(suite, test_diagonal);
-    SUITE_ADD_TEST(suite, test_bands);
-    SUITE_ADD_TEST(suite, test_logAdd);
-    SUITE_ADD_TEST(suite, test_sequenceConstruct);
-    SUITE_ADD_TEST(suite, test_cell);
-    SUITE_ADD_TEST(suite, test_dpDiagonal);
+
+    //SUITE_ADD_TEST(suite, test_diagonal);
+    //SUITE_ADD_TEST(suite, test_bands);
+    //SUITE_ADD_TEST(suite, test_logAdd);
+    //SUITE_ADD_TEST(suite, test_sequenceConstruct);
+    //SUITE_ADD_TEST(suite, test_cell);
+    //SUITE_ADD_TEST(suite, test_dpDiagonal);
     //SUITE_ADD_TEST(suite, test_getSubSequence);
-    SUITE_ADD_TEST(suite, test_dpMatrix);
-    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_getSplitPoints);
+    //SUITE_ADD_TEST(suite, test_dpMatrix);
+    //SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_getSplitPoints);
     //SUITE_ADD_TEST(suite, test_getBlastPairs);
     //SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
     //SUITE_ADD_TEST(suite, test_kmer_cell);
-    SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
+    //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
     //SUITE_ADD_TEST(suite, test_kmer_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_getAlignedPairs);
-    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
-    SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
+    //SUITE_ADD_TEST(suite, test_getAlignedPairs);
+    //SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
+    //SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairs);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairsWithBanding);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairsWithRaggedEnds);
-    SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_symbols);
+    //SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_kmers);
-    SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_symbols);
+    //SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_kmers);
-    SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
+    //SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_kmers);
-*/
+
     return suite;
 }
