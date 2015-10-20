@@ -93,25 +93,11 @@ stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_
                         stList *(*getAnchorPairFcn)(void *, void *, PairwiseAlignmentParameters *),
                         bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
-stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY,
-                                      PairwiseAlignmentParameters *p,
-        //Sequence *(SeqXConstructorFcn)(int64_t, void *, void *(*)),
-        //Sequence *(SeqYConstructorFcn)(int64_t, void *, void *(*)),
-        //void *(getXFcn), void *(getYFcn),
-                                      void *(*getXFcn)(void *, int64_t),
-                                      void *(*getYFcn)(void *, int64_t),
-                                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
-
 stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignment *pA, int64_t trim);
-
-stList *getAlignedPairsUsingAnchors(StateMachine *sM, Sequence *SsX, Sequence *SsY, //SequenceType t,
-                                    stList *anchorPairs, PairwiseAlignmentParameters *p,
-                                    bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 /*
  * Expectation calculation functions for EM algorithms.
  */
-
 void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
                              void *extraArgs);
 
@@ -249,6 +235,11 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
                                             double totalProbability, PairwiseAlignmentParameters *p,
                                             void *extraArgs);
 
+void diagonalCalculationMultiPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
+                                                 DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
+                                                 double totalProbability, PairwiseAlignmentParameters *p,
+                                                 void *extraArgs);
+
 //Banded matrix calculation of posterior probs
 
 void getPosteriorProbsWithBanding(StateMachine *sM,
@@ -260,6 +251,25 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
                                                                   Sequence*, Sequence*,
                                                                   double, PairwiseAlignmentParameters *, void *),
                                   void *extraArgs);
+
+stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_t lY,
+                                      PairwiseAlignmentParameters *p,
+                                      void *(*getXFcn)(void *, int64_t),
+                                      void *(*getYFcn)(void *, int64_t),
+                                      void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *,
+                                                                      DpMatrix *, Sequence *, Sequence *, double,
+                                                                      PairwiseAlignmentParameters *, void *),
+                                      bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+
+stList *getAlignedPairsUsingAnchors(StateMachine *sM,
+                                    Sequence *SsX, Sequence *SsY,
+                                    stList *anchorPairs,
+                                    PairwiseAlignmentParameters *p,
+                                    void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *,
+                                                                    DpMatrix *, Sequence *, Sequence *, double,
+                                                                    PairwiseAlignmentParameters *, void *),
+                                    bool alignmentHasRaggedLeftEnd,
+                                    bool alignmentHasRaggedRightEnd);
 
 //Blast pairs
 

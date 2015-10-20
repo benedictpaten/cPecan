@@ -579,7 +579,9 @@ int main(int argc, char *argv[]) {
         else {
             //Get posterior prob pairs
             stList *alignedPairs = getAlignedPairsUsingAnchors(sM, subSeqX, subSeqY, filteredAnchoredPairs,
-                    pairwiseAlignmentBandingParameters, 1, 1);
+                                                               pairwiseAlignmentBandingParameters,
+                                                               diagonalCalculationPosteriorMatchProbs,
+                                                               1, 1);
             //Output all the posterior match probs, if needed
             if(allPosteriorProbsFile != NULL) {
                 writePosteriorProbs(allPosteriorProbsFile, alignedPairs);

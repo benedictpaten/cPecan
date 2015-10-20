@@ -157,9 +157,7 @@ static void test_vanilla_cell(CuTest *testCase) {
 
 static void test_echelon_cell(CuTest *testCase) {
     char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
-    st_uglyf("SENTINAL - about to construct stateMachine\n");
     StateMachine *sM = getEchelonStateMachine(modelFile);
-    st_uglyf("SENTINAL - stateMachine constructed and poreModel loaded\n");
     double lowerF[sM->stateNumber], middleF[sM->stateNumber], upperF[sM->stateNumber], currentF[sM->stateNumber];
     double lowerB[sM->stateNumber], middleB[sM->stateNumber], upperB[sM->stateNumber], currentB[sM->stateNumber];
     for (int64_t i = 0; i < sM->stateNumber; i++) {
@@ -182,29 +180,23 @@ static void test_echelon_cell(CuTest *testCase) {
             59.783408, 1.128591, 0.002, //CACATT
     };
     char *referenceSeq = "ATGACACATT";
-    char *endPadding = "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn";
     int64_t correctedLength = sequence_correctSeqLength(strlen(referenceSeq), event);
     CuAssertIntEquals(testCase, testLength, correctedLength);
-    referenceSeq = stString_print("%s%s", referenceSeq, endPadding);
-    st_uglyf("SENTINAL - padded sequence %s\n", referenceSeq);
 
     // make sequence objects
     Sequence *referSeq = sequence_construct(correctedLength, referenceSeq, sequence_getKmer2);
+    sequence_padSequence(referSeq);
     Sequence *eventSeq = sequence_construct(testLength, fakeEventSeq, sequence_getEvent);
 
     // test sequence_getEvent
     for (int64_t i = 0; i < testLength; i++) {
-        st_uglyf("SENTINAL - testing getEvent %lld\n", i);
         CuAssertDblEquals(testCase, *(double *)eventSeq->get(eventSeq->elements, i),
                           fakeEventSeq[i * NB_EVENT_PARAMS], 0.0);
     }
 
     // get one element from each sequence
-    void *kX = referSeq->get(referSeq->elements, 1);
-    void *eY = eventSeq->get(eventSeq->elements, 1);
-
-    st_uglyf("SENTINAL - got elements kX: %s, eY: %f\n", (char *) kX, *(double *) eY);
-
+    void *kX = referSeq->get(referSeq->elements, 0);
+    void *eY = eventSeq->get(eventSeq->elements, 0);
 
     //Do forward
     cell_calculateForward(sM, lowerF, NULL, NULL, middleF, kX, eY, NULL);
@@ -217,24 +209,76 @@ static void test_echelon_cell(CuTest *testCase) {
     double totalProbForward = cell_dotProduct2(currentF, sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(middleB, sM, sM->startStateProb);
     st_logInfo("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
-    st_uglyf("Total probability for cell test, forward %f and backward %f\n", totalProbForward, totalProbBackward);
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.00001); //Check the forward and back probabilities are about equal
+}
+
+static void test_echelon_dpDiagonal(CuTest *testCase) {
+
+    // make stateMachine, forward and reverse DP matrices and banding stuff
+    char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    StateMachine *sM = getEchelonStateMachine(modelFile);
+
+    Diagonal diagonal = diagonal_construct(3, -1, 1);
+
+    DpDiagonal *dpDiagonal = dpDiagonal_construct(diagonal, sM->stateNumber);
+
+    //Get cell
+    double *c1 = dpDiagonal_getCell(dpDiagonal, -1);
+    CuAssertTrue(testCase, c1 != NULL);
+
+    double *c2 = dpDiagonal_getCell(dpDiagonal, 1);
+    CuAssertTrue(testCase, c2 != NULL);
+
+    CuAssertTrue(testCase, dpDiagonal_getCell(dpDiagonal, 3) == NULL);
+    CuAssertTrue(testCase, dpDiagonal_getCell(dpDiagonal, -3) == NULL);
+
+    dpDiagonal_initialiseValues(dpDiagonal, sM, sM->endStateProb); //Test initialise values
+    double totalProb = LOG_ZERO;
+    for (int64_t i = 0; i < sM->stateNumber; i++) {
+        CuAssertDblEquals(testCase, c1[i], sM->endStateProb(sM, i), 0.0);
+        CuAssertDblEquals(testCase, c2[i], sM->endStateProb(sM, i), 0.0);
+        totalProb = logAdd(totalProb, 2 * c1[i]);
+        totalProb = logAdd(totalProb, 2 * c2[i]);
+    }
+
+    DpDiagonal *dpDiagonal2 = dpDiagonal_clone(dpDiagonal);
+    CuAssertTrue(testCase, dpDiagonal_equals(dpDiagonal, dpDiagonal2));
+
+    //Check it runs
+    CuAssertDblEquals(testCase, totalProb, dpDiagonal_dotProduct(dpDiagonal, dpDiagonal2), 0.001);
+
+    dpDiagonal_destruct(dpDiagonal);
+    dpDiagonal_destruct(dpDiagonal2);
 }
 
 
 static void test_vanilla_diagonalDPCalculations(CuTest *testCase) {
     // make some DNA sequences
-    char *sX = "ATGACACATT";
-    double sY[12] = {
-            60.032615, 0.791316, 0.005, //ATGACA
-            60.332089, 0.620198, 0.012, //TGACAC
-            //61.618848, 0.747567, 0.008, //GACACA //skip
-            66.015805, 0.714290, 0.021, //ACACAT
-            59.783408, 1.128591, 0.002, //CACATT
+    //char *sX = "ATGACACATT";
+    //double sY[12] = {
+    //        60.032615, 0.791316, 0.005, //ATGACA
+    //        60.332089, 0.620198, 0.012, //TGACAC
+    //        //61.618848, 0.747567, 0.008, //GACACA //skip
+    //        66.015805, 0.714290, 0.021, //ACACAT
+    //        59.783408, 1.128591, 0.002, //CACATT
+    //};
+
+    char *sX = "ACGATACGGACAT";
+
+    double sY[21] = {
+            58.743435, 0.887833, 0.0571, //ACGATA 0
+            53.604965, 0.816836, 0.0571, //CGATAC 1
+            58.432015, 0.735143, 0.0571, //GATACG 2
+            63.684352, 0.795437, 0.0571, //ATACGG 3
+            //63.520262, 0.757803, 0.0571, //TACGGA 4
+            58.921430, 0.812959, 0.0571, //ACGGAC 5 (4)
+            59.895882, 0.740952, 0.0571, //CGGACA 6 (5)
+            61.684303, 0.722332, 0.0571, //GGACAT 7 (6)
     };
+
     // make variables for the (corrected) length of the sequences
     int64_t lX = sequence_correctSeqLength(strlen(sX), event);
-    int64_t lY = 4;
+    int64_t lY = 7;
     // make Sequence objects
     Sequence *SsX = sequence_construct(lX, sX, sequence_getKmer2);
     Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent);
@@ -303,70 +347,28 @@ static void test_vanilla_diagonalDPCalculations(CuTest *testCase) {
     stSortedSet *alignedPairsSet = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
                                                           (void (*)(void *)) stIntTuple_destruct);
 
-
-    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(0, 0));
-    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(1, 1));
-    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 2));
-    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(4, 3));
-
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(0, 1));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 2));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 3));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(5, 4));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(6, 5));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(7, 6));
 
     // make sure alignedPairs is correct
     for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
         stIntTuple *pair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
         st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
-        st_uglyf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
         CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
-    CuAssertIntEquals(testCase, 4, (int) stList_length(alignedPairs));
+    CuAssertIntEquals(testCase, 6, (int) stList_length(alignedPairs));
 
     // clean up
     sequence_sequenceDestroy(SsX);
     sequence_sequenceDestroy(SsY);
 }
 
-static void test_echelon_dpDiagonal(CuTest *testCase) {
-
-    // make stateMachine, forward and reverse DP matrices and banding stuff
-    char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
-    StateMachine *sM = getEchelonStateMachine(modelFile);
-
-    Diagonal diagonal = diagonal_construct(3, -1, 1);
-
-    DpDiagonal *dpDiagonal = dpDiagonal_construct(diagonal, sM->stateNumber);
-
-    //Get cell
-    double *c1 = dpDiagonal_getCell(dpDiagonal, -1);
-    CuAssertTrue(testCase, c1 != NULL);
-
-    double *c2 = dpDiagonal_getCell(dpDiagonal, 1);
-    CuAssertTrue(testCase, c2 != NULL);
-
-    CuAssertTrue(testCase, dpDiagonal_getCell(dpDiagonal, 3) == NULL);
-    CuAssertTrue(testCase, dpDiagonal_getCell(dpDiagonal, -3) == NULL);
-
-    dpDiagonal_initialiseValues(dpDiagonal, sM, sM->endStateProb); //Test initialise values
-    double totalProb = LOG_ZERO;
-    for (int64_t i = 0; i < sM->stateNumber; i++) {
-        CuAssertDblEquals(testCase, c1[i], sM->endStateProb(sM, i), 0.0);
-        CuAssertDblEquals(testCase, c2[i], sM->endStateProb(sM, i), 0.0);
-        totalProb = logAdd(totalProb, 2 * c1[i]);
-        totalProb = logAdd(totalProb, 2 * c2[i]);
-    }
-
-    DpDiagonal *dpDiagonal2 = dpDiagonal_clone(dpDiagonal);
-    CuAssertTrue(testCase, dpDiagonal_equals(dpDiagonal, dpDiagonal2));
-
-    //Check it runs
-    CuAssertDblEquals(testCase, totalProb, dpDiagonal_dotProduct(dpDiagonal, dpDiagonal2), 0.001);
-
-    dpDiagonal_destruct(dpDiagonal);
-    dpDiagonal_destruct(dpDiagonal2);
-}
-
 static void test_echelon_diagonalDPCalculations(CuTest *testCase) {
-    // make some DNA sequences
-    //char *sX = "ATGACACATT"; old one
     //          01234567
     char *sX = "ACGATACGGACAT";
 
@@ -375,7 +377,7 @@ static void test_echelon_diagonalDPCalculations(CuTest *testCase) {
             53.604965, 0.816836, 0.0571, //CGATAC 1
             58.432015, 0.735143, 0.0571, //GATACG 2
             63.684352, 0.795437, 0.0571, //ATACGG 3
-            //63.520262, 0.757803, 0.0571, //TACGGA 4
+            //63.520262, 0.757803, 0.0571, //TACGGA 4 //skip
             58.921430, 0.812959, 0.0571, //ACGGAC 5 (4)
             59.895882, 0.740952, 0.0571, //CGGACA 6 (5)
             61.684303, 0.722332, 0.0571, //GGACAT 7 (6)
@@ -383,17 +385,6 @@ static void test_echelon_diagonalDPCalculations(CuTest *testCase) {
     // make variables for the (corrected) length of the sequences
     int64_t lX = sequence_correctSeqLength(strlen(sX), event);
     int64_t lY = 7;
-
-    /*
-    // padding sequence testing
-    st_uglyf("sX before padding: %s \n", sX);
-    char *endPadding = "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnn";
-    //sX = stString_print("%s%s%s", endPadding, sX, endPadding);
-    sX = stString_print("%s%s", sX, endPadding);
-    st_uglyf("sX after padding: %s \n", sX);
-    //sX = sX+(6*5);
-    st_uglyf("sX after padding and adjustment: %s \n", sX);
-    */
 
     Sequence *SsX = sequence_construct(lX, sX, sequence_getKmer2);
     sequence_padSequence(SsX);
@@ -454,9 +445,11 @@ static void test_echelon_diagonalDPCalculations(CuTest *testCase) {
     // Perform alignment
     for (int64_t i = 1; i <= lX + lY; i++) {
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-        p->threshold = 0.1;
-        diagonalCalculationPosteriorMatchProbs(sM, i, dpMatrixForward, dpMatrixBackward, SsX, SsY,
-                                               totalProbForward, p, extraArgs);
+        p->threshold = 0.5;
+        //diagonalCalculationPosteriorMatchProbs(sM, i, dpMatrixForward, dpMatrixBackward, SsX, SsY,
+        //                                       totalProbForward, p, extraArgs);
+        diagonalCalculationMultiPosteriorMatchProbs(sM, i, dpMatrixForward, dpMatrixBackward, SsX, SsY,
+                                                    totalProbForward, p, extraArgs);
         pairwiseAlignmentBandingParameters_destruct(p);
     }
 
@@ -464,6 +457,10 @@ static void test_echelon_diagonalDPCalculations(CuTest *testCase) {
     stSortedSet *alignedPairsSet = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
                                                           (void (*)(void *)) stIntTuple_destruct);
 
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(0, 0));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(1, 0));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(1, 1));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 1));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 2));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 3));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(5, 4));
@@ -475,10 +472,9 @@ static void test_echelon_diagonalDPCalculations(CuTest *testCase) {
         stIntTuple *pair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
         st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
-        st_uglyf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
-        //CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
+        CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
-    //CuAssertIntEquals(testCase, 5, (int) stList_length(alignedPairs));
+    CuAssertIntEquals(testCase, 9, (int) stList_length(alignedPairs));
 
     // clean up
     sequence_sequenceDestroy(SsX);
@@ -519,20 +515,8 @@ static void test_scaleModel(CuTest *testCase) {
     }
 }
 
-static stList *compareAlignedPairs(stList *pairs1, stList *pairs2) {
-    /*
-     * doesn't work, need to remove probs
-     */
-    stSortedSet *sortedSet1 = stList_getSortedSet(pairs1, (int (*)(const void *, const void *))stIntTuple_cmpFn);
-    stSortedSet *sortedSet2 = stList_getSortedSet(pairs2, (int (*)(const void *, const void *))stIntTuple_cmpFn);
-    stSortedSet *intersection = stSortedSet_getIntersection(sortedSet1, sortedSet2);
-    stList *list = stSortedSet_getList(intersection);
-    return list;
-}
-
 static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY) {
     st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
-    //st_uglyf("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
     stSortedSet *pairs = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
                                                 (void (*)(void *)) stIntTuple_destruct);
     for (int64_t i = 0; i < stList_length(blastPairs); i++) {
@@ -558,7 +542,34 @@ static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, 
     stSortedSet_destruct(pairs);
 }
 
-static void test_signal_strandAlignmentNoBanding2(CuTest *testCase) {
+static void checkAlignedPairsForEchelon(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY) {
+    st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
+    stSortedSet *pairs = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
+                                                (void (*)(void *)) stIntTuple_destruct);
+    for (int64_t i = 0; i < stList_length(blastPairs); i++) {
+        stIntTuple *j = stList_get(blastPairs, i);
+        CuAssertTrue(testCase, stIntTuple_length(j) == 3);
+
+        int64_t x = stIntTuple_get(j, 1);
+        int64_t y = stIntTuple_get(j, 2);
+        int64_t score = stIntTuple_get(j, 0);
+        CuAssertTrue(testCase, score > 0);
+        CuAssertTrue(testCase, score <= PAIR_ALIGNMENT_PROB_1);
+
+        CuAssertTrue(testCase, x >= 0);
+        CuAssertTrue(testCase, y >= 0);
+        CuAssertTrue(testCase, x < lX);
+        CuAssertTrue(testCase, y < lY);
+
+        //Check is unique
+        stIntTuple *pair = stIntTuple_construct2(x, y);
+        //CuAssertTrue(testCase, stSortedSet_search(pairs, pair) == NULL);
+        stSortedSet_insert(pairs, pair);
+    }
+    stSortedSet_destruct(pairs);
+}
+
+static void test_vanilla_strandAlignmentNoBanding2(CuTest *testCase) {
     // load reference
     char *ZymoReference = stString_print("../../cPecan/tests/ZymoRef.txt");
     FILE *fH = fopen(ZymoReference, "r");
@@ -579,12 +590,47 @@ static void test_signal_strandAlignmentNoBanding2(CuTest *testCase) {
                                 npRead->templateParams.var_sd); // clunky
 
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-    p->threshold = 0.5; //0.4;
+    p->threshold = 0.2; //0.4;
 
-    stList *alignedPairs = getAlignedPairsWithoutBanding(sM, ZymoReferenceSeq, npRead->templateEvents, lX, lY, p,
-                                                         sequence_getKmer2, sequence_getEvent, 0, 0);
+    stList *alignedPairs = getAlignedPairsWithoutBanding(sM, ZymoReferenceSeq, npRead->templateEvents, lX,
+                                                         lY, p,
+                                                         sequence_getKmer2, sequence_getEvent,
+                                                         diagonalCalculationPosteriorMatchProbs,
+                                                         0, 0);
     st_uglyf("there are %lld aligned pairs without banding, first time\n", stList_length(alignedPairs));
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
+}
+
+static void test_echelon_strandAlignmentNoBanding2(CuTest *testCase) {
+    // load reference
+    char *ZymoReference = stString_print("../../cPecan/tests/ZymoRef.txt");
+    FILE *fH = fopen(ZymoReference, "r");
+    char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
+
+    // load NanoporeRead
+    char *npReadFile = stString_print("../../cPecan/tests/ZymoC_file1.npRead");
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+
+    int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
+    int64_t lY = npRead->nbTemplateEvents;
+
+    // load stateMachine and model
+    char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    StateMachine *sM = getEchelonStateMachine(modelFile);
+    emissions_signal_scaleModel(sM, npRead->templateParams.scale, npRead->templateParams.shift,
+                                npRead->templateParams.var, npRead->templateParams.scale_sd,
+                                npRead->templateParams.var_sd); // clunky
+
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+    p->threshold = 0.2; //0.4;
+
+    stList *alignedPairs = getAlignedPairsWithoutBanding(sM, ZymoReferenceSeq, npRead->templateEvents, lX,
+                                                         lY, p,
+                                                         sequence_getKmer2, sequence_getEvent,
+                                                         diagonalCalculationMultiPosteriorMatchProbs,
+                                                         0, 0);
+    st_uglyf("there are %lld echelon aligned pairs without banding, first time\n", stList_length(alignedPairs));
+    checkAlignedPairsForEchelon(testCase, alignedPairs, lX, lY);
 }
 
 static stList *scoreAnchorPairs(stList *anchorPairs, stList *alignedPairs) {
@@ -619,7 +665,7 @@ static stList *scoreAnchorPairs(stList *anchorPairs, stList *alignedPairs) {
     return scoredAnchorPairs;
 }
 
-static void test_signal_getAlignedPairsWithBanding(CuTest *testCase) {
+static void test_vanilla_getAlignedPairsWithBanding(CuTest *testCase) {
     // load up test stuff and make stateMachine
     char *ZymoReference = stString_print("../../cPecan/tests/ZymoRef.txt");
     FILE *fH = fopen(ZymoReference, "r");
@@ -637,7 +683,7 @@ static void test_signal_getAlignedPairsWithBanding(CuTest *testCase) {
                                 npRead->templateParams.var_sd); // clunky
 
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-    p->threshold = 0.5;
+    p->threshold = 0.2;
 
     // get anchors
     stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
@@ -650,28 +696,83 @@ static void test_signal_getAlignedPairsWithBanding(CuTest *testCase) {
     Sequence *templateSeq = sequence_construct(lY, npRead->templateEvents, sequence_getEvent);
 
     // do alignment
-    stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p, 0, 0);
+    stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
+                                                       diagonalCalculationPosteriorMatchProbs,
+                                                       0, 0);
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
     st_uglyf("there are %lld aligned pairs using anchors\n", stList_length(alignedPairs));
     // do alignment without banding
-    stList *alignedPairs2 = getAlignedPairsWithoutBanding(sMt, ZymoReferenceSeq, npRead->templateEvents, lX, lY, p,
-                                                          sequence_getKmer2, sequence_getEvent, 0, 0);
+    stList *alignedPairs2 = getAlignedPairsWithoutBanding(sMt, ZymoReferenceSeq, npRead->templateEvents, lX,
+                                                          lY, p,
+                                                          sequence_getKmer2, sequence_getEvent,
+                                                          diagonalCalculationPosteriorMatchProbs,
+                                                          0, 0);
     st_uglyf("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
     checkAlignedPairs(testCase, alignedPairs2, lX, lY);
 }
 
+static void test_echelon_getAlignedPairsWithBanding(CuTest *testCase) {
+    // load up test stuff and make stateMachine
+    char *ZymoReference = stString_print("../../cPecan/tests/ZymoRef.txt");
+    FILE *fH = fopen(ZymoReference, "r");
+    char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
+    char *npReadFile = stString_print("../../cPecan/tests/ZymoC_file1.npRead");
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+
+    int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
+    int64_t lY = npRead->nbTemplateEvents;
+
+    char *templateModelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    StateMachine *sMt = getEchelonStateMachine(templateModelFile);
+    emissions_signal_scaleModel(sMt, npRead->templateParams.scale, npRead->templateParams.shift,
+                                npRead->templateParams.var, npRead->templateParams.scale_sd,
+                                npRead->templateParams.var_sd); // clunky
+
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+    p->threshold = 0.2;
+
+    // get anchors
+    stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
+    // remap and filter
+    nanopore_remapAnchorPairs(anchorPairs, npRead->templateEventMap);
+    stList *filteredRemappedAnchors = filterToRemoveOverlap(anchorPairs);
+
+    // make Sequences
+    Sequence *refSeq = sequence_construct(lX, ZymoReferenceSeq, sequence_getKmer2);
+    sequence_padSequence(refSeq);
+    Sequence *templateSeq = sequence_construct(lY, npRead->templateEvents, sequence_getEvent);
+
+    // do alignment with anchors
+    stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
+                                                       diagonalCalculationMultiPosteriorMatchProbs,
+                                                       0, 0);
+    checkAlignedPairsForEchelon(testCase, alignedPairs, lX, lY);
+    st_uglyf("there are %lld aligned pairs using anchors\n", stList_length(alignedPairs));
+
+    // do alignment without banding
+    stList *alignedPairs2 = getAlignedPairsWithoutBanding(sMt, ZymoReferenceSeq, npRead->templateEvents, lX,
+                                                          lY, p,
+                                                          sequence_getKmer2, sequence_getEvent,
+                                                          diagonalCalculationMultiPosteriorMatchProbs,
+                                                          0, 0);
+    st_uglyf("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
+    checkAlignedPairsForEchelon(testCase, alignedPairs2, lX, lY);
+}
+
 CuSuite *signalPairwiseTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-    //SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
-    //SUITE_ADD_TEST(suite, test_bivariateGaussPdfMatchProb);
-    //SUITE_ADD_TEST(suite, test_twoDistributionPdf);
-    //SUITE_ADD_TEST(suite, test_vanilla_cell);
-    //SUITE_ADD_TEST(suite, test_echelon_cell);
-    //SUITE_ADD_TEST(suite, test_echelon_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
+    SUITE_ADD_TEST(suite, test_bivariateGaussPdfMatchProb);
+    SUITE_ADD_TEST(suite, test_twoDistributionPdf);
+    SUITE_ADD_TEST(suite, test_vanilla_cell);
+    SUITE_ADD_TEST(suite, test_echelon_cell);
+    SUITE_ADD_TEST(suite, test_echelon_dpDiagonal);
     SUITE_ADD_TEST(suite, test_vanilla_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_echelon_diagonalDPCalculations);
-    //SUITE_ADD_TEST(suite, test_scaleModel);
-    //SUITE_ADD_TEST(suite, test_signal_strandAlignmentNoBanding2);
-    //SUITE_ADD_TEST(suite, test_signal_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_scaleModel);
+    SUITE_ADD_TEST(suite, test_vanilla_strandAlignmentNoBanding2);
+    //SUITE_ADD_TEST(suite, test_echelon_strandAlignmentNoBanding2);
+    SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_echelon_getAlignedPairsWithBanding);
     return suite;
 }

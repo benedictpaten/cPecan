@@ -693,21 +693,64 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
                     posteriorProbability = 1.0;
                 }
                 //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld (%s), Y: %lld (%f)\n", posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
+                //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f)\n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1));
                 posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
             }
             if (posteriorProbability <= p->threshold) {
-                //st_uglyf("NOT Adding to alignedPairs! posteriorProb: %f, X: %lld (%s), Y: %lld (%f)\n", posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
+                //st_uglyf("NOT Adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f)\n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1));
             }
         }
         xmy += 2;
     }
     //st_uglyf("final length for alignedPairs: %lld\n", stList_length(alignedPairs));
 }
-/*
- * This function now takes Sequence objects and determines if the alignment is between nucleotides
- * or kmers and calls the appropriate functions
- */
+
+void diagonalCalculationMultiPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
+                                                 DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
+                                                 double totalProbability, PairwiseAlignmentParameters *p,
+                                                 void *extraArgs) {
+    assert(p->threshold >= 0.0);
+    assert(p->threshold <= 1.0);
+    stList *alignedPairs = ((void **) extraArgs)[0];
+    DpDiagonal *forwardDiagonal = dpMatrix_getDiagonal(forwardDpMatrix, xay);
+    DpDiagonal *backDiagonal = dpMatrix_getDiagonal(backwardDpMatrix, xay);
+    Diagonal diagonal = forwardDiagonal->diagonal;
+    int64_t xmy = diagonal_getMinXmy(diagonal);
+
+    //Walk over the cells computing the posteriors
+    while (xmy <= diagonal_getMaxXmy(diagonal)) {
+        int64_t x = diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy);
+        int64_t y = diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy);
+        if (x > 0 && y > 0) {
+            double *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
+            //st_uglyf("X: %lld Y: %lld cellForward->MatchState: %f ", x, y, cellForward[sM->matchState]);
+            double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
+            //st_uglyf("cellBackward->MatchState: %f ", cellBackward[sM->matchState]);
+            for (int64_t s = sM->matchState; s < 6; s++) {
+                double posteriorProbability = exp(
+                        (cellForward[s] + cellBackward[s]) - totalProbability);
+                if (posteriorProbability >= p->threshold) {
+                    if (posteriorProbability > 1.0) {
+                        posteriorProbability = 1.0;
+                    }
+                    posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
+                    for (int64_t n = 0; n < s; n++) {
+                        //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f), s:%lld \n", posteriorProbability, (x + n) - 1, y - 1, *(double *)sY->get(sY->elements, y-1), s);
+                        stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, (x + n) - 1, y - 1));
+                    }
+                }
+                if (posteriorProbability <= p->threshold) {
+                    //st_uglyf("NOT adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f), s:%lld \n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1), s);
+                }
+
+            }
+        }
+        xmy += 2;
+    }
+    //st_uglyf("final length for alignedPairs: %lld\n", stList_length(alignedPairs));
+}
+
 static void diagonalCalculationExpectations(StateMachine *sM,
                                             int64_t xay,
                                             DpMatrix *forwardDpMatrix,
@@ -1315,6 +1358,9 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM,
                                     Sequence *SsX, Sequence *SsY,
                                     stList *anchorPairs,
                                     PairwiseAlignmentParameters *p,
+                                    void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *,
+                                                                    DpMatrix *, Sequence *, Sequence *, double,
+                                                                    PairwiseAlignmentParameters *, void *),
                                     bool alignmentHasRaggedLeftEnd,
                                     bool alignmentHasRaggedRightEnd) {
 
@@ -1328,7 +1374,7 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM,
                                         p,
                                         alignmentHasRaggedLeftEnd,
                                         alignmentHasRaggedRightEnd,
-                                        diagonalCalculationPosteriorMatchProbs,
+                                        diagonalPosteriorProbFn,
                                         alignedPairCoordinateCorrectionFn,
                                         extraArgs);
 
@@ -1352,7 +1398,9 @@ stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_
     Sequence *SsY = sequence_construct(lY, cY, getYFcn);
 
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, SsX, SsY,
-                                                       anchorPairs, p, alignmentHasRaggedLeftEnd,
+                                                       anchorPairs, p,
+                                                       diagonalCalculationPosteriorMatchProbs,
+                                                       alignmentHasRaggedLeftEnd,
                                                        alignmentHasRaggedRightEnd);
     sequence_sequenceDestroy(SsX);
     sequence_sequenceDestroy(SsY);
@@ -1364,9 +1412,13 @@ stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int6
                                       PairwiseAlignmentParameters *p,
                                       void *(*getXFcn)(void *, int64_t),
                                       void *(*getYFcn)(void *, int64_t),
+                                      void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *,
+                                                                      DpMatrix *, Sequence *, Sequence *, double,
+                                                                      PairwiseAlignmentParameters *, void *),
                                       bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
     // make sequence objects
     Sequence *ScX = sequence_construct(lX, cX, getXFcn);
+    sequence_padSequence(ScX);
     Sequence *ScY = sequence_construct(lY, cY, getYFcn);
 
     // make matrices and bands
@@ -1403,8 +1455,7 @@ stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int6
     stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
     void *extraArgs[1] = { alignedPairs };
     for (int64_t i = 0; i <= diagonalNumber; i++) {
-        diagonalCalculationPosteriorMatchProbs(sM, i, forwardDpMatrix, backwardDpMatrix,
-                                               ScX, ScY, totalProbability, p, extraArgs);
+        diagonalPosteriorProbFn(sM, i, forwardDpMatrix, backwardDpMatrix, ScX, ScY, totalProbability, p, extraArgs);
     }
     return alignedPairs;
 }

@@ -298,7 +298,8 @@ static inline double emissions_signal_logGaussPdf(double x, double mu, double si
 
 static double emissions_signal_poissonPosteriorProb(int64_t n, double duration) {
     assert(n <= 5);
-    double c = 0.00570570570571;
+    //double c = 0.00570570570571;
+    double c = 0.00332005312085;
     double l_2 = 0.69314718055994529;
     double lambda = duration / c;
     double l_factorials[6] = {0.0, 0.0, 0.69314718056, 1.79175946923, 3.17805383035, 4.78749174278};
@@ -1285,11 +1286,6 @@ StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
 
 StateMachine *getSignalStateMachine3(const char *modelFile) {
     // construct a stateMachine3Vanilla then load the model
-    //StateMachine *sM3v = stateMachine3Vanilla_construct(threeState, NUM_OF_KMERS,
-    //                                                    emissions_signal_initEmissionsToZero,
-    //                                                    emissions_signal_getKmerSkipProb,
-    //                                                    emissions_signal_logGaussMatchProb,
-    //                                                    emissions_signal_logGaussMatchProb);
     StateMachine *sM3v = stateMachine3Vanilla_construct(threeState, NUM_OF_KMERS,
                                                         emissions_signal_initEmissionsToZero,
                                                         emissions_signal_getKmerSkipProb,
