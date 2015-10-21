@@ -248,9 +248,9 @@ double emissions_signal_meanEventMatchProb(const double *eventModel, void *kmers
 
 double emissions_signal_getDurationProb(void *event, int64_t n);
 
-StateMachine *getSignalStateMachine3(const char *modelFile);
+StateMachine *getSignalStateMachine3Vanilla(const char *modelFile);
 
-StateMachine *getEchelonStateMachine(const char *modelFile);
+StateMachine *getStateMachineEchelon(const char *modelFile);
 
 // EM
 StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs);

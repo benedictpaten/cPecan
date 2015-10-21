@@ -157,30 +157,8 @@ static void test_sequenceConstruct(CuTest* testCase) {
     sequence_sequenceDestroy(testSequence);
 }
 
-static void test_getSubSequence(CuTest* testCase) {
-    for (int64_t test = 0; test < 10; test++) {
-        int64_t lS = 10;
-        char* cS = getRandomSequence(lS);
-        //int64_t offset = st_randomInt(0, lS);
-        int64_t offset = 1;
-        //int64_t sliceLength = st_randomInt(1, (lS-offset));
-        int64_t sliceLength = 4;
-        st_uglyf("Original sequence %s\n", cS);
-        Sequence* wholeSequence = sequence_construct(lS, cS, sequence_getKmer2);
-        Sequence* seqSlice = sequence_getSubSequence(wholeSequence, offset, sliceLength, sequence_getKmer2);
-        void *wSx = wholeSequence->get(wholeSequence->elements, offset);
-        void *sSx = seqSlice->get(seqSlice->elements, 0);
-        st_uglyf("whole sequence index offset: %s\n", (char *) wSx);
-        st_uglyf("slice sequence at index 0: %s\n", (char *) sSx);
-
-    }
-}
-
 
 static void test_cell(CuTest *testCase) {
-    /*
-     * Tests NEW stateMachine stuff, nucleotide/nucleotide
-     */
     StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
                                                emissions_symbol_setEmissionsToDefaults,
                                                emissions_symbol_getGapProb,
@@ -222,9 +200,6 @@ static void test_cell(CuTest *testCase) {
 }
 
 static void test_kmer_cell(CuTest *testCase) {
-    /*
-     * Tests NEW stateMachine stuff
-     */
     StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
                                                emissions_symbol_setEmissionsToDefaults,
                                                emissions_symbol_getGapProb,
@@ -269,7 +244,6 @@ static void test_kmer_cell(CuTest *testCase) {
 }
 
 static void test_dpDiagonal(CuTest *testCase) {
-
     StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
                                                emissions_symbol_setEmissionsToDefaults,
                                                emissions_symbol_getGapProb,
@@ -398,7 +372,6 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);
 
     // Test calculating the posterior probabilities along the diagonals of the matrix.
-    //st_uglyf("\n-->Calculating posterior probabilities\n");
     for (int64_t i = 0; i <= lX + lY; i++) {
         //Calculate the total probs
         double totalDiagonalProb = diagonalCalculationTotalProbability(sM, i,
@@ -411,7 +384,6 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
 
     //Now do the posterior probabilities
     stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
-    // aligned pairs has length 0 here, just constructed
     void *extraArgs[1] = { alignedPairs };
     for (int64_t i = 1; i <= lX + lY; i++) {
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -434,7 +406,6 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
         stIntTuple *pair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
         st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
-        //printf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
         CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
 
@@ -443,13 +414,11 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
 }
 
 static void test_kmer_diagonalDPCalculations(CuTest *testCase) {
-    // These are the originals:
+    /*
+     * Broken right now
+     */
     const char *sX = "AGCG";
     const char *sY = "AGTTCG";
-
-    // These are alternative sequences for testing
-    //const char *sX = getRandomSequence(5);
-    //const char *sY = evolveSequence(sX);
 
     // set lX and lY to the lengths of those sequences
     int64_t slX = sequence_correctSeqLength(strlen(sX), kmer);
@@ -611,7 +580,7 @@ static void checkAlignedPairs_kmer(CuTest *testCase, stList *blastPairs, int64_t
         CuAssertTrue(testCase, score <= PAIR_ALIGNMENT_PROB_1);
 
         CuAssertTrue(testCase, x >= 0);
-        CuAssertTrue(testCase, y >= 0);   // TODO check this out:
+        CuAssertTrue(testCase, y >= 0);
         CuAssertTrue(testCase, x < lX+1); // remove offset for aligned kmers
         CuAssertTrue(testCase, y < lY+1); // at the end of the sequences
 
@@ -788,10 +757,8 @@ static void test_filterToRemoveOverlap(CuTest *testCase) {
             }
         }
 
-        //printf("%lld is pairs length\n", stList_length(pairs));
         //Now run filter pairs
         stList *nonoverlappingPairs = filterToRemoveOverlap(pairs);
-        //printf("%lld is nonoverlappingPairs length\n", stList_length(nonoverlappingPairs));
 
         //Check non overlapping
         checkBlastPairs(testCase, nonoverlappingPairs, lX, lY, 1);
@@ -844,10 +811,6 @@ static void test_getBlastPairsWithRecursion(CuTest *testCase) {
         char *seqX = getRandomSequence(st_randomInt(0, 10000));
         char *seqY = evolveSequence(seqX); //stString_copy(seqX);
         int64_t lX = strlen(seqX), lY = strlen(seqY);
-        //Sequence* SsX = sequence_construct(lX, seqX, nucleotide);
-        //Sequence* SsY = sequence_construct(lY, seqY, nucleotide);
-        //st_logInfo("Sequence X to align: %s END, seq length %" PRIi64 "\n", SsX->repr, SsX->length);
-        //st_logInfo("Sequence Y to align: %s END, seq length %" PRIi64 "\n", SsY->repr, SsY->length);
 
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 
@@ -939,11 +902,6 @@ static void test_getAlignedPairs(CuTest *testCase) {
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
 
-        //Sequence* SsX = sequence_construct(lX, sX, sequence_getBase);
-        //Sequence* SsY = sequence_construct(lY, sY, sequence_getBase);
-        //st_logInfo("Sequence X to align: %s END\n", SsX->repr);
-        //st_logInfo("Sequence Y to align: %s END\n", SsY->repr);
-
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 
@@ -978,10 +936,6 @@ static void test_kmer_getAlignedPairs(CuTest *testCase) {
         int64_t lY = strlen(sY);
         int64_t lX2 = sequence_correctSeqLength(lX, kmer);
         int64_t lY2 = sequence_correctSeqLength(lY, kmer);
-        //Sequence* SsX = sequence_construct(slX, sX, sequence_getKmer);
-        //Sequence* SsY = sequence_construct(slY, sY, sequence_getKmer);
-        //st_logInfo("Sequence X to align: %s END\n", sX);
-        //st_logInfo("Sequence Y to align: %s END\n", sY);
 
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -1018,12 +972,6 @@ static void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
 
-        //Sequence* SsX = sequence_construct(lX, sX, sequence_getBase);
-        //Sequence* SsY = sequence_construct(lY, sY, sequence_getBase);
-
-        //st_logInfo("Sequence X to align: %s END\n", SsX->repr);
-        //st_logInfo("Sequence Y to align: %s END\n", SsY->repr);
-
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 
@@ -1038,9 +986,7 @@ static void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
                                                getBlastPairsForPairwiseAlignmentParameters,
                                                1, 1);
 
-        //printf("Before filtering alignedPairs Length: %lld\n", (int64_t) stList_length(alignedPairs));
         alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, sX, sY, 0.2);
-        //printf("After filtering alignedPairs Length: %lld\n", (int64_t) stList_length(alignedPairs));
 
         //Check the aligned pairs.
         checkAlignedPairs(testCase, alignedPairs, lX, lY);
@@ -1074,8 +1020,6 @@ static void test_kmer_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         int64_t lX2 = sequence_correctSeqLength(lX, kmer);
         int64_t lY2 = sequence_correctSeqLength(lY, kmer);
         int64_t coreLengthInKmers = sequence_correctSeqLength(coreLength, kmer);
-        //Sequence* SsX = sequence_construct(slX, sX, sequence_getKmer);
-        //Sequence* SsY = sequence_construct(slY, sY, sequence_getKmer);
 
         st_logInfo("Sequence X to align: %s END\n", sX);
         st_logInfo("Sequence Y to align: %s END\n", sY);
@@ -1094,7 +1038,6 @@ static void test_kmer_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
                                                getBlastPairsForPairwiseAlignmentParameters,
                                                1, 1);
 
-        // TODO figure out how to deal with this
         alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, sX, sY, 0.2);
 
         // Check the aligned pairs.
@@ -1327,34 +1270,33 @@ static void test_hmmDiscrete_EM_5State_symbols(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-
-    //SUITE_ADD_TEST(suite, test_diagonal);
-    //SUITE_ADD_TEST(suite, test_bands);
-    //SUITE_ADD_TEST(suite, test_logAdd);
-    //SUITE_ADD_TEST(suite, test_sequenceConstruct);
-    //SUITE_ADD_TEST(suite, test_cell);
-    //SUITE_ADD_TEST(suite, test_dpDiagonal);
-    //SUITE_ADD_TEST(suite, test_getSubSequence);
-    //SUITE_ADD_TEST(suite, test_dpMatrix);
-    //SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
-    //SUITE_ADD_TEST(suite, test_getSplitPoints);
-    //SUITE_ADD_TEST(suite, test_getBlastPairs);
-    //SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
-    //SUITE_ADD_TEST(suite, test_kmer_cell);
-    //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
+    /*
+    SUITE_ADD_TEST(suite, test_diagonal);
+    SUITE_ADD_TEST(suite, test_bands);
+    SUITE_ADD_TEST(suite, test_logAdd);
+    SUITE_ADD_TEST(suite, test_sequenceConstruct);
+    SUITE_ADD_TEST(suite, test_cell);
+    SUITE_ADD_TEST(suite, test_kmer_cell);
+    SUITE_ADD_TEST(suite, test_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_dpMatrix);
+    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
     //SUITE_ADD_TEST(suite, test_kmer_diagonalDPCalculations);
-    //SUITE_ADD_TEST(suite, test_getAlignedPairs);
-    //SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
-    //SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
+    SUITE_ADD_TEST(suite, test_getSplitPoints);
+    SUITE_ADD_TEST(suite, test_getBlastPairs);
+    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
+    SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
+    SUITE_ADD_TEST(suite, test_getAlignedPairs);
+    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairs);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairsWithBanding);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairsWithRaggedEnds);
-    //SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_symbols);
+    SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_kmers);
-    //SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_symbols);
+    SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_kmers);
-    //SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
+    SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_kmers);
-
+    */
     return suite;
 }

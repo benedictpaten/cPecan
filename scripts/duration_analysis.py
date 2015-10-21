@@ -40,9 +40,8 @@ def write_event_durations_to_file(directories, destination):
                         print(c[3], c[6], 'c', sep=',', end='\n', file=all_together_file)
             npRead.close()
 
+
 def main():
-    #print(sys.argv[1:-1])  # gets all arguments to the script except the last one
-    #print(sys.argv[-1])  # gets the last argument
     files = sys.argv[1:-1]
     write_event_durations_to_file(files, sys.argv[-1])
 

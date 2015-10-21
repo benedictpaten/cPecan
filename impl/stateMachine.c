@@ -298,16 +298,29 @@ static inline double emissions_signal_logGaussPdf(double x, double mu, double si
 
 static double emissions_signal_poissonPosteriorProb(int64_t n, double duration) {
     assert(n <= 5);
-    //double c = 0.00570570570571;
-    double c = 0.00332005312085;
-    double l_2 = 0.69314718055994529;
+
+    // Experimented with different values of c,
+    //double c = 0.00570570570571; // max of PDF
+    double c = 0.00332005312085; // mode of all test durations
+    //double c = 0.0045; // guess of somewhere in between
+
+    // Experimenting with changing the rate parameter, started with 2, but then the p(c|N=2) == p(c|N=1) which
+    // doesn't make sense. When 0 < beta < 1 then the p(c|N=0) > p(c|N=1). At 1.25, it seems to have the correct
+    // curve.
+    //double l_2 = 0.69314718055994529;
+    //double beta = 1.25;
+    double l_beta = 0.22314355131420976;
     double lambda = duration / c;
     double l_factorials[6] = {0.0, 0.0, 0.69314718056, 1.79175946923, 3.17805383035, 4.78749174278};
+
     //result = ((n+1)*np.log(2)) + (n*np.log(lam)) - np.log(factorial(n)) - (2*lam)
-    double a = (n+1) * l_2;
+    double a = (n+1) * l_beta;
     double b = n * log(lambda);
     double d = 2 * lambda;
+
     // returns log-space
+    //double prob = a + b - l_factorials[n] - d;
+    //return prob;
     return a + b - l_factorials[n] - d;
 }
 
@@ -441,6 +454,7 @@ double emissions_signal_multipleKmerMatchProb(const double *eventModel, void *km
     return p - log(n);
 }
 
+// not implemented
 double emissions_signal_meanEventMatchProb(const double *eventModel, void *kmers, void *event) {
     // first go though and add up all of the event/kmer match probs
     double totalMatchProb = 0.0;
@@ -453,7 +467,7 @@ double emissions_signal_meanEventMatchProb(const double *eventModel, void *kmers
         if (p > LOG_ZERO) {
             n += 1;
         }
-        totalMatchProb += exp(p);
+        totalMatchProb += exp(p); // can make this a logAdd
     }
     while (n > 0) {
         double p_d = emissions_signal_poissonPosteriorProb(n, duration);
@@ -468,7 +482,6 @@ double emissions_signal_getDurationProb(void *event, int64_t n) {
 }
 
 double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, void *kmer, void *event) {
-
     // wrangle event data
     double eventMean = *(double *) event;
     double eventNoise = *(double *) (event + sizeof(double)); // aaah pointers
@@ -1066,7 +1079,7 @@ static void stateMachineEchelon_cellCalculate(StateMachine *sM,
         doTransition(lower, current, gapX, gapX, 0, la_xx, extraArgs);
     }
     if (middle != NULL) {
-        // first we handle going from all of the match states to all the other ones
+        // first we handle going from all of the match states to match1 through match5
         for (int64_t n = 1; n < 6; n++) {
             for (int64_t from = 0; from < 6; from++) {
                 doTransition(middle, current, from, n,
@@ -1284,7 +1297,7 @@ StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
     }
 }
 
-StateMachine *getSignalStateMachine3(const char *modelFile) {
+StateMachine *getSignalStateMachine3Vanilla(const char *modelFile) {
     // construct a stateMachine3Vanilla then load the model
     StateMachine *sM3v = stateMachine3Vanilla_construct(threeState, NUM_OF_KMERS,
                                                         emissions_signal_initEmissionsToZero,
@@ -1295,7 +1308,7 @@ StateMachine *getSignalStateMachine3(const char *modelFile) {
     return sM3v;
 }
 
-StateMachine *getEchelonStateMachine(const char *modelFile) {
+StateMachine *getStateMachineEchelon(const char *modelFile) {
     StateMachine *sMe = stateMachineEchelon_construct(echelon, NUM_OF_KMERS,
                                                       emissions_signal_initEmissionsToZero,
                                                       emissions_signal_getDurationProb,

@@ -736,7 +736,7 @@ void diagonalCalculationMultiPosteriorMatchProbs(StateMachine *sM, int64_t xay, 
                     }
                     posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
                     for (int64_t n = 0; n < s; n++) {
-                        //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f), s:%lld \n", posteriorProbability, (x + n) - 1, y - 1, *(double *)sY->get(sY->elements, y-1), s);
+                        //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f), state:%lld \n", posteriorProbability/PAIR_ALIGNMENT_PROB_1, (x + n) - 1, y - 1, *(double *)sY->get(sY->elements, y-1), s);
                         stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, (x + n) - 1, y - 1));
                     }
                 }

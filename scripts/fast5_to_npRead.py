@@ -19,7 +19,7 @@ import sys
 
 def main():
     if len(sys.argv) < 3:
-        print("USAGE: python thisScript.py /path/to/fast5")
+        print("USAGE: python thisScript.py /path/to/file.fast5 /path/to/destination")
 
     if len(sys.argv) == 3:
         # setup
