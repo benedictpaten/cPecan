@@ -190,11 +190,26 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     return npRead;
 }
 
-void nanopore_remapAnchorPairs(stList *blastPairs, int64_t *eventMap) {
+stList *nanopore_remapAnchorPairs(stList *blastPairs, int64_t *eventMap) {
+    stList *mappedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
+
     for (int64_t i = 0; i < stList_length(blastPairs); i++) {
         stIntTuple *pair = stList_get(blastPairs, i);
-        stList_set(blastPairs, i,
-                   stIntTuple_construct2(stIntTuple_get(pair, 0), eventMap[stIntTuple_get(pair, 1)]));
+        //stList_set(blastPairs, i,
+        //           stIntTuple_construct2(stIntTuple_get(pair, 0), eventMap[stIntTuple_get(pair, 1)]));
+        stList_append(mappedPairs,
+                      stIntTuple_construct2(stIntTuple_get(pair, 0), eventMap[stIntTuple_get(pair, 1)]));
         stIntTuple_destruct(pair);
     }
+
+    return mappedPairs;
+}
+
+void nanopore_nanoporeReadDestruct(NanoporeRead *npRead) {
+    free(npRead->twoDread);
+    free(npRead->templateEventMap);
+    free(npRead->templateEvents);
+    free(npRead->complementEventMap);
+    free(npRead->complementEvents);
+    free(npRead);
 }

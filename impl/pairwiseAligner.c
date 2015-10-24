@@ -297,22 +297,9 @@ void *sequence_getBase(void *elements, int64_t index) {
 }
 
 void *sequence_getKmer(void *elements, int64_t index) {
-    /*
-     * Returns a kmer from a sequence object, similarly to sequence_getBase, this might be changed to only
-     * if we decide to only use indicies for kmers/events/nucleotides. That would also make it easy to
-     * remove the malloc...
-     */
-    //
-    char* n;
-    n = "NNNNNN"; // hardwired null kmer
-    int64_t i = index;
-    // change kmer length here, hardwired so far...
-    int kmerLength = KMER_LENGTH;
-    char *k_i = malloc((kmerLength+1) * sizeof(char));
-    for (int x = 0; x < kmerLength; x++) {
-        k_i[x] = *((char *)elements+(i+x));
-    }
-    return index >= 0 ? k_i : n;
+    char *n = "";
+    //int64_t i = index;
+    return index >= 0 ? &(((char *) elements)[index]) : n;
 }
 
 void *sequence_getKmer2(void *elements, int64_t index) {
@@ -1457,6 +1444,11 @@ stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int6
     for (int64_t i = 0; i <= diagonalNumber; i++) {
         diagonalPosteriorProbFn(sM, i, forwardDpMatrix, backwardDpMatrix, ScX, ScY, totalProbability, p, extraArgs);
     }
+
+    // cleanup
+    sequence_sequenceDestroy(ScX);
+    sequence_sequenceDestroy(ScY);
+
     return alignedPairs;
 }
 

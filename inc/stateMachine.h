@@ -131,18 +131,21 @@ struct _StateMachine3 {
     double TRANSITION_GAP_SWITCH_TO_Y; //0.0073673675173412815f;
 
     double (*getXGapProbFcn)(const double *emissionXGapProbs, void *i);
-    double (*getYGapProbFcn)(const double *emissionYGapProbs, void *i);
+
+    // 10/23 - changed to use strawMan simple 3-state pair-hmm for development
+    //double (*getYGapProbFcn)(const double *emissionYGapProbs, void *i); // old version for discrete-space alignments
+    double (*getYGapProbFcn)(const double *emissionYGapProbs, void *x, void *y);
     double (*getMatchProbFcn)(const double *emissionMatchProbs, void *x, void *y);
 };
 
 typedef struct _StateMachine3vanilla {
-    // for signal-level alignments, most basic model
+    // reimplementation of nanopolish HMM by JTS.
     StateMachine model;
 
     double TRANSITION_M_TO_Y_NOT_X;
     double TRANSITION_E_TO_E;
-    double DEFAULT_END_MATCH_PROB; //0.79015888282447311; // stride_prb
-    double DEFAULT_END_FROM_X_PROB; //0.19652425498269727; // skip_prob
+    double DEFAULT_END_MATCH_PROB;  //0.79015888282447311;  // stride_prb
+    double DEFAULT_END_FROM_X_PROB; //0.19652425498269727;  // skip_prob
     double DEFAULT_END_FROM_Y_PROB; //0.013316862192910478; // stay_prob
 
     double (*getKmerSkipProb)(StateMachine *sM, void *kmerList);
@@ -151,16 +154,12 @@ typedef struct _StateMachine3vanilla {
 } StateMachine3Vanilla;
 
 typedef struct _StateMachine2echelon {
-    // pseudo 8-state general hmm
+    // 8-state general hmm
     StateMachine model;
 
-    // from stateMachine3Vanilla..
-    //double TRANSITION_M_TO_Y_NOT_X;
-    //double TRANSITION_E_TO_E;
     double BACKGROUND_EVENT_PROB;
     double DEFAULT_END_MATCH_PROB; //0.79015888282447311; // stride_prb
     double DEFAULT_END_FROM_X_PROB; //0.19652425498269727; // skip_prob
-    //double DEFAULT_END_FROM_Y_PROB; //0.013316862192910478; // stay_prob prob don't need
 
     double (*getKmerSkipProb)(StateMachine *sM, void *kmerList); // beta
     double (*getDurationProb)(void *event, int64_t n); // P(dj|n)
@@ -187,9 +186,10 @@ StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSe
                                       double (*matchProbFcn)(const double *, void *, void *));
 
 StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSetSize,
+                                      void (*setTransitionsToDefaults)(StateMachine *sM),
                                       void (*setEmissionsDefaults)(StateMachine *sM),
                                       double (*gapXProbFcn)(const double *, void *),
-                                      double (*gapYProbFcn)(const double *, void *),
+                                      double (*gapYProbFcn)(const double *, void *, void *),
                                       double (*matchProbFcn)(const double *, void *, void *));
 
 StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t parameterSetSize,
@@ -211,6 +211,11 @@ int64_t emissions_discrete_getBaseIndex(void *base);
 
 //Returns the index for a kmer.
 int64_t emissions_discrete_getKmerIndex(void *kmer);
+
+// transition defaults
+void stateMachine3_setTransitionsToNucleotideDefaults(StateMachine *sM);
+
+void stateMachine3_setTransitionsToNanoporeDefaults(StateMachine *sM);
 
 // emissions defaults
 void emissions_discrete_initEmissionsToZero(StateMachine *sM);
@@ -247,6 +252,8 @@ void emissions_signal_scaleModel(StateMachine *sM, double scale, double shift, d
 double emissions_signal_meanEventMatchProb(const double *eventModel, void *kmers, void *event);
 
 double emissions_signal_getDurationProb(void *event, int64_t n);
+
+StateMachine *getStrawManStateMachine3(const char *modelFile);
 
 StateMachine *getSignalStateMachine3Vanilla(const char *modelFile);
 
