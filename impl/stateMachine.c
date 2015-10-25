@@ -185,13 +185,12 @@ double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, vo
 
 /////////////////////////////////////////// STATIC FUNCTIONS ////////////////////////////////////////////////////////
 
-static inline void emissions_signal_initializeEmissionsMatrices(StateMachine *sM) {
+static inline void emissions_vanilla_initializeEmissionsMatrices(StateMachine *sM, int64_t nbSkipParams) {
     // changed to 30 for skip prob bins
     // the kmer/gap and skip (f(|ui-1 - ui|)) probs have smaller tables, either 30 for the skip or parameterSetSize
     // for the naive kmer skip one
     // see note at emissions_signal_initEmissionsToZero about this change
-    //sM->EMISSION_GAP_X_PROBS = st_malloc(30 * sizeof(double));
-    sM->EMISSION_GAP_X_PROBS = st_malloc(sM->parameterSetSize * sizeof(double));
+    sM->EMISSION_GAP_X_PROBS = st_malloc(nbSkipParams * sizeof(double));
 
     // both the Iy and M - type states use the event/kmer match model so the matrices need to be the same size
     sM->EMISSION_GAP_Y_PROBS = st_malloc(1 + (sM->parameterSetSize * MODEL_PARAMS) * sizeof(double));
@@ -227,7 +226,7 @@ static inline double emissions_signal_getModelFluctuationLambda(const double *ev
     return kmerIndex > NUM_OF_KMERS ? 0.0 : eventModel[1 + (kmerIndex * MODEL_PARAMS + 4)];
 }
 
-static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFile) {
+static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFile, StateMachineType type) {
     /*
      *  the model file has the format:
      *  line 1: [correlation coefficient] [level_mean] [level_sd] [noise_mean]
@@ -262,15 +261,28 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
     tokens = stString_split(string);
     // check for correctness
     if (stList_length(tokens) != 30) {
-        st_errAbort("Did not get expected number of kmer skip bins, expected 30, got %lld\n", stList_length(tokens));
+        st_errAbort("Did not get expected number of kmer skip bins, expected 30, got %lld\n",
+                    stList_length(tokens));
     }
-    // load X Gap emissions into stateMachine
-    for (int64_t i = 0; i < 30; i++) {
-        int64_t j = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_GAP_X_PROBS[i]));
-        if (j != 1) {
-            st_errAbort("emissions_signal_loadPoreModel: error loading kmer skip bins\n");
+
+    // load in the kmer skip 'bins' for the vanilla and echelon models
+    if (type >= vanilla) {
+        // load X Gap emissions into stateMachine
+        for (int64_t i = 0; i < 30; i++) {
+            int64_t j = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_GAP_X_PROBS[i]));
+            if (j != 1) {
+                st_errAbort("emissions_signal_loadPoreModel: error loading vanilla kmer skip bins\n");
+            }
+
+            if (type == echelon) {
+                int64_t j = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_GAP_X_PROBS[i+30]));
+                if (j != 1) {
+                    st_errAbort("emissions_signal_loadPoreModel: error loading echelon kmer skip bins\n");
+                }
+            }
         }
     }
+
     // clean up X Gap emissions line
     free(string);
     stList_destruct(tokens);
@@ -350,19 +362,13 @@ static double emissions_signal_poissonPosteriorProb(int64_t n, double duration) 
 
 ///////////////////////////////////////////// CORE FUNCTIONS ////////////////////////////////////////////////////////
 
-void emissions_signal_initEmissionsToZero(StateMachine *sM) {
+void emissions_signal_initEmissionsToZero(StateMachine *sM, int64_t nbSkipParams) {
     // initialize
-    emissions_signal_initializeEmissionsMatrices(sM);
+    emissions_vanilla_initializeEmissionsMatrices(sM, nbSkipParams);
 
-    // 10/23 - changed the size of the kmer skip (Ix) to be the size of double*parameter set size so that the
-    // strawMan stateMachine3 could learn individial kmer (-,x_i) emission probs. In reality, the matrix is bigger
-    // than it needs to be for use with the vanilla and echelon models that only use it for the 'bins'. In a final
-    // version decide on which to use and stick with it. But in the mean time there is a little extra space malloc'ed
-    // so that I don't need duplicate functions just for the strawMan model.
-
-    //emissions_signal_initKmerSkipTableToZero(sM->EMISSION_GAP_X_PROBS, 30); // this is the way it was
-    // set gap matrices to zeros                                              // for vanilla/echelon
-    emissions_signal_initKmerSkipTableToZero(sM->EMISSION_GAP_X_PROBS, sM->parameterSetSize);
+    // set kmer skip matrix to zeros
+    emissions_signal_initKmerSkipTableToZero(sM->EMISSION_GAP_X_PROBS, nbSkipParams);
+    // set extra event matrix to zeros
     emissions_signal_initMatchMatrixToZero(sM->EMISSION_GAP_Y_PROBS, sM->parameterSetSize);
     // set match matrix to zeros
     emissions_signal_initMatchMatrixToZero(sM->EMISSION_MATCH_PROBS, sM->parameterSetSize);
@@ -596,6 +602,7 @@ void emissions_signal_scaleModel(StateMachine *sM,
 ////////////////////////////
 // EM emissions functions //
 ////////////////////////////
+
 static void emissions_em_loadMatchProbs(double *emissionMatchProbs, Hmm *hmm, int64_t matchState) {
     //Load the matches
     for(int64_t x = 0; x < hmm->symbolSetSize; x++) {
@@ -1083,7 +1090,7 @@ static void stateMachine3Vanilla_cellCalculate(StateMachine *sM,
     double a_mm = 1.0f - a_my - a_mx;
 
     // from Y [Extra event state]
-    double a_yy = sM3v->TRANSITION_E_TO_E; //
+    double a_yy = sM3v->TRANSITION_E_TO_E;
     double a_ym = 1.0f - a_yy;
 
     // from X [Skipped event state]
@@ -1123,7 +1130,7 @@ static void stateMachineEchelon_cellCalculate(StateMachine *sM,
     double a_mx = sMe->getKmerSkipProb((StateMachine *) sMe, cX), la_mx = log(a_mx); // beta
     double a_mh = 1 - a_mx, la_mh = log(a_mh); // 1 - beta
     // from X (kmer skip)
-    double a_xx = a_mx, la_xx = log(a_xx); // alpha
+    double a_xx = a_mx, la_xx = log(a_xx); // alpha, to seperate alpha, need to change here
     double a_xh = 1 - a_xx, la_xh = log(a_xh); // 1 - alpha
 
     if (lower != NULL) {
@@ -1163,7 +1170,7 @@ static void stateMachineEchelon_cellCalculate(StateMachine *sM,
 
 StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSetSize,
                                       void (*setTransitionsToDefaults)(StateMachine *sM),
-                                      void (*setEmissionsDefaults)(StateMachine *sM),
+                                      void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                       double (*gapXProbFcn)(const double *, void *),
                                       double (*gapYProbFcn)(const double *, void *, void *),
                                       double (*matchProbFcn)(const double *, void *, void *)) {
@@ -1176,18 +1183,6 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
     if (type != threeState && type != threeStateAsymmetric) {
         st_errAbort("Tried to create a three state state-machine with the wrong type");
     }
-    // setup transitions
-    /*
-    sM3->TRANSITION_MATCH_CONTINUE = -0.030064059121770816; //0.9703833696510062f
-    sM3->TRANSITION_MATCH_FROM_GAP_X = -1.272871422049609; //1.0 - gapExtend - gapSwitch = 0.280026392297485
-    sM3->TRANSITION_MATCH_FROM_GAP_Y = -1.272871422049609; //1.0 - gapExtend - gapSwitch = 0.280026392297485
-    sM3->TRANSITION_GAP_OPEN_X = -4.21256642; //0.0129868352330243
-    sM3->TRANSITION_GAP_OPEN_Y = -4.21256642; //0.0129868352330243
-    sM3->TRANSITION_GAP_EXTEND_X = -0.3388262689231553; //0.7126062401851738f;
-    sM3->TRANSITION_GAP_EXTEND_Y = -0.3388262689231553; //0.7126062401851738f;
-    sM3->TRANSITION_GAP_SWITCH_TO_X = -4.910694825551255; //0.0073673675173412815f;
-    sM3->TRANSITION_GAP_SWITCH_TO_Y = -4.910694825551255; //0.0073673675173412815f;
-     */
 
     // setup the parent class
     sM3->model.type = type;
@@ -1209,19 +1204,19 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
     setTransitionsToDefaults((StateMachine *) sM3);
 
     // set emissions to defaults or zeros
-    setEmissionsDefaults((StateMachine *) sM3);
+    setEmissionsDefaults((StateMachine *) sM3, parameterSetSize);
 
     return (StateMachine *) sM3;
 }
 
 StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t parameterSetSize,
-                                             void (*setEmissionsDefaults)(StateMachine *sM),
+                                             void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                              double (*xSkipProbFcn)(StateMachine *, void *),
                                              double (*scaledMatchProbFcn)(const double *, void *, void *),
                                              double (*matchProbFcn)(const double *, void *, void *)) {
     StateMachine3Vanilla *sM3v = st_malloc(sizeof(StateMachine3Vanilla));
     // check
-    if (type != threeState && type != threeStateAsymmetric) {
+    if (type != vanilla) {
         st_errAbort("Tried to create a vanilla state machine with the wrong type?");
     }
     // setup end state prob defaults
@@ -1248,17 +1243,21 @@ StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t para
     sM3v->getMatchProbFcn = matchProbFcn;
 
     // set emissions to defaults or zeros
-    setEmissionsDefaults((StateMachine *) sM3v);
+    setEmissionsDefaults((StateMachine *) sM3v, 30);
     return (StateMachine *) sM3v;
 }
 
 StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t parameterSetSize,
-                                            void (*setEmissionsToDefaults)(StateMachine *sM),
+                                            void (*setEmissionsToDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                             double (*durationProbFcn)(void *event, int64_t n),
                                             double (*skipProbFcn)(StateMachine *sM, void *kmerList),
                                             double (*matchProbFcn)(const double *, void *, void *, int64_t n),
                                             double (*scaledMatchProbFcn)(const double *, void *, void *)) {
     StateMachineEchelon *sMe = st_malloc(sizeof(StateMachineEchelon));
+
+    if (type != echelon) {
+        st_errAbort("Tried to create a echelon state machine with the wrong type?");
+    }
 
     // setup end state probabilities
     sMe->DEFAULT_END_MATCH_PROB = 0.79015888282447311; // stride_prb
@@ -1282,7 +1281,7 @@ StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t param
     sMe->getMatchProbFcn = matchProbFcn;
     sMe->getScaledMatchProbFcn = scaledMatchProbFcn;
 
-    setEmissionsToDefaults((StateMachine *) sMe);
+    setEmissionsToDefaults((StateMachine *) sMe, 60);
     return (StateMachine *) sMe;
 }
 
@@ -1362,23 +1361,23 @@ StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
 
 StateMachine *getStrawManStateMachine3(const char *modelFile) {
     StateMachine *sM3 = stateMachine3_construct(threeState, NUM_OF_KMERS,
-                                               stateMachine3_setTransitionsToNanoporeDefaults,
-                                               emissions_signal_initEmissionsToZero,
-                                               emissions_kmer_getGapProb,
-                                               emissions_signal_strawManGetKmerEventMatchProb,
-                                               emissions_signal_strawManGetKmerEventMatchProb);
-    emissions_signal_loadPoreModel(sM3, modelFile);
+                                                stateMachine3_setTransitionsToNanoporeDefaults,
+                                                emissions_signal_initEmissionsToZero,
+                                                emissions_kmer_getGapProb,
+                                                emissions_signal_strawManGetKmerEventMatchProb,
+                                                emissions_signal_strawManGetKmerEventMatchProb);
+    emissions_signal_loadPoreModel(sM3, modelFile, sM3->type);
     return sM3;
 }
 
 StateMachine *getSignalStateMachine3Vanilla(const char *modelFile) {
     // construct a stateMachine3Vanilla then load the model
-    StateMachine *sM3v = stateMachine3Vanilla_construct(threeState, NUM_OF_KMERS,
+    StateMachine *sM3v = stateMachine3Vanilla_construct(vanilla, NUM_OF_KMERS,
                                                         emissions_signal_initEmissionsToZero,
                                                         emissions_signal_getKmerSkipProb,
                                                         emissions_signal_getEventMatchProbWithTwoDists,
                                                         emissions_signal_getEventMatchProbWithTwoDists);
-    emissions_signal_loadPoreModel(sM3v, modelFile);
+    emissions_signal_loadPoreModel(sM3v, modelFile, sM3v->type);
     return sM3v;
 }
 
@@ -1389,7 +1388,7 @@ StateMachine *getStateMachineEchelon(const char *modelFile) {
                                                       emissions_signal_getKmerSkipProb,
                                                       emissions_signal_multipleKmerMatchProb,
                                                       emissions_signal_getEventMatchProbWithTwoDists);
-    emissions_signal_loadPoreModel(sMe, modelFile);
+    emissions_signal_loadPoreModel(sMe, modelFile, sMe->type);
     return sMe;
 }
 

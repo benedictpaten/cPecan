@@ -365,6 +365,44 @@ static void test_echelon_cell(CuTest *testCase) {
     sequence_sequenceDestroy(referSeq);
 }
 
+static void test_strawMan_dpDiagonal(CuTest *testCase) {
+    // make stateMachine, forward and reverse DP matrices and banding stuff
+    char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    StateMachine *sM = getStrawManStateMachine3(modelFile);
+    Diagonal diagonal = diagonal_construct(3, -1, 1);
+    DpDiagonal *dpDiagonal = dpDiagonal_construct(diagonal, sM->stateNumber);
+
+    //Get cell
+    double *c1 = dpDiagonal_getCell(dpDiagonal, -1);
+    CuAssertTrue(testCase, c1 != NULL);
+
+    double *c2 = dpDiagonal_getCell(dpDiagonal, 1);
+    CuAssertTrue(testCase, c2 != NULL);
+
+    CuAssertTrue(testCase, dpDiagonal_getCell(dpDiagonal, 3) == NULL);
+    CuAssertTrue(testCase, dpDiagonal_getCell(dpDiagonal, -3) == NULL);
+
+    dpDiagonal_initialiseValues(dpDiagonal, sM, sM->endStateProb); //Test initialise values
+    double totalProb = LOG_ZERO;
+    for (int64_t i = 0; i < sM->stateNumber; i++) {
+        CuAssertDblEquals(testCase, c1[i], sM->endStateProb(sM, i), 0.0);
+        CuAssertDblEquals(testCase, c2[i], sM->endStateProb(sM, i), 0.0);
+        totalProb = logAdd(totalProb, 2 * c1[i]);
+        totalProb = logAdd(totalProb, 2 * c2[i]);
+    }
+
+    DpDiagonal *dpDiagonal2 = dpDiagonal_clone(dpDiagonal);
+    CuAssertTrue(testCase, dpDiagonal_equals(dpDiagonal, dpDiagonal2));
+
+    //Check it runs
+    CuAssertDblEquals(testCase, totalProb, dpDiagonal_dotProduct(dpDiagonal, dpDiagonal2), 0.001);
+
+    // cleanup
+    stateMachine_destruct(sM);
+    dpDiagonal_destruct(dpDiagonal);
+    dpDiagonal_destruct(dpDiagonal2);
+}
+
 static void test_echelon_dpDiagonal(CuTest *testCase) {
     // make stateMachine, forward and reverse DP matrices and banding stuff
     char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
@@ -866,12 +904,73 @@ static void test_echelon_strandAlignmentNoBanding(CuTest *testCase) {
     stList_destruct(alignedPairs);
     stateMachine_destruct(sM);
 }
-
-/*
 static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
+    // load the reference sequence and the nanopore read
+    char *ZymoReference = stString_print("../../cPecan/tests/ZymoRef.txt");
+    FILE *fH = fopen(ZymoReference, "r");
+    char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
+    char *npReadFile = stString_print("../../cPecan/tests/ZymoC_ch_1_file1.npRead");
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
 
+    // get sequence lengths
+    int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
+    int64_t lY = npRead->nbTemplateEvents;
+
+    // load stateMachine from model file
+    char *templateModelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    StateMachine *sMt = getStrawManStateMachine3(templateModelFile);
+
+    // scale model
+    emissions_signal_scaleModel(sMt, npRead->templateParams.scale, npRead->templateParams.shift,
+                                npRead->templateParams.var, npRead->templateParams.scale_sd,
+                                npRead->templateParams.var_sd); // clunky
+
+    // parameters for pairwise alignment using defaults
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+
+    // get anchors using lastz
+    stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
+
+    // remap and filter
+    stList *remappedAnchors = nanopore_remapAnchorPairs(anchorPairs, npRead->templateEventMap);
+    stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
+
+    // make Sequences for reference and template events
+    Sequence *refSeq = sequence_construct(lX, ZymoReferenceSeq, sequence_getKmer);
+    Sequence *templateSeq = sequence_construct(lY, npRead->templateEvents, sequence_getEvent);
+
+    // do alignment of template events
+    stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
+                                                       diagonalCalculationPosteriorMatchProbs,
+                                                       1, 1);
+    checkAlignedPairs(testCase, alignedPairs, lX, lY);
+    st_logInfo("there are %lld aligned pairs with banding\n", stList_length(alignedPairs));
+
+    // for ch1_file1 template there should be this many aligned pairs with banding
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 1001);
+
+    // check against alignment without banding
+    stList *alignedPairs2 = getAlignedPairsWithoutBanding(sMt, ZymoReferenceSeq, npRead->templateEvents, lX,
+                                                          lY, p,
+                                                          sequence_getKmer, sequence_getEvent,
+                                                          diagonalCalculationPosteriorMatchProbs,
+                                                          0, 0);
+    st_logInfo("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
+    checkAlignedPairs(testCase, alignedPairs2, lX, lY);
+    CuAssertTrue(testCase, stList_length(alignedPairs2) == 980);
+
+    // there shouldn't be too many more aligned pairs with banding than without
+    CuAssertTrue(testCase, 1 < (stList_length(alignedPairs)/stList_length(alignedPairs2)) < 1.5);
+
+    // clean
+    pairwiseAlignmentBandingParameters_destruct(p);
+    nanopore_nanoporeReadDestruct(npRead);
+    sequence_sequenceDestroy(refSeq);
+    sequence_sequenceDestroy(templateSeq);
+    stList_destruct(alignedPairs);
+    stList_destruct(alignedPairs2);
+    stateMachine_destruct(sMt);
 }
-*/
 
 static void test_vanilla_getAlignedPairsWithBanding(CuTest *testCase) {
     // load the reference sequence and the nanopore read
@@ -913,7 +1012,7 @@ static void test_vanilla_getAlignedPairsWithBanding(CuTest *testCase) {
                                                        diagonalCalculationPosteriorMatchProbs,
                                                        1, 1);
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
-    st_uglyf("there are %lld aligned pairs with banding\n", stList_length(alignedPairs));
+    st_logInfo("there are %lld aligned pairs with banding\n", stList_length(alignedPairs));
     // for ch1_file1 template there should be this many aligned pairs with banding
     CuAssertTrue(testCase, stList_length(alignedPairs) == 961);
 
@@ -923,9 +1022,10 @@ static void test_vanilla_getAlignedPairsWithBanding(CuTest *testCase) {
                                                           sequence_getKmer2, sequence_getEvent,
                                                           diagonalCalculationPosteriorMatchProbs,
                                                           0, 0);
-    st_uglyf("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
+    st_logInfo("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
     checkAlignedPairs(testCase, alignedPairs2, lX, lY);
     CuAssertTrue(testCase, stList_length(alignedPairs2) == 953);
+
     // there shouldn't be too many more aligned pairs with banding than without
     CuAssertTrue(testCase, 1 < (stList_length(alignedPairs)/stList_length(alignedPairs2)) < 1.5);
 
@@ -983,7 +1083,7 @@ static void test_echelon_getAlignedPairsWithBanding(CuTest *testCase) {
     checkAlignedPairsForEchelon(testCase, alignedPairs, lX, lY);
     // for ch1_file1 template there should be this many aligned pairs with banding
     CuAssertIntEquals(testCase, stList_length(alignedPairs), 1031);
-    st_uglyf("there are %lld aligned pairs using anchors\n", stList_length(alignedPairs));
+    st_logInfo("there are %lld aligned pairs using anchors\n", stList_length(alignedPairs));
 
     // do alignment without banding
     stList *alignedPairs2 = getAlignedPairsWithoutBanding(sMt, ZymoReferenceSeq, npRead->templateEvents, lX,
@@ -993,7 +1093,7 @@ static void test_echelon_getAlignedPairsWithBanding(CuTest *testCase) {
                                                           0, 0);
     // for ch1_file1 template there should be this many aligned pairs with banding
     CuAssertIntEquals(testCase, stList_length(alignedPairs2), 1026);
-    st_uglyf("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
+    st_logInfo("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
     checkAlignedPairsForEchelon(testCase, alignedPairs2, lX, lY);
 
     // Make sure there aren't too many more anchor-aligned pairs than without anchors
@@ -1016,16 +1116,18 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_twoDistributionPdf);
     SUITE_ADD_TEST(suite, test_poissonPosteriorProb);
     SUITE_ADD_TEST(suite, test_strawMan_cell);
-    SUITE_ADD_TEST(suite, test_strawMan_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_vanilla_cell);
     SUITE_ADD_TEST(suite, test_echelon_cell);
     SUITE_ADD_TEST(suite, test_echelon_dpDiagonal);
     SUITE_ADD_TEST(suite, test_vanilla_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_strawMan_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_strawMan_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_vanilla_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_echelon_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_scaleModel);
     //SUITE_ADD_TEST(suite, test_vanilla_strandAlignmentNoBanding);
     //SUITE_ADD_TEST(suite, test_echelon_strandAlignmentNoBanding);
+    SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_echelon_getAlignedPairsWithBanding);
     return suite;

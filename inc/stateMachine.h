@@ -14,17 +14,14 @@
 #define SYMBOL_NUMBER_NO_N 4
 #define MODEL_PARAMS 5 // level_mean, level_sd, fluctuation_mean, fluctuation_noise, fluctuation_lambda
 
-/*
- * The statemachine object for computing pairwise alignments with.
- */
 
-// TODO expand this?
 typedef enum {
     fiveState=0,
     fiveStateAsymmetric=1,
     threeState=2,
     threeStateAsymmetric=3,
-    echelon=4
+    vanilla=4,
+    echelon=5
 } StateMachineType;
 
 typedef struct _stateMachine StateMachine;
@@ -187,19 +184,19 @@ StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSe
 
 StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSetSize,
                                       void (*setTransitionsToDefaults)(StateMachine *sM),
-                                      void (*setEmissionsDefaults)(StateMachine *sM),
+                                      void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                       double (*gapXProbFcn)(const double *, void *),
                                       double (*gapYProbFcn)(const double *, void *, void *),
                                       double (*matchProbFcn)(const double *, void *, void *));
 
 StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t parameterSetSize,
-                                             void (*setEmissionsDefaults)(StateMachine *sM),
+                                             void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                              double (*xSkipProbFcn)(StateMachine *, void *),
                                              double (*scaledMatchProbFcn)(const double *, void *, void *),
                                              double (*matchProbFcn)(const double *, void *, void *));
 
 StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t parameterSetSize,
-                                            void (*setEmissionsToDefaults)(StateMachine *sM),
+                                            void (*setEmissionsToDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                             double (*durationProbFcn)(void *event, int64_t n),
                                             double (*skipProbFcn)(StateMachine *sM, void *kmerList),
                                             double (*matchProbFcn)(const double *, void *, void *, int64_t n),
@@ -227,7 +224,7 @@ void emissions_symbol_setEmissionsToDefaults(StateMachine *sM);
 * matrix is nK x 1 and the match matrix is nK x nK
 * In the most simple case, with 4 nucleotides the gap matrix is 4x1 matrix and the match matrix is a 4x4 matrix.
 */
-void emissions_signal_initEmissionsToZero(StateMachine *sM);
+void emissions_signal_initEmissionsToZero(StateMachine *sM, int64_t nbSkipParams);
 
 double emissions_symbol_getGapProb(const double *emissionGapProbs, void *base);
 

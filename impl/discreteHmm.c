@@ -40,15 +40,15 @@ Hmm *hmmDiscrete_constructEmpty(double pseudocount, int64_t stateNumber, int64_t
 
     // Set up functions
     // transitions
-    hmmD->addToTransitionExpectationFcn = addToTransitionExpFcn; //add
-    hmmD->setTransitionFcn = setTransitionFcn; // set
-    hmmD->getTransitionsExpFcn = getTransitionsExpFcn; // get
+    hmmD->addToTransitionExpectationFcn = addToTransitionExpFcn; // add
+    hmmD->setTransitionFcn = setTransitionFcn;                   // set
+    hmmD->getTransitionsExpFcn = getTransitionsExpFcn;           // get
     // emissions
-    hmmD->addToEmissionExpectationFcn = addEmissionsExpFcn; // add
-    hmmD->setEmissionExpectationFcn = setEmissionExpFcn; // set
-    hmmD->getEmissionExpFcn = getEmissionExpFcn; // get
+    hmmD->addToEmissionExpectationFcn = addEmissionsExpFcn;      // add
+    hmmD->setEmissionExpectationFcn = setEmissionExpFcn;         // set
+    hmmD->getEmissionExpFcn = getEmissionExpFcn;                 // get
     // indexing
-    hmmD->getElementIndexFcn = getElementIndexFcn;
+    hmmD->getElementIndexFcn = getElementIndexFcn;               // indexing
 
     return hmmD;
 }
