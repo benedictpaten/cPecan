@@ -1109,27 +1109,31 @@ static void test_echelon_getAlignedPairsWithBanding(CuTest *testCase) {
     stateMachine_destruct(sMt);
 }
 
+static void test_continuousPairHmm(CuTest *testCase) {
+
+}
+
 CuSuite *signalPairwiseTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
-    SUITE_ADD_TEST(suite, test_bivariateGaussPdfMatchProb);
-    SUITE_ADD_TEST(suite, test_twoDistributionPdf);
-    SUITE_ADD_TEST(suite, test_poissonPosteriorProb);
-    SUITE_ADD_TEST(suite, test_strawMan_cell);
-    SUITE_ADD_TEST(suite, test_vanilla_cell);
-    SUITE_ADD_TEST(suite, test_echelon_cell);
-    SUITE_ADD_TEST(suite, test_echelon_dpDiagonal);
-    SUITE_ADD_TEST(suite, test_vanilla_dpDiagonal);
-    SUITE_ADD_TEST(suite, test_strawMan_dpDiagonal);
-    SUITE_ADD_TEST(suite, test_strawMan_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_vanilla_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_echelon_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_scaleModel);
+    //SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
+    //SUITE_ADD_TEST(suite, test_bivariateGaussPdfMatchProb);
+    //SUITE_ADD_TEST(suite, test_twoDistributionPdf);
+    //SUITE_ADD_TEST(suite, test_poissonPosteriorProb);
+    //SUITE_ADD_TEST(suite, test_strawMan_cell);
+    //SUITE_ADD_TEST(suite, test_vanilla_cell);
+    //SUITE_ADD_TEST(suite, test_echelon_cell);
+    //SUITE_ADD_TEST(suite, test_echelon_dpDiagonal);
+    //SUITE_ADD_TEST(suite, test_vanilla_dpDiagonal);
+    //SUITE_ADD_TEST(suite, test_strawMan_dpDiagonal);
+    //SUITE_ADD_TEST(suite, test_strawMan_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_vanilla_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_echelon_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_scaleModel);
     //SUITE_ADD_TEST(suite, test_vanilla_strandAlignmentNoBanding);
     //SUITE_ADD_TEST(suite, test_echelon_strandAlignmentNoBanding);
-    SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
-    SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);
-    SUITE_ADD_TEST(suite, test_echelon_getAlignedPairsWithBanding);
+    //SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
+    //SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);
+    //SUITE_ADD_TEST(suite, test_echelon_getAlignedPairsWithBanding);
 
     return suite;
 }
