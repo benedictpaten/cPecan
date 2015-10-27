@@ -374,7 +374,39 @@ void emissions_signal_initEmissionsToZero(StateMachine *sM, int64_t nbSkipParams
     emissions_signal_initMatchMatrixToZero(sM->EMISSION_MATCH_PROBS, sM->parameterSetSize);
 }
 
+int64_t emissions_signal_getKmerSkipBin(double *matchModel, void *kmers) {
+    char *kmer_im1 = malloc((KMER_LENGTH) * sizeof(char));
+    for (int64_t x = 0; x < KMER_LENGTH; x++) {
+        kmer_im1[x] = *((char *)kmers+x);
+    }
+    kmer_im1[KMER_LENGTH] = '\0';
+
+    // make kmer_i
+    char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
+    for (int64_t x = 0; x < KMER_LENGTH; x++) {
+        kmer_i[x] = *((char *)kmers+(x+1));
+    }
+    kmer_i[KMER_LENGTH] = '\0';
+
+    // get indices
+    int64_t k_i= emissions_discrete_getKmerIndex(kmer_i);
+    int64_t k_im1 = emissions_discrete_getKmerIndex(kmer_im1);
+
+    // get the expected mean current for each one
+    double u_ki = emissions_signal_getModelLevelMean(matchModel, k_i);
+    double u_kim1 = emissions_signal_getModelLevelMean(matchModel, k_im1);
+
+    // find the difference
+    double d = fabs(u_ki - u_kim1);
+
+    // get the 'bin' for skip prob, clamp to the last bin
+    int64_t bin = (int64_t)(d / 0.5); // 0.5 pA bins right now
+    bin = bin >= 30 ? 29 : bin;
+    return bin;
+}
+
 double emissions_signal_getKmerSkipProb(StateMachine *sM, void *kmers) {
+    //TODO refactor this so that it uses the above function to minimize redundant code.
     StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *) sM;
     // make kmer_i-1
     char *kmer_im1 = malloc((KMER_LENGTH) * sizeof(char));

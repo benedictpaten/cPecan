@@ -5,6 +5,12 @@
 #include <stdint.h>
 #include "stateMachine.h"
 
+typedef struct _hmmDiscrete {
+    Hmm baseHmm;
+    double *transitions;
+    double *emissions;
+} HmmDiscrete;
+
 // Construct
 Hmm *hmmDiscrete_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
                                 void (*addToTransitionExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),

@@ -1130,5 +1130,6 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_echelon_getAlignedPairsWithBanding);
+
     return suite;
 }

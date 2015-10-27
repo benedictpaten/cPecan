@@ -31,15 +31,16 @@ typedef struct _hmm Hmm;
  * Hmm for loading/unloading HMMs and storing expectations.
  * Maybe move these definitions to stateMachine.c to clean this up?
  */
-
 typedef struct _hmm {
     double likelihood;
     StateMachineType type;
     int64_t stateNumber;
     int64_t symbolSetSize;
     int64_t matrixSize;
-    double *transitions;
-    double *emissions;
+
+    // 10/27 moved into HmmDiscrete subClass
+    //double *transitions;
+    //double *emissions;
 
     void (*addToTransitionExpectationFcn)(Hmm *hmm, int64_t from, int64_t to, double p);
 
@@ -150,7 +151,7 @@ typedef struct _StateMachine3vanilla {
     double (*getMatchProbFcn)(const double *eventModel, void *kmer, void *event);
 } StateMachine3Vanilla;
 
-typedef struct _StateMachine2echelon {
+typedef struct _StateMachineEchelon {
     // 8-state general hmm
     StateMachine model;
 
@@ -233,6 +234,8 @@ double emissions_symbol_getMatchProb(const double *emissionMatchProbs, void *x, 
 double emissions_kmer_getGapProb(const double *emissionGapProbs, void *kmer);
 
 double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, void *y);
+
+int64_t emissions_signal_getKmerSkipBin(double *matchModel, void *kmers);
 
 double emissions_signal_getKmerSkipProb(StateMachine *sM, void *kmers);
 

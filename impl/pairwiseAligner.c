@@ -751,7 +751,10 @@ static void diagonalCalculationExpectations(StateMachine *sM,
      */
     Hmm *hmmExpectations = extraArgs; // maybe change around hmm here?
     void *extraArgs2[2] = { &totalProbability, hmmExpectations }; // this is where you pack in totalprob
+
+    // update likelihood
     hmmExpectations->likelihood += totalProbability;
+
     // We do this once per diagonal, which is a hack, rather than for the
     // whole matrix. The correction factor is approximately 1/number of
     // diagonals.
@@ -1249,8 +1252,7 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         PairwiseAlignmentParameters *p,
         bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
         void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *,
-                                        DpMatrix *, const Sequence*,
-                                        const Sequence*, double,
+                                        DpMatrix *, Sequence*, Sequence*, double,
                                         PairwiseAlignmentParameters *, void *),
         void (*coordinateCorrectionFn)(), void *extraArgs) {
     // you are going to cut the sequences into subSequences anyways, so not having the correct
@@ -1463,7 +1465,7 @@ void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                                                p,
                                                                alignmentHasRaggedLeftEnd,
                                                                alignmentHasRaggedRightEnd,
-                                                               diagonalCalculationExpectations,
+                                                               diagonalCalculationExpectations, // maybe make this external
                                                                NULL, hmmExpectations);
 }
 

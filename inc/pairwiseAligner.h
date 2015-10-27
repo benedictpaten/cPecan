@@ -240,7 +240,6 @@ void diagonalCalculationMultiPosteriorMatchProbs(StateMachine *sM, int64_t xay, 
                                                  double totalProbability, PairwiseAlignmentParameters *p,
                                                  void *extraArgs);
 
-//Banded matrix calculation of posterior probs
 
 void getPosteriorProbsWithBanding(StateMachine *sM,
                                   stList *anchorPairs,
@@ -287,15 +286,12 @@ stList *getSplitPoints(stList *anchorPairs, int64_t lX, int64_t lY,
         int64_t maxMatrixSize, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
-        StateMachine *sM, stList *anchorPairs,
-        Sequence *SsX, Sequence *SsY, //SequenceType t,
-        PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd,
-        bool alignmentHasRaggedRightEnd,
-        void (*diagonalPosteriorProbFn)(StateMachine *,
-                                        int64_t, DpMatrix *, DpMatrix *,
-                                        const Sequence*, const Sequence*,
-                                        double, PairwiseAlignmentParameters *,
-                                        void *),
+        StateMachine *sM, stList *anchorPairs, Sequence *SsX, Sequence *SsY,
+        PairwiseAlignmentParameters *p,
+        bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
+        void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *,
+                                        DpMatrix *, Sequence*, Sequence*, double,
+                                        PairwiseAlignmentParameters *, void *),
         void (*coordinateCorrectionFn)(), void *extraArgs);
 
 //Calculate posterior probabilities of being aligned to gaps

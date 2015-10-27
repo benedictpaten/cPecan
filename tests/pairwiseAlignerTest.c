@@ -1225,7 +1225,8 @@ static void test_HmmDiscrete_em(CuTest *testCase, StateMachineType sMType, int64
                                               emissions_discrete_getBaseIndex);
 
             // E-step
-            getExpectations(sM, hmmD, sX, sY, lX, lY, p, sequence_getBase, getBlastPairsForPairwiseAlignmentParameters,
+            getExpectations(sM, hmmD, sX, sY, lX, lY, p, sequence_getBase,
+                            getBlastPairsForPairwiseAlignmentParameters,
                             0, 0);
 
             hmmDiscrete_normalize(hmmD);
@@ -1270,33 +1271,33 @@ static void test_hmmDiscrete_EM_5State_symbols(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-    /*
-    SUITE_ADD_TEST(suite, test_diagonal);
-    SUITE_ADD_TEST(suite, test_bands);
-    SUITE_ADD_TEST(suite, test_logAdd);
-    SUITE_ADD_TEST(suite, test_sequenceConstruct);
-    SUITE_ADD_TEST(suite, test_cell);
-    SUITE_ADD_TEST(suite, test_kmer_cell);
-    SUITE_ADD_TEST(suite, test_dpDiagonal);
-    SUITE_ADD_TEST(suite, test_dpMatrix);
-    SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+
+    //SUITE_ADD_TEST(suite, test_diagonal);
+    //SUITE_ADD_TEST(suite, test_bands);
+    //SUITE_ADD_TEST(suite, test_logAdd);
+    //SUITE_ADD_TEST(suite, test_sequenceConstruct);
+    //SUITE_ADD_TEST(suite, test_cell);
+    //SUITE_ADD_TEST(suite, test_kmer_cell);
+    //SUITE_ADD_TEST(suite, test_dpDiagonal);
+    //SUITE_ADD_TEST(suite, test_dpMatrix);
+    //SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_getSplitPoints);
+    //SUITE_ADD_TEST(suite, test_getBlastPairs);
+    //SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
+    //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
+    //SUITE_ADD_TEST(suite, test_getAlignedPairs);
+    //SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
+    //SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
     //SUITE_ADD_TEST(suite, test_kmer_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_getSplitPoints);
-    SUITE_ADD_TEST(suite, test_getBlastPairs);
-    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
-    SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
-    SUITE_ADD_TEST(suite, test_getAlignedPairs);
-    SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
-    SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairs);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairsWithBanding);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairsWithRaggedEnds);
     SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_kmers);
-    SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_symbols);
+    //SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_kmers);
     SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_kmers);
-    */
+
     return suite;
 }
