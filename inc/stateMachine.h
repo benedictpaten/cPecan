@@ -87,6 +87,9 @@ struct _stateMachine {
                           void* cX, void* cY,
                           void(*doTransition)(double *, double *, int64_t, int64_t, double, double, void *),
                           void *extraArgs);
+
+    void (*cellCalculateUpdateExpectations) (double *fromCells, double *toCells, int64_t from, int64_t to,
+                                             double eP, double tP, void *extraArgs);
 };
 
 typedef struct _StateMachine5 StateMachine5;
@@ -185,27 +188,39 @@ StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSe
                                       void (*setEmissionsDefaults)(StateMachine *sM),
                                       double (*gapXProbFcn)(const double *, void *),
                                       double (*gapYProbFcn)(const double *, void *),
-                                      double (*matchProbFcn)(const double *, void *, void *));
+                                      double (*matchProbFcn)(const double *, void *, void *),
+                                      void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
+                                                                   int64_t from, int64_t to,
+                                                                   double eP, double tP, void *extraArgs));
 
 StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSetSize,
                                       void (*setTransitionsToDefaults)(StateMachine *sM),
                                       void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                       double (*gapXProbFcn)(const double *, void *),
                                       double (*gapYProbFcn)(const double *, void *, void *),
-                                      double (*matchProbFcn)(const double *, void *, void *));
+                                      double (*matchProbFcn)(const double *, void *, void *),
+                                      void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
+                                                                   int64_t from, int64_t to,
+                                                                   double eP, double tP, void *extraArgs));
 
 StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t parameterSetSize,
                                              void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                              double (*xSkipProbFcn)(StateMachine *, void *),
                                              double (*scaledMatchProbFcn)(const double *, void *, void *),
-                                             double (*matchProbFcn)(const double *, void *, void *));
+                                             double (*matchProbFcn)(const double *, void *, void *),
+                                             void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
+                                                                          int64_t from, int64_t to,
+                                                                          double eP, double tP, void *extraArgs));
 
 StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t parameterSetSize,
                                             void (*setEmissionsToDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                             double (*durationProbFcn)(void *event, int64_t n),
                                             double (*skipProbFcn)(StateMachine *sM, void *kmerList),
                                             double (*matchProbFcn)(const double *, void *, void *, int64_t n),
-                                            double (*scaledMatchProbFcn)(const double *, void *, void *));
+                                            double (*scaledMatchProbFcn)(const double *, void *, void *),
+                                            void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
+                                                                         int64_t from, int64_t to,
+                                                                         double eP, double tP, void *extraArgs));
 
 // indexing functions //
 //Returns the index for a base, for use with matrices and emissions_discrete_getKmerIndex

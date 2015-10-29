@@ -20,6 +20,7 @@
 #include "bioioC.h"
 #include "pairwiseAlignment.h"
 #include "pairwiseAligner.h"
+#include "continuousHmm.h"
 #include "stateMachine.h"
 #include "emissionMatrix.h"
 
@@ -389,7 +390,7 @@ void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, i
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
     Hmm *hmmExpectations = ((void **) extraArgs)[1];
 
-    int64_t x = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]);
+    int64_t x = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]); // this gives you the base/kmer index
     int64_t y = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[3]);
 
     //Calculate posterior probability of the transition/emission pair
@@ -401,16 +402,15 @@ void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, i
     }
 }
 
-static void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *toCells,
-                                                           int64_t from, int64_t to, double eP, double tP,
-                                                           void *extraArgs) {
+void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *toCells, int64_t from, int64_t to,
+                                                    double eP, double tP, void *extraArgs) {
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
     Hmm *hmmExpectations = ((void **) extraArgs)[1];
 
-    int64_t x = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]);
+    int64_t x = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]); // this gives you the kmer index
 
-    //Calculate posterior probability of the transition/emission pair
+    // Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
     // update transitions expectation
     hmmExpectations->addToTransitionExpectationFcn(hmmExpectations, from, to, p);
@@ -420,6 +420,24 @@ static void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, do
     }
 }
 
+void cell_signal_updateAlphaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
+                                 void *extraArgs) {
+    //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
+    double totalProbability = *((double *) ((void **) extraArgs)[0]);
+    VanillaHmm *hmmExpectations = ((void **) extraArgs)[1];
+
+    // you want this to give you the skip bin
+    int64_t x = hmmExpectations->getKmerSkipBin(hmmExpectations->matchModel, (((void **) extraArgs)[2]));
+
+    // Calculate posterior probability of the transition/emission pair
+    double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
+    // update
+    if (to == shortGapX) {
+        hmmExpectations->baseContinuousHmm.baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, x, 0, p);
+    }
+}
+
+// todo might be removeable
 static void cell_calculateExpectation(StateMachine *sM,
                                       double *current, double *lower, double *middle, double *upper,
                                       void* cX, void* cY,
@@ -431,16 +449,16 @@ static void cell_calculateExpectation(StateMachine *sM,
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, cell_updateExpectations, extraArgs2);
 }
 
-static void cell_calculate_signal_updateExpectation(StateMachine *sM,
-                                                    double *current, double *lower, double *middle, double *upper,
-                                                    void* cX, void* cY,
-                                                    void *extraArgs) {
+static void cell_signal_calculateUpdateExpectation(StateMachine *sM,
+                                                   double *current, double *lower, double *middle, double *upper,
+                                                   void *cX, void *cY,
+                                                   void *extraArgs) {
     void *extraArgs2[4] = { ((void **)extraArgs)[0], // hmmExpectations
                             ((void **)extraArgs)[1], // &totalProbabability
-                            cX,   // pointer to kmer
+                            cX,   // pointer to char in sequence
                             cY }; // pointer to event array, can remove..?
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY,
-                      cell_signal_updateTransAndKmerSkipExpectations, // TODO eventually implant this into sM
+                      sM->cellCalculateUpdateExpectations,
                       extraArgs2);
 }
 
@@ -814,7 +832,7 @@ void diagonalCalculation_signal_Expectations(StateMachine *sM, int64_t xay,
                         dpMatrix_getDiagonal(backwardDpMatrix, xay),
                         dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
                         dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
-                        sX, sY, cell_calculate_signal_updateExpectation, extraArgs2);
+                        sX, sY, cell_signal_calculateUpdateExpectation, extraArgs2);
 }
 
 
@@ -1522,7 +1540,7 @@ void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                                                p,
                                                                alignmentHasRaggedLeftEnd,
                                                                alignmentHasRaggedRightEnd,
-                                                               diagonalCalcExpectationFcn, // maybe make this external
+                                                               diagonalCalcExpectationFcn,
                                                                NULL, hmmExpectations);
 }
 

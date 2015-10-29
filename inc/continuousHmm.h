@@ -19,6 +19,8 @@ typedef struct _strawManHmm {
 
 typedef struct _vanillaHmm {
     HmmContinuous baseContinuousHmm;
+    double *matchModel;
+    double *scaledMatchModel;
     double *kmerSkipBins;
     int64_t (*getKmerSkipBin)(double *matchModel, void *cX);
 } VanillaHmm;
@@ -66,6 +68,14 @@ void vanillaHmm_setKmerSkipBinExpectation(Hmm *hmm, int64_t bin, int64_t ignore,
 
 double vanillaHmm_getKmerSkipBinExpectation(Hmm *hmm, int64_t bin, int64_t ignore);
 
-void vanillaHmm_normalize(Hmm *hmm);
+void vanillaHmm_normalizeKmerSkipBins(Hmm *hmm);
+
+void vanillaHmm_randomizeKmerSkipBins(Hmm *hmm);
+
+void vanillaHmm_loadKmerSkipBinExpectations(StateMachine *sM, Hmm *hmm);
+
+void vanillaHmm_implantMatchModelsintoHmm(StateMachine *sM, Hmm *hmm);
+
+void vanillaHmm_destruct(Hmm *hmm);
 
 #endif

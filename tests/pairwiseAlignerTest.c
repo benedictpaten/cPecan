@@ -163,7 +163,8 @@ static void test_cell(CuTest *testCase) {
                                                emissions_symbol_setEmissionsToDefaults,
                                                emissions_symbol_getGapProb,
                                                emissions_symbol_getGapProb,
-                                               emissions_symbol_getMatchProb);
+                                               emissions_symbol_getMatchProb,
+                                               cell_updateExpectations);
 
     double lowerF[sM->stateNumber], middleF[sM->stateNumber], upperF[sM->stateNumber], currentF[sM->stateNumber];
     double lowerB[sM->stateNumber], middleB[sM->stateNumber], upperB[sM->stateNumber], currentB[sM->stateNumber];
@@ -204,7 +205,8 @@ static void test_kmer_cell(CuTest *testCase) {
                                                emissions_symbol_setEmissionsToDefaults,
                                                emissions_symbol_getGapProb,
                                                emissions_symbol_getGapProb,
-                                               emissions_symbol_getMatchProb);
+                                               emissions_symbol_getMatchProb,
+                                               cell_updateExpectations);
 
     double lowerF[sM->stateNumber], middleF[sM->stateNumber], upperF[sM->stateNumber], currentF[sM->stateNumber];
     double lowerB[sM->stateNumber], middleB[sM->stateNumber], upperB[sM->stateNumber], currentB[sM->stateNumber];
@@ -248,7 +250,8 @@ static void test_dpDiagonal(CuTest *testCase) {
                                                emissions_symbol_setEmissionsToDefaults,
                                                emissions_symbol_getGapProb,
                                                emissions_symbol_getGapProb,
-                                               emissions_symbol_getMatchProb);           // match prob fcn
+                                               emissions_symbol_getMatchProb,
+                                               cell_updateExpectations);           // match prob fcn
 
     Diagonal diagonal = diagonal_construct(3, -1, 1);
 
@@ -334,7 +337,8 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
                                                emissions_symbol_setEmissionsToDefaults,
                                                emissions_symbol_getGapProb,
                                                emissions_symbol_getGapProb,
-                                               emissions_symbol_getMatchProb);
+                                               emissions_symbol_getMatchProb,
+                                               cell_updateExpectations);
 
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
@@ -436,7 +440,8 @@ static void test_kmer_diagonalDPCalculations(CuTest *testCase) {
                                                emissions_symbol_setEmissionsToDefaults,
                                                emissions_kmer_getGapProb,
                                                emissions_kmer_getGapProb,
-                                               emissions_kmer_getMatchProb);
+                                               emissions_kmer_getMatchProb,
+                                               cell_updateExpectations);
 
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber);
@@ -615,7 +620,8 @@ static void test_getAlignedPairsWithBanding(CuTest *testCase) {
                                                    emissions_symbol_setEmissionsToDefaults,
                                                    emissions_symbol_getGapProb,              // gapX prob fcn
                                                    emissions_symbol_getGapProb,              // gapY prob fcn
-                                                   emissions_symbol_getMatchProb);           // match prob fcn
+                                                   emissions_symbol_getMatchProb,
+                                                   cell_updateExpectations);           // match prob fcn
 
         stList *anchorPairs = getRandomAnchorPairs(lX, lY);
 
@@ -667,7 +673,8 @@ static void test_kmer_getAlignedPairsWithBanding(CuTest *testCase) {
                                                    emissions_symbol_setEmissionsToDefaults,
                                                    emissions_kmer_getGapProb,                // gapX fcn
                                                    emissions_kmer_getGapProb,                // gapY fcn
-                                                   emissions_kmer_getMatchProb);             // match prob fcn
+                                                   emissions_kmer_getMatchProb,
+                                                   cell_updateExpectations);             // match prob fcn
 
         stList *anchorPairs = getRandomAnchorPairs(lX, lY);
 
@@ -909,7 +916,8 @@ static void test_getAlignedPairs(CuTest *testCase) {
                                                    emissions_symbol_setEmissionsToDefaults,
                                                    emissions_symbol_getGapProb,
                                                    emissions_symbol_getGapProb,
-                                                   emissions_symbol_getMatchProb);
+                                                   emissions_symbol_getMatchProb,
+                                                   cell_updateExpectations);
 
         stList *alignedPairs = getAlignedPairs(sM, sX, sY, lX, lY, p,
                                                sequence_getBase, sequence_getBase,
@@ -944,7 +952,8 @@ static void test_kmer_getAlignedPairs(CuTest *testCase) {
                                                    emissions_symbol_setEmissionsToDefaults,
                                                    emissions_kmer_getGapProb,                // gapX fcn
                                                    emissions_kmer_getGapProb,                // gapY fcn
-                                                   emissions_kmer_getMatchProb);             // match prob fcn
+                                                   emissions_kmer_getMatchProb,
+                                                   cell_updateExpectations);             // match prob fcn
 
         stList *alignedPairs = getAlignedPairs(sM, sX, sY, lX2, lY2, p,
                                                sequence_getKmer, sequence_getKmer,
@@ -979,7 +988,8 @@ static void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
                                                    emissions_symbol_setEmissionsToDefaults,
                                                    emissions_symbol_getGapProb,
                                                    emissions_symbol_getGapProb,
-                                                   emissions_symbol_getMatchProb);
+                                                   emissions_symbol_getMatchProb,
+                                                   cell_updateExpectations);
 
         stList *alignedPairs = getAlignedPairs(sM, sX, sY, lX, lY, p,
                                                sequence_getBase, sequence_getBase,
@@ -1031,7 +1041,8 @@ static void test_kmer_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
                                                    emissions_symbol_setEmissionsToDefaults,
                                                    emissions_kmer_getGapProb,                // gapX fcn
                                                    emissions_kmer_getGapProb,                // gapY fcn
-                                                   emissions_kmer_getMatchProb);             // match prob fcn
+                                                   emissions_kmer_getMatchProb,
+                                                   cell_updateExpectations);             // match prob fcn
 
         stList *alignedPairs = getAlignedPairs(sM, sX, sY, lX2, lY2, p,
                                                sequence_getKmer, sequence_getKmer,

@@ -101,6 +101,12 @@ stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignm
 void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
                              void *extraArgs);
 
+void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *toCells, int64_t from, int64_t to,
+                                                    double eP, double tP, void *extraArgs);
+
+void cell_signal_updateAlphaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
+                                 void *extraArgs);
+
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
                      void *sX, void *sY, int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,
                      void *(getFcn)(void *, int64_t),

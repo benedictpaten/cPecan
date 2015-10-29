@@ -287,7 +287,7 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
             if (j != 1) {
                 st_errAbort("emissions_signal_loadPoreModel: error loading vanilla kmer skip bins\n");
             }
-
+            // load the alpha gap probs, in the same array, just after the beta gap probs
             if (type == echelon) {
                 int64_t j = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_GAP_X_PROBS[i+30]));
                 if (j != 1) {
@@ -416,6 +416,8 @@ int64_t emissions_signal_getKmerSkipBin(double *matchModel, void *kmers) {
     // get the 'bin' for skip prob, clamp to the last bin
     int64_t bin = (int64_t)(d / 0.5); // 0.5 pA bins right now
     bin = bin >= 30 ? 29 : bin;
+    free(kmer_im1);
+    free(kmer_i);
     return bin;
 }
 
@@ -806,7 +808,10 @@ StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSe
                                       void (*setEmissionsDefaults)(StateMachine *sM),
                                       double (*gapXProbFcn)(const double *, void *),
                                       double (*gapYProbFcn)(const double *, void *),
-                                      double (*matchProbFcn)(const double *, void *, void *)) {
+                                      double (*matchProbFcn)(const double *, void *, void *),
+                                      void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
+                                                                   int64_t from, int64_t to,
+                                                                   double eP, double tP, void *extraArgs)) {
     /*
      * Description of (potentially ambigious) arguments:
      * parameterSetSize = the number of kmers that we are using, of len(kmer) = 1, then the number is 4 (or 5 if we're
@@ -845,10 +850,13 @@ StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSe
     sM5->model.endStateProb = stateMachine5_endStateProb;
     sM5->model.raggedStartStateProb = stateMachine5_raggedStartStateProb;
     sM5->model.raggedEndStateProb = stateMachine5_raggedEndStateProb;
+    sM5->model.cellCalculate = stateMachine5_cellCalculate;
+    sM5->model.cellCalculateUpdateExpectations = cellCalcUpdateExpFcn;
+
     sM5->getXGapProbFcn = gapXProbFcn;
     sM5->getYGapProbFcn = gapYProbFcn;
     sM5->getMatchProbFcn = matchProbFcn;
-    sM5->model.cellCalculate = stateMachine5_cellCalculate;
+
     // set emissions to defaults (or zeros)
     setEmissionsDefaults((StateMachine *) sM5);
 
@@ -1219,7 +1227,10 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
                                       void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                       double (*gapXProbFcn)(const double *, void *),
                                       double (*gapYProbFcn)(const double *, void *, void *),
-                                      double (*matchProbFcn)(const double *, void *, void *)) {
+                                      double (*matchProbFcn)(const double *, void *, void *),
+                                      void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
+                                                                   int64_t from, int64_t to,
+                                                                   double eP, double tP, void *extraArgs)) {
     /*
      * Description of (potentially ambigious) arguments:
      * parameterSetSize = the number of kmers that we are using, of len(kmer) = 1, then the number is 4 (or 5 if we're
@@ -1240,6 +1251,7 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
     sM3->model.raggedStartStateProb = stateMachine3_raggedStartStateProb;
     sM3->model.raggedEndStateProb = stateMachine3_raggedEndStateProb;
     sM3->model.cellCalculate = stateMachine3_cellCalculate;
+    sM3->model.cellCalculateUpdateExpectations = cellCalcUpdateExpFcn;
 
     // setup functions
     sM3->getXGapProbFcn = gapXProbFcn;
@@ -1259,7 +1271,10 @@ StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t para
                                              void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                              double (*xSkipProbFcn)(StateMachine *, void *),
                                              double (*scaledMatchProbFcn)(const double *, void *, void *),
-                                             double (*matchProbFcn)(const double *, void *, void *)) {
+                                             double (*matchProbFcn)(const double *, void *, void *),
+                                             void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
+                                                                          int64_t from, int64_t to,
+                                                                          double eP, double tP, void *extraArgs)) {
     StateMachine3Vanilla *sM3v = st_malloc(sizeof(StateMachine3Vanilla));
     // check
     if (type != vanilla) {
@@ -1282,6 +1297,7 @@ StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t para
     sM3v->model.endStateProb = stateMachine3Vanilla_endStateProb;
     sM3v->model.raggedEndStateProb = stateMachine3Vanilla_endStateProb;
     sM3v->model.cellCalculate = stateMachine3Vanilla_cellCalculate;
+    sM3v->model.cellCalculateUpdateExpectations = cellCalcUpdateExpFcn;
 
     // stateMachine3Vanilla-specific functions
     sM3v->getKmerSkipProb = xSkipProbFcn;
@@ -1298,7 +1314,10 @@ StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t param
                                             double (*durationProbFcn)(void *event, int64_t n),
                                             double (*skipProbFcn)(StateMachine *sM, void *kmerList),
                                             double (*matchProbFcn)(const double *, void *, void *, int64_t n),
-                                            double (*scaledMatchProbFcn)(const double *, void *, void *)) {
+                                            double (*scaledMatchProbFcn)(const double *, void *, void *),
+                                            void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
+                                                                         int64_t from, int64_t to,
+                                                                         double eP, double tP, void *extraArgs)) {
     StateMachineEchelon *sMe = st_malloc(sizeof(StateMachineEchelon));
 
     if (type != echelon) {
@@ -1320,6 +1339,7 @@ StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t param
     sMe->model.endStateProb = stateMachineEchelon_endStateProb;
     sMe->model.raggedEndStateProb = stateMachineEchelon_endStateProb;
     sMe->model.cellCalculate = stateMachineEchelon_cellCalculate;
+    sMe->model.cellCalculateUpdateExpectations = cellCalcUpdateExpFcn;
 
     // class functions
     sMe->getKmerSkipProb = skipProbFcn;
@@ -1391,7 +1411,8 @@ StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
                                                                        emissions_discrete_initEmissionsToZero,
                                                                        sMfs->gapXProbFcn,
                                                                        sMfs->gapYProbFcn,
-                                                                       sMfs->matchProbFcn);
+                                                                       sMfs->matchProbFcn,
+                                                                       cell_updateExpectations);
         stateMachine5_loadSymmetric(sM5, hmmD);
         return (StateMachine *) sM5;
     }
@@ -1400,7 +1421,8 @@ StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
                                                                        emissions_discrete_initEmissionsToZero,
                                                                        sMfs->gapXProbFcn,
                                                                        sMfs->gapYProbFcn,
-                                                                       sMfs->matchProbFcn);
+                                                                       sMfs->matchProbFcn,
+                                                                       cell_updateExpectations);
         stateMachine5_loadAsymmetric(sM5, hmmD);
         return (StateMachine *) sM5;
     }
@@ -1412,7 +1434,8 @@ StateMachine *getStrawManStateMachine3(const char *modelFile) {
                                                 emissions_signal_initEmissionsToZero,
                                                 emissions_kmer_getGapProb,
                                                 emissions_signal_strawManGetKmerEventMatchProb,
-                                                emissions_signal_strawManGetKmerEventMatchProb);
+                                                emissions_signal_strawManGetKmerEventMatchProb,
+                                                cell_signal_updateTransAndKmerSkipExpectations);
     emissions_signal_loadPoreModel(sM3, modelFile, sM3->type);
     return sM3;
 }
@@ -1423,7 +1446,8 @@ StateMachine *getSignalStateMachine3Vanilla(const char *modelFile) {
                                                         emissions_signal_initEmissionsToZero,
                                                         emissions_signal_getKmerSkipProb,
                                                         emissions_signal_getEventMatchProbWithTwoDists,
-                                                        emissions_signal_getEventMatchProbWithTwoDists);
+                                                        emissions_signal_getEventMatchProbWithTwoDists,
+                                                        cell_signal_updateAlphaProb);
     emissions_signal_loadPoreModel(sM3v, modelFile, sM3v->type);
     return sM3v;
 }
@@ -1434,7 +1458,8 @@ StateMachine *getStateMachineEchelon(const char *modelFile) {
                                                       emissions_signal_getDurationProb,
                                                       emissions_signal_getKmerSkipProb,
                                                       emissions_signal_multipleKmerMatchProb,
-                                                      emissions_signal_getEventMatchProbWithTwoDists);
+                                                      emissions_signal_getEventMatchProbWithTwoDists,
+                                                      NULL);
     emissions_signal_loadPoreModel(sMe, modelFile, sMe->type);
     return sMe;
 }

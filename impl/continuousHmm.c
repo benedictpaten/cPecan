@@ -194,12 +194,15 @@ Hmm *vanillaHmm_constructEmpty(double pseudocount, int64_t stateNumber, int64_t 
     for (int64_t i = 0; i < 30; i++) {
         vHmm->kmerSkipBins[i] = pseudocount;
     }
-
+    // make a variable to make life easier, add 1 because of the correlation param
+    int64_t nb_matchModelBuckets = 1 + (vHmm->baseContinuousHmm.baseHmm.symbolSetSize * MODEL_PARAMS);
+    vHmm->matchModel = st_malloc(nb_matchModelBuckets * sizeof(double));
+    vHmm->scaledMatchModel = st_malloc(nb_matchModelBuckets * sizeof(double));
     vHmm->getKmerSkipBin = emissions_signal_getKmerSkipBin;
 
     return (Hmm *) vHmm;
 }
-
+// transitions (kmer skip bins)
 void vanillaHmm_addToKmerSkipBinExpectation(Hmm *hmm, int64_t bin, int64_t ignore, double p) {
     VanillaHmm *vHmm = (VanillaHmm *) hmm;
     (void) ignore;
@@ -218,7 +221,8 @@ double vanillaHmm_getKmerSkipBinExpectation(Hmm *hmm, int64_t bin, int64_t ignor
     return vHmm->kmerSkipBins[bin];
 }
 
-void vanillaHmm_normalize(Hmm *hmm) {
+// normalize/randomize
+void vanillaHmm_normalizeKmerSkipBins(Hmm *hmm) {
     double total = 0.0;
     for (int64_t i = 0; i < 30; i++) {
         total += hmm->getTransitionsExpFcn(hmm, i, 0);
@@ -227,4 +231,42 @@ void vanillaHmm_normalize(Hmm *hmm) {
         double newProb = hmm->getTransitionsExpFcn(hmm, i, 0) / total;
         hmm->setTransitionFcn(hmm, i, 0, newProb);
     }
+}
+
+void vanillaHmm_randomizeKmerSkipBins(Hmm *hmm) {
+    for (int64_t i = 0; i < 30; i++) {
+        hmm->setTransitionFcn(hmm, i, 0, st_random());
+    }
+    vanillaHmm_normalizeKmerSkipBins(hmm);
+}
+
+// load pore model
+void vanillaHmm_implantMatchModelsintoHmm(StateMachine *sM, Hmm *hmm) {
+    // down cast
+    StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *)sM;
+    VanillaHmm *vHmm = (VanillaHmm *)hmm;
+
+    // go through the match and scaled match models and load them into the hmm
+    int64_t nb_matchModelBuckets = 1 + (sM3v->model.parameterSetSize * MODEL_PARAMS);
+    for (int64_t i = 0; i < nb_matchModelBuckets; i++) {
+        vHmm->matchModel[i] = sM3v->model.EMISSION_MATCH_PROBS[i];
+        vHmm->scaledMatchModel[i] = sM3v->model.EMISSION_GAP_Y_PROBS[i];
+    }
+}
+
+// load into stateMachine
+void vanillaHmm_loadKmerSkipBinExpectations(StateMachine *sM, Hmm *hmm) {
+    StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *)sM; // might be able to make this vanilla/echelon agnostic
+    for (int64_t i = 0; i < 30; i++) {
+        sM3v->model.EMISSION_GAP_X_PROBS[i] = hmm->getTransitionsExpFcn(hmm, i, 0);
+    }
+}
+
+// destructor
+void vanillaHmm_destruct(Hmm *hmm) {
+    VanillaHmm *vHmm = (VanillaHmm *)hmm;
+    free(vHmm->matchModel);
+    free(vHmm->scaledMatchModel);
+    free(vHmm->kmerSkipBins);
+    //free(vHmm);
 }

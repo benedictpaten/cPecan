@@ -522,7 +522,8 @@ int main(int argc, char *argv[]) {
                                      emissions_symbol_setEmissionsToDefaults,
                                      emissions_symbol_getGapProb,
                                      emissions_symbol_getGapProb,
-                                     emissions_symbol_getMatchProb);
+                                     emissions_symbol_getMatchProb,
+                                     cell_updateExpectations);
     }
 
     //Make the expectations object, if needed 0.000000000001
