@@ -25,10 +25,10 @@
 //////////////////////////////////////////////////////////////////////////////
 
 /////////////////////////////////////////// STATIC FUNCTIONS ////////////////////////////////////////////////////////
-
-typedef enum {
-    match = 0, shortGapX = 1, shortGapY = 2, longGapX = 3, longGapY = 4
-} State;
+// moved to stateMachine.h 10/28
+//typedef enum {
+//    match = 0, shortGapX = 1, shortGapY = 2, longGapX = 3, longGapY = 4
+//} State;
 
 static void state_check(StateMachine *sM, State s) {
     assert(s >= 0 && s < sM->stateNumber);
@@ -135,6 +135,20 @@ int64_t emissions_discrete_getKmerIndex(void *kmer) {
     x += emissions_discrete_getBaseIndex(kmer + last);
 
     return x;
+}
+
+int64_t emissions_discrete_getKmerIndexFromKmer(void *kmer) {
+    // make temp kmer meant to work with getKmer
+    char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
+    for (int64_t x = 0; x < KMER_LENGTH; x++) {
+        kmer_i[x] = *((char *)kmer+x);
+    }
+    kmer_i[KMER_LENGTH] = '\0';
+
+    int64_t i = emissions_discrete_getKmerIndex(kmer_i);
+    //index_check(i);
+    free(kmer_i);
+    return i;
 }
 
 double emissions_symbol_getGapProb(const double *emissionGapProbs, void *base) {
@@ -1323,15 +1337,16 @@ static void stateMachine3_loadAsymmetric(StateMachine3 *sM3, Hmm *hmm) {
     if (hmm->type != threeStateAsymmetric) {
         st_errAbort("Wrong hmm type");
     }
-    sM3->TRANSITION_MATCH_CONTINUE = log(hmm_getTransition(hmm, match, match));
-    sM3->TRANSITION_MATCH_FROM_GAP_X = log(hmm_getTransition(hmm, shortGapX, match));
-    sM3->TRANSITION_MATCH_FROM_GAP_Y = log(hmm_getTransition(hmm, shortGapY, match));
-    sM3->TRANSITION_GAP_OPEN_X = log(hmm_getTransition(hmm, match, shortGapX));
-    sM3->TRANSITION_GAP_OPEN_Y = log(hmm_getTransition(hmm, match, shortGapY));
-    sM3->TRANSITION_GAP_EXTEND_X = log(hmm_getTransition(hmm, shortGapX, shortGapX));
-    sM3->TRANSITION_GAP_EXTEND_Y = log(hmm_getTransition(hmm, shortGapY, shortGapY));
-    sM3->TRANSITION_GAP_SWITCH_TO_X = log(hmm_getTransition(hmm, shortGapY, shortGapX));
-    sM3->TRANSITION_GAP_SWITCH_TO_Y = log(hmm_getTransition(hmm, shortGapX, shortGapY));
+    //sM3->TRANSITION_MATCH_CONTINUE = log(hmm_getTransition(hmm, match, match));
+    sM3->TRANSITION_MATCH_CONTINUE = log(hmm->getTransitionsExpFcn(hmm, match, match));
+    sM3->TRANSITION_MATCH_FROM_GAP_X = log(hmm->getTransitionsExpFcn(hmm, shortGapX, match));
+    sM3->TRANSITION_MATCH_FROM_GAP_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapY, match));
+    sM3->TRANSITION_GAP_OPEN_X = log(hmm->getTransitionsExpFcn(hmm, match, shortGapX));
+    sM3->TRANSITION_GAP_OPEN_Y = log(hmm->getTransitionsExpFcn(hmm, match, shortGapY));
+    sM3->TRANSITION_GAP_EXTEND_X = log(hmm->getTransitionsExpFcn(hmm, shortGapX, shortGapX));
+    sM3->TRANSITION_GAP_EXTEND_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapY, shortGapY));
+    sM3->TRANSITION_GAP_SWITCH_TO_X = log(hmm->getTransitionsExpFcn(hmm, shortGapY, shortGapX));
+    sM3->TRANSITION_GAP_SWITCH_TO_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapX, shortGapY));
     emissions_em_loadMatchProbs(sM3->EMISSION_MATCH_PROBS, hmm, match);
     int64_t xGapStates[1] = { shortGapX };
     int64_t yGapStates[1] = { shortGapY };

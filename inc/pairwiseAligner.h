@@ -101,13 +101,6 @@ stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignm
 void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
                              void *extraArgs);
 
-void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
-                                 Sequence *sX, Sequence *sY, //SequenceType t,
-                                 stList *anchorPairs,
-                                 PairwiseAlignmentParameters *p,
-                                 bool alignmentHasRaggedLeftEnd,
-                                 bool alignmentHasRaggedRightEnd);
-
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
                      void *sX, void *sY, int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,
                      void *(getFcn)(void *, int64_t),
@@ -240,6 +233,15 @@ void diagonalCalculationMultiPosteriorMatchProbs(StateMachine *sM, int64_t xay, 
                                                  double totalProbability, PairwiseAlignmentParameters *p,
                                                  void *extraArgs);
 
+void diagonalCalculationExpectations(StateMachine *sM, int64_t xay,
+                                     DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
+                                     double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs);
+
+void diagonalCalculation_signal_Expectations(StateMachine *sM, int64_t xay,
+                                             DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
+                                             Sequence* sX, Sequence* sY,
+                                             double totalProbability,
+                                             PairwiseAlignmentParameters *p, void *extraArgs);
 
 void getPosteriorProbsWithBanding(StateMachine *sM,
                                   stList *anchorPairs,
@@ -269,6 +271,22 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM,
                                                                     PairwiseAlignmentParameters *, void *),
                                     bool alignmentHasRaggedLeftEnd,
                                     bool alignmentHasRaggedRightEnd);
+
+// EM stuff
+void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
+                                 Sequence *SsX, Sequence *SsY,
+                                 stList *anchorPairs,
+                                 PairwiseAlignmentParameters *p,
+                                 void (*diagonalCalcExpectationFcn)(StateMachine *sM, int64_t xay,
+                                                                    DpMatrix *forwardDpMatrix,
+                                                                    DpMatrix *backwardDpMatrix,
+                                                                    Sequence* sX, Sequence* sY,
+                                                                    double totalProbability,
+                                                                    PairwiseAlignmentParameters *p,
+                                                                    void *extraArgs),
+                                 bool alignmentHasRaggedLeftEnd,
+                                 bool alignmentHasRaggedRightEnd);
+
 
 //Blast pairs
 

@@ -574,7 +574,7 @@ int main(int argc, char *argv[]) {
         if(expectationsFile != NULL) {
             st_logInfo("Computing expectations\n");
             getExpectationsUsingAnchors(sM, hmmExpectations, subSeqX, subSeqY, filteredAnchoredPairs,
-                                pairwiseAlignmentBandingParameters, 1, 1);
+                                pairwiseAlignmentBandingParameters, diagonalCalculationExpectations, 1, 1);
         }
         else {
             //Get posterior prob pairs

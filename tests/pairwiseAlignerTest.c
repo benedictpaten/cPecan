@@ -1073,8 +1073,8 @@ static void test_hmmDiscrete(CuTest *testCase, int64_t symbolSetSize, StateMachi
                                            hmmDiscrete_getTransitionExpectation,   // get
                                            hmmDiscrete_addToEmissionExpectation,   // add
                                            hmmDiscrete_setEmissionExpectation,     // set
-                                           hmmDiscrete_getEmissionExpectation,
-                                           emissions_discrete_getBaseIndex);    // get
+                                           hmmDiscrete_getEmissionExpectation,     // get
+                                           emissions_discrete_getBaseIndex);       // index
 
     //Add some transition expectations
     for (int64_t from = 0; from < hmmD->stateNumber; from++) {
@@ -1128,7 +1128,7 @@ static void test_hmmDiscrete(CuTest *testCase, int64_t symbolSetSize, StateMachi
     }
 
     //Normalise
-    hmmDiscrete_normalize(hmmD);
+    hmmDiscrete_normalize2(hmmD, 1);
 
     //Recheck transitions
     for (int64_t from = 0; from < hmmD->stateNumber; from++) {
@@ -1292,11 +1292,11 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairs);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairsWithBanding);
     //SUITE_ADD_TEST(suite, test_kmer_getAlignedPairsWithRaggedEnds);
-    SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_symbols);
+    //SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_kmers);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_kmers);
-    SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
+    //SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_kmers);
 
     return suite;

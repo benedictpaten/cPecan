@@ -322,13 +322,14 @@ int64_t sequence_correctSeqLength(int64_t length, SequenceType type) {
     }
     if (length > 0) {
         switch (type) {
-            case 0: // nucleotide sequence
+            case nucleotide: // nucleotide sequence
                 return length;
-            case 1: // event and kmer sequence
-            case 2:
+            case kmer: // event and kmer sequence
+            case event:
                 return length - (KMER_LENGTH - 1);
         }
     }
+    return 0;
 }
 
 
@@ -400,6 +401,25 @@ void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, i
     }
 }
 
+static void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *toCells,
+                                                           int64_t from, int64_t to, double eP, double tP,
+                                                           void *extraArgs) {
+    //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
+    double totalProbability = *((double *) ((void **) extraArgs)[0]);
+    Hmm *hmmExpectations = ((void **) extraArgs)[1];
+
+    int64_t x = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]);
+
+    //Calculate posterior probability of the transition/emission pair
+    double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
+    // update transitions expectation
+    hmmExpectations->addToTransitionExpectationFcn(hmmExpectations, from, to, p);
+    //
+    if (to == shortGapX) {
+        hmmExpectations->addToEmissionExpectationFcn(hmmExpectations, 0, x, 0, p);
+    }
+}
+
 static void cell_calculateExpectation(StateMachine *sM,
                                       double *current, double *lower, double *middle, double *upper,
                                       void* cX, void* cY,
@@ -409,6 +429,19 @@ static void cell_calculateExpectation(StateMachine *sM,
                             cX,
                             cY };
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, cell_updateExpectations, extraArgs2);
+}
+
+static void cell_calculate_signal_updateExpectation(StateMachine *sM,
+                                                    double *current, double *lower, double *middle, double *upper,
+                                                    void* cX, void* cY,
+                                                    void *extraArgs) {
+    void *extraArgs2[4] = { ((void **)extraArgs)[0], // hmmExpectations
+                            ((void **)extraArgs)[1], // &totalProbabability
+                            cX,   // pointer to kmer
+                            cY }; // pointer to event array, can remove..?
+    sM->cellCalculate(sM, current, lower, middle, upper, cX, cY,
+                      cell_signal_updateTransAndKmerSkipExpectations, // TODO eventually implant this into sM
+                      extraArgs2);
 }
 
 
@@ -738,14 +771,9 @@ void diagonalCalculationMultiPosteriorMatchProbs(StateMachine *sM, int64_t xay, 
     //st_uglyf("final length for alignedPairs: %lld\n", stList_length(alignedPairs));
 }
 
-static void diagonalCalculationExpectations(StateMachine *sM,
-                                            int64_t xay,
-                                            DpMatrix *forwardDpMatrix,
-                                            DpMatrix *backwardDpMatrix,
-                                            Sequence* sX, Sequence* sY,
-                                            double totalProbability,
-                                            PairwiseAlignmentParameters *p,
-                                            void *extraArgs) {
+void diagonalCalculationExpectations(StateMachine *sM, int64_t xay,
+                                     DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
+                                     double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs) {
     /*
      * Updates the expectations of the transitions/emissions for the given diagonal.
      */
@@ -763,6 +791,30 @@ static void diagonalCalculationExpectations(StateMachine *sM,
                         dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
                         dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
                         sX, sY, cell_calculateExpectation, extraArgs2);
+}
+
+void diagonalCalculation_signal_Expectations(StateMachine *sM, int64_t xay,
+                                             DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
+                                             Sequence* sX, Sequence* sY,
+                                             double totalProbability,
+                                             PairwiseAlignmentParameters *p, void *extraArgs) {
+    /*
+     * Updates the expectations of the transitions/emissions for the given diagonal.
+     */
+    Hmm *hmmExpectations = extraArgs; // maybe change around hmm here?
+    void *extraArgs2[2] = { &totalProbability, hmmExpectations }; // this is where you pack in totalprob
+
+    // update likelihood
+    hmmExpectations->likelihood += totalProbability;
+
+    // We do this once per diagonal, which is a hack, rather than for the
+    // whole matrix. The correction factor is approximately 1/number of
+    // diagonals.
+    diagonalCalculation(sM,
+                        dpMatrix_getDiagonal(backwardDpMatrix, xay),
+                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
+                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
+                        sX, sY, cell_calculate_signal_updateExpectation, extraArgs2);
 }
 
 
@@ -1358,14 +1410,12 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM,
     stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
     void *extraArgs[2] = { subListOfAlignedPairs, alignedPairs };
 
-    getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
-                                        sM, anchorPairs, SsX, SsY,
-                                        p,
-                                        alignmentHasRaggedLeftEnd,
-                                        alignmentHasRaggedRightEnd,
-                                        diagonalPosteriorProbFn,
-                                        alignedPairCoordinateCorrectionFn,
-                                        extraArgs);
+    getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(sM, anchorPairs, SsX, SsY, p,
+                                                               alignmentHasRaggedLeftEnd,
+                                                               alignmentHasRaggedRightEnd,
+                                                               diagonalPosteriorProbFn,
+                                                               alignedPairCoordinateCorrectionFn,
+                                                               extraArgs);
 
     assert(stList_length(subListOfAlignedPairs) == 0);
     stList_destruct(subListOfAlignedPairs);
@@ -1458,6 +1508,13 @@ void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                  Sequence *SsX, Sequence *SsY,
                                  stList *anchorPairs,
                                  PairwiseAlignmentParameters *p,
+                                 void (*diagonalCalcExpectationFcn)(StateMachine *sM, int64_t xay,
+                                                                    DpMatrix *forwardDpMatrix,
+                                                                    DpMatrix *backwardDpMatrix,
+                                                                    Sequence* sX, Sequence* sY,
+                                                                    double totalProbability,
+                                                                    PairwiseAlignmentParameters *p,
+                                                                    void *extraArgs),
                                  bool alignmentHasRaggedLeftEnd,
                                  bool alignmentHasRaggedRightEnd) {
     getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(sM, anchorPairs,
@@ -1465,7 +1522,7 @@ void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
                                                                p,
                                                                alignmentHasRaggedLeftEnd,
                                                                alignmentHasRaggedRightEnd,
-                                                               diagonalCalculationExpectations, // maybe make this external
+                                                               diagonalCalcExpectationFcn, // maybe make this external
                                                                NULL, hmmExpectations);
 }
 
@@ -1482,6 +1539,7 @@ void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
 
     getExpectationsUsingAnchors(sM, hmmExpectations, SsX, SsY,
                                 anchorPairs, p,
+                                diagonalCalculationExpectations,
                                 alignmentHasRaggedLeftEnd,
                                 alignmentHasRaggedRightEnd);
 

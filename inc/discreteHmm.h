@@ -34,7 +34,7 @@ double hmmDiscrete_getEmissionExpectation(Hmm *hmm, int64_t state, int64_t x, in
 // Randomize/Normalize
 void hmmDiscrete_randomize(Hmm *hmmD);
 void hmmDiscrete_normalize(Hmm *hmmD);
-
+void hmmDiscrete_normalize2(Hmm *hmm, bool normalizeEmissions);
 // Writers
 void hmmDiscrete_write(Hmm *hmmD, FILE *fileHandle);
 

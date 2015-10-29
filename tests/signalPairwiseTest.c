@@ -9,6 +9,8 @@
 #include "CuTest.h"
 #include "sonLib.h"
 #include "pairwiseAligner.h"
+#include "continuousHmm.h"
+#include "discreteHmm.h"
 #include "emissionMatrix.h"
 #include "multipleAligner.h"
 #include "randomSequences.h"
@@ -1110,8 +1112,195 @@ static void test_echelon_getAlignedPairsWithBanding(CuTest *testCase) {
 }
 
 static void test_continuousPairHmm(CuTest *testCase) {
+    // make the hmm object
+    Hmm *cpHmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState,
+                                                 continuousPairHmm_addToTransitionsExpectation,
+                                                 continuousPairHmm_setTransitionExpectation,
+                                                 continuousPairHmm_getTransitionExpectation,
+                                                 continuousPairHmm_addToKmerGapExpectation,
+                                                 continuousPairHmm_setKmerGapExpectation,
+                                                 continuousPairHmm_getKmerGapExpectation,
+                                                 emissions_discrete_getKmerIndex);
+    // Add some transition expectations
+    for (int64_t from = 0; from < cpHmm->stateNumber; from++) {
+        for (int64_t to = 0; to < cpHmm->stateNumber; to++) {
+            double dummy = from * cpHmm->stateNumber + to;
+            cpHmm->addToTransitionExpectationFcn(cpHmm, from, to, dummy);
+        }
+    }
+    // Check the transition expectations
+    for (int64_t from = 0; from < cpHmm->stateNumber; from++) {
+        for (int64_t to = 0; to < cpHmm->stateNumber; to++) {
+            double retrievedProb = cpHmm->getTransitionsExpFcn(cpHmm, from, to);
+            double correctProb = from * cpHmm->stateNumber + to;
+            CuAssertTrue(testCase, retrievedProb == correctProb);
+        }
+    }
+    // Add some emissions to the kmer skip probs
+    double dummyTotal = 0.0;
+    for (int64_t i = 0; i < cpHmm->symbolSetSize; i++) {
+        double dummy = (cpHmm->symbolSetSize * cpHmm->stateNumber) + i;
+        cpHmm->setEmissionExpectationFcn(cpHmm, 0, i, 0, dummy);
+        dummyTotal += dummy;
+    }
 
+    // normalize
+    continuousPairHmm_normalize(cpHmm);
+
+    // Recheck transitions
+    for (int64_t from = 0; from < cpHmm->stateNumber; from++) {
+        for (int64_t to = 0; to < cpHmm->stateNumber; to++) {
+            double z = from * cpHmm->stateNumber * cpHmm->stateNumber + (cpHmm->stateNumber * (cpHmm->stateNumber - 1)) / 2;
+            double retrievedNormedProb = cpHmm->getTransitionsExpFcn(cpHmm, from, to);
+            CuAssertDblEquals(testCase, (from * cpHmm->stateNumber + to) / z, retrievedNormedProb, 0.0);
+        }
+    }
+
+    // Recheck kmerGap emissions
+    for (int64_t i = 0; i < cpHmm->symbolSetSize; i++) {
+        double received = cpHmm->getEmissionExpFcn(cpHmm, 0, i, 0);
+        double correctNormed = ((cpHmm->symbolSetSize * cpHmm->stateNumber) + i) / dummyTotal;
+        CuAssertDblEquals(testCase, received, correctNormed, 0.001);
+    }
+    continuousPairHmm_destruct(cpHmm);
 }
+
+static void test_vanillaHmm(CuTest *testCase) {
+    Hmm *vHmm = vanillaHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, vanilla,
+                                          vanillaHmm_addToKmerSkipBinExpectation,
+                                          vanillaHmm_setKmerSkipBinExpectation,
+                                          vanillaHmm_getKmerSkipBinExpectation,
+                                          emissions_discrete_getKmerIndex);
+
+    // add some stuff to the kmer skip bins
+    double dummyTotal = 0.0;
+    for (int64_t i = 0; i < 30; i++) {
+        double dummy = (vHmm->symbolSetSize * vHmm->stateNumber) + i;
+        dummyTotal += dummy;
+        vHmm->setTransitionFcn(vHmm, i, 0, dummy);
+    }
+
+    // check
+    for (int64_t i = 0; i < 30; i++) {
+        double correctProb = (vHmm->symbolSetSize * vHmm->stateNumber) + i;
+        double recievedProb = vHmm->getTransitionsExpFcn(vHmm, i, 0);
+        CuAssertDblEquals(testCase, correctProb, recievedProb, 0.001);
+    }
+
+    vanillaHmm_normalize(vHmm);
+
+    // Recheck
+    for (int64_t i = 0; i < 30; i++) {
+        double received = vHmm->getTransitionsExpFcn(vHmm, i, 0);
+        double correct = ((vHmm->symbolSetSize * vHmm->stateNumber) + i) / dummyTotal;
+        CuAssertDblEquals(testCase, received, correct, 0.001);
+    }
+}
+
+static void test_continuousPairHmm_em(CuTest *testCase) {
+    // load the reference sequence
+    st_uglyf("SENTINAL - starting EM test\n");
+    char *referencePath = stString_print("../../cPecan/tests/ZymoRef.txt");
+    FILE *fH = fopen(referencePath, "r");
+    char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
+    // load the npRead
+    char *npReadFile = stString_print("../../cPecan/tests/ZymoC_ch_1_file1.npRead");
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+    st_uglyf("SENTINAL - loaded npRead and reference sequence\n");
+    // get sequence lengths
+    int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
+    int64_t lY = npRead->nbTemplateEvents;
+
+    // start with random model
+    double pLikelihood = -INFINITY;
+    Hmm *cpHmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState,
+                                                  continuousPairHmm_addToTransitionsExpectation,
+                                                  continuousPairHmm_setTransitionExpectation,
+                                                  continuousPairHmm_getTransitionExpectation,
+                                                  continuousPairHmm_addToKmerGapExpectation,
+                                                  continuousPairHmm_setKmerGapExpectation,
+                                                  continuousPairHmm_getKmerGapExpectation,
+                                                  emissions_discrete_getKmerIndex);
+    continuousPairHmm_randomize(cpHmm);
+    st_uglyf("SENTINAL - made random HMM\n");
+    // load stateMachine from model file
+    char *templateModelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    StateMachine *sMt = getStrawManStateMachine3(templateModelFile);
+
+    // scale model
+    emissions_signal_scaleModel(sMt, npRead->templateParams.scale, npRead->templateParams.shift,
+                                npRead->templateParams.var, npRead->templateParams.scale_sd,
+                                npRead->templateParams.var_sd);
+
+    // load transitions into stateMachine
+    continuousPairHmm_loadTransitionsAndKmerGapProbs(sMt, cpHmm);
+
+    // parameters for pairwise alignment using defaults
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+
+    st_uglyf("SENTINAL - Made stateMachine and params\n");
+
+    // close hmm
+    continuousPairHmm_destruct(cpHmm);
+    st_uglyf("SENTINAL - killed hmm\n");
+
+    for (int64_t iter = 0; iter < 50; iter++) {
+        cpHmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState,
+                                                 continuousPairHmm_addToTransitionsExpectation,
+                                                 continuousPairHmm_setTransitionExpectation,
+                                                 continuousPairHmm_getTransitionExpectation,
+                                                 continuousPairHmm_addToKmerGapExpectation,
+                                                 continuousPairHmm_setKmerGapExpectation,
+                                                 continuousPairHmm_getKmerGapExpectation,
+                                                 emissions_discrete_getKmerIndexFromKmer);
+        // E step
+        // get anchors using lastz
+        stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
+
+        // remap and filter
+        stList *remappedAnchors = nanopore_remapAnchorPairs(anchorPairs, npRead->templateEventMap);
+        stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
+
+        // make Sequences for reference and template events
+        Sequence *refSeq = sequence_construct(lX, ZymoReferenceSeq, sequence_getKmer);
+        Sequence *templateSeq = sequence_construct(lY, npRead->templateEvents, sequence_getEvent);
+
+        getExpectationsUsingAnchors(sMt, cpHmm, refSeq, templateSeq, filteredRemappedAnchors,
+                                    p, diagonalCalculation_signal_Expectations, 0, 0);
+
+        continuousPairHmm_normalize(cpHmm);
+
+        //Log stuff
+        for (int64_t from = 0; from < sMt->stateNumber; from++) {
+            for (int64_t to = 0; to < sMt->stateNumber; to++) {
+                st_logInfo("Transition from %" PRIi64 " to %" PRIi64 " has expectation %f\n", from, to,
+                           cpHmm->getTransitionsExpFcn(cpHmm, from, to));
+            }
+        }
+        for (int64_t x = 0; x < cpHmm->symbolSetSize; x++) {
+            st_logInfo("Emission x %" PRIi64 " has expectation %f\n", x, cpHmm->getEmissionExpFcn(cpHmm, 0, x, 0));
+
+        }
+        st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n",
+                   cpHmm->likelihood, iter);
+        // M step
+        continuousPairHmm_loadTransitionsAndKmerGapProbs(sMt, cpHmm);
+
+        assert(pLikelihood <= cpHmm->likelihood * 0.95);
+        CuAssertTrue(testCase, pLikelihood <= cpHmm->likelihood * 0.95);
+        pLikelihood = cpHmm->likelihood;
+
+        // per iteration clean up
+        continuousPairHmm_destruct(cpHmm);
+        sequence_sequenceDestroy(refSeq);
+        sequence_sequenceDestroy(templateSeq);
+        stList_destruct(filteredRemappedAnchors);
+    }
+    nanopore_nanoporeReadDestruct(npRead);
+    pairwiseAlignmentBandingParameters_destruct(p);
+    stateMachine_destruct(sMt);
+}
+
 
 CuSuite *signalPairwiseTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
@@ -1134,6 +1323,8 @@ CuSuite *signalPairwiseTestSuite(void) {
     //SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
     //SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);
     //SUITE_ADD_TEST(suite, test_echelon_getAlignedPairsWithBanding);
-
+    SUITE_ADD_TEST(suite, test_continuousPairHmm);
+    SUITE_ADD_TEST(suite, test_vanillaHmm);
+    SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
     return suite;
 }

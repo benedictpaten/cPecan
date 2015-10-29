@@ -24,6 +24,10 @@ typedef enum {
     echelon=5
 } StateMachineType;
 
+typedef enum {
+    match = 0, shortGapX = 1, shortGapY = 2, longGapX = 3, longGapY = 4
+} State;
+
 typedef struct _stateMachine StateMachine;
 typedef struct _hmm Hmm;
 
@@ -31,7 +35,7 @@ typedef struct _hmm Hmm;
  * Hmm for loading/unloading HMMs and storing expectations.
  * Maybe move these definitions to stateMachine.c to clean this up?
  */
-typedef struct _hmm {
+struct _hmm {
     double likelihood;
     StateMachineType type;
     int64_t stateNumber;
@@ -207,8 +211,11 @@ StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t param
 //Returns the index for a base, for use with matrices and emissions_discrete_getKmerIndex
 int64_t emissions_discrete_getBaseIndex(void *base);
 
-//Returns the index for a kmer.
+//Returns the index for a kmer from pointer to kmer string
 int64_t emissions_discrete_getKmerIndex(void *kmer);
+
+// Returns index of kmer from pointer to array
+int64_t emissions_discrete_getKmerIndexFromKmer(void *kmer);
 
 // transition defaults
 void stateMachine3_setTransitionsToNucleotideDefaults(StateMachine *sM);
