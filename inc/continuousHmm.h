@@ -56,6 +56,10 @@ void continuousPairHmm_randomize(Hmm *hmm);
 
 void continuousPairHmm_destruct(Hmm *hmm);
 
+void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle);
+
+Hmm *continuousPairHmm_loadFromFile(const char *fileName);
+
 Hmm *vanillaHmm_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
                                void (*addToKmerBinExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
                                void (*setKmerBinFcn)(Hmm *hmm, int64_t from, int64_t to, double p),

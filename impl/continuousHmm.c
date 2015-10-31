@@ -6,7 +6,7 @@
 #include "stateMachine.h"
 #include "continuousHmm.h"
 
-// maybe make this static
+
 static HmmContinuous *hmmContinuous_constructEmpty(
         int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
         void (*addToTransitionExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
@@ -24,6 +24,7 @@ static HmmContinuous *hmmContinuous_constructEmpty(
     hmmC->baseHmm.stateNumber = stateNumber;
     hmmC->baseHmm.symbolSetSize = symbolSetSize;
     hmmC->baseHmm.matrixSize = MODEL_PARAMS;
+    hmmC->baseHmm.likelihood = 0.0;
 
     // initialize match models, for storage in between iterations
     hmmC->matchModel = st_malloc(hmmC->baseHmm.matrixSize * hmmC->baseHmm.symbolSetSize * sizeof(double));
@@ -173,6 +174,135 @@ void continuousPairHmm_loadTransitionsAndKmerGapProbs(StateMachine *sM, Hmm *hmm
     for (int64_t i = 0; i < hmm->symbolSetSize; i++) {
         sM3->model.EMISSION_GAP_X_PROBS[i] = hmm->getEmissionExpFcn(hmm, 0, i, 0);
     }
+}
+
+void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
+    /*
+     * Format:
+     * type \t stateNumber \t symbolSetSize \n
+     * [transitions... \t] likelihood \n
+     * [kmer skip probs ... \t] \n
+     */
+    // downcast
+    ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
+
+    // write the basic stuff to disk (positions are line:item#, not line:col)
+    fprintf(fileHandle, "%i\t", cpHmm->baseContinuousHmm.baseHmm.type); // type 0:0
+    fprintf(fileHandle, "%lld\t", cpHmm->baseContinuousHmm.baseHmm.stateNumber); // stateNumber 0:1
+    fprintf(fileHandle, "%lld\t", cpHmm->baseContinuousHmm.baseHmm.symbolSetSize); // symbolSetSize 0:2
+    fprintf(fileHandle, "\n"); // newLine
+
+    // write the transitions to disk
+    int64_t nb_transitions = (cpHmm->baseContinuousHmm.baseHmm.stateNumber
+                              * cpHmm->baseContinuousHmm.baseHmm.stateNumber);
+    for (int64_t i = 0; i < nb_transitions; i++) {
+        fprintf(fileHandle, "%f\t", cpHmm->transitions[i]); // transitions 1:(0-9)
+    }
+
+    // write the likelihood
+    fprintf(fileHandle, "%f\n", cpHmm->baseContinuousHmm.baseHmm.likelihood); // likelihood 1:10, newLine
+
+    // write the individual kmer skip probs to disk
+    for (int64_t i = 0; i < cpHmm->baseContinuousHmm.baseHmm.symbolSetSize; i++) {
+        fprintf(fileHandle, "%f\t", cpHmm->individualKmerGapProbs[i]); // indiv kmer skip probs 2:(0-4096)
+    }
+    fprintf(fileHandle, "\n"); // newLine
+}
+
+Hmm *continuousPairHmm_loadFromFile(const char *fileName) {
+    // open file
+    FILE *fH = fopen(fileName, "r");
+
+    // line 0
+    char *string = stFile_getLineFromFile(fH);
+    stList *tokens = stString_split(string);
+    int type;
+    int64_t stateNumber, symbolSetSize;
+    int64_t j = sscanf(stList_get(tokens, 0), "%i", &type); // type
+    if (j != 1) {
+        st_errAbort("Failed to parse type (int) from string: %s\n", string);
+    }
+    int64_t s = sscanf(stList_get(tokens, 1), "%lld", &stateNumber); // stateNumber
+    if (s != 1) {
+        st_errAbort("Failed to parse state number (int) from string: %s\n", string);
+    }
+    int64_t n = sscanf(stList_get(tokens, 2), "%lld", &symbolSetSize); // symbolSetSize
+    if (n != 1) {
+        st_errAbort("Failed to parse symbol set size (int) from string: %s\n", string);
+    }
+
+    // make empty cpHMM
+    Hmm *hmm = continuousPairHmm_constructEmpty(0.0, stateNumber, symbolSetSize, type,
+                                                  continuousPairHmm_addToTransitionsExpectation,
+                                                  continuousPairHmm_setTransitionExpectation,
+                                                  continuousPairHmm_getTransitionExpectation,
+                                                  continuousPairHmm_addToKmerGapExpectation,
+                                                  continuousPairHmm_setKmerGapExpectation,
+                                                  continuousPairHmm_getKmerGapExpectation,
+                                                  emissions_discrete_getKmerIndexFromKmer);
+
+    // Downcast
+    ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
+
+    // cleanup
+    free(string);
+    stList_destruct(tokens);
+
+    // Transitions
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+
+    int64_t nb_transitions = (cpHmm->baseContinuousHmm.baseHmm.stateNumber
+                              * cpHmm->baseContinuousHmm.baseHmm.stateNumber);
+
+    // check for the correct number of transitions
+    if (stList_length(tokens) != nb_transitions + 1) { // + 1 bc. likelihood is also on that line
+        st_errAbort(
+                "Incorrect number of transitions in the input HMM file %s, got %" PRIi64 " instead of %" PRIi64 "\n",
+                fileName, stList_length(tokens), nb_transitions + 1);
+    }
+    // load them
+    for (int64_t i = 0; i < nb_transitions; i++) {
+        j = sscanf(stList_get(tokens, i), "%lf", &(cpHmm->transitions[i]));
+        if (j != 1) {
+            st_errAbort("Failed to parse transition prob (float) from string: %s\n", string);
+        }
+    }
+    // load likelihood
+    j = sscanf(stList_get(tokens, stList_length(tokens) - 1), "%lf", &(cpHmm->baseContinuousHmm.baseHmm.likelihood));
+    if (j != 1) {
+        st_errAbort("Failed to parse likelihood (float) from string: %s\n", string);
+    }
+    // Cleanup transitions line
+    free(string);
+    stList_destruct(tokens);
+
+    // Emissions
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+
+    // check
+    if (stList_length(tokens) != cpHmm->baseContinuousHmm.baseHmm.symbolSetSize) {
+        st_errAbort(
+                "Incorrect number of emissions in the input HMM file %s, got %" PRIi64 " instead of %" PRIi64 "\n",
+                fileName, stList_length(tokens), cpHmm->baseContinuousHmm.baseHmm.symbolSetSize);
+    }
+    // load them
+    for (int64_t i = 0; i < cpHmm->baseContinuousHmm.baseHmm.symbolSetSize; i++) {
+        j = sscanf(stList_get(tokens, i), "%lf", &(cpHmm->individualKmerGapProbs[i]));
+        if (j != 1) {
+            st_errAbort("Failed to parse the individual kmer skip probs from string %s\n", string);
+        }
+    }
+
+    // Cleanup emissions line
+    free(string);
+    stList_destruct(tokens);
+    // close file
+    fclose(fH);
+
+    return (Hmm *)cpHmm;
+
 }
 
 Hmm *vanillaHmm_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,

@@ -212,7 +212,7 @@ Hmm *hmmDiscrete_loadFromFile(const char *fileName) {
     // get StateMachineType
     int64_t j = sscanf(stList_get(tokens, 0), "%i", &type);
     if (j != 1) {
-        st_errAbort("Failed to parse state number (int) from string: %s\n", string);
+        st_errAbort("Failed to parse type (int) from string: %s\n", string);
     }
     // get stateNumber
     int64_t s = sscanf(stList_get(tokens, 1), "%lld", &stateNumber);
@@ -222,7 +222,7 @@ Hmm *hmmDiscrete_loadFromFile(const char *fileName) {
     // get parameterSetSize
     int64_t n = sscanf(stList_get(tokens, 2), "%lld", &parameterSetSize);
     if (n != 1) {
-        st_errAbort("Failed to parse state number (int) from string: %s\n", string);
+        st_errAbort("Failed to parse symbol set size (int) from string: %s\n", string);
     }
 
     // make empty Hmm
@@ -238,7 +238,7 @@ Hmm *hmmDiscrete_loadFromFile(const char *fileName) {
     free(string);
     stList_destruct(tokens);
 
-    // upcast
+    // downcast
     HmmDiscrete *hmmD = (HmmDiscrete *) hmm;
 
     // Transitions

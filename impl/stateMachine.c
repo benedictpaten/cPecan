@@ -601,8 +601,6 @@ double emissions_signal_strawManGetKmerEventMatchProb(const double *eventModel, 
     // get index
     int64_t kmerIndex = emissions_discrete_getKmerIndex(kmer_i);
 
-
-
     // get the µ and σ for the level and noise for the model
     double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
     double levelStdDev = emissions_signal_getModelLevelSd(eventModel, kmerIndex);
@@ -612,13 +610,11 @@ double emissions_signal_strawManGetKmerEventMatchProb(const double *eventModel, 
     double l_probEventMean = emissions_signal_logGaussPdf(eventMean, levelMean, levelStdDev);
     double l_probEventNoise = emissions_signal_logGaussPdf(eventNoise, noiseMean, noiseStdDev);
 
-
-
     // clean
     free(kmer_i);
 
     // debugging
-    double prob = l_probEventMean + l_probEventNoise;
+    //double prob = l_probEventMean + l_probEventNoise;
     //st_uglyf("MATCHING--kmer:%s (index: %lld), event mean: %f, \n modelMean: %f, modelLsd: %f probEvent: %f probNoise: %f, combined: %f\n",
     //         kmer_i, kmerIndex, eventMean, levelMean, levelStdDev, l_probEventMean, l_probEventNoise, prob);
 
@@ -1183,6 +1179,7 @@ static void stateMachineEchelon_cellCalculate(StateMachine *sM,
     // from M
     double a_mx = sMe->getKmerSkipProb((StateMachine *) sMe, cX), la_mx = log(a_mx); // beta
     double a_mh = 1 - a_mx, la_mh = log(a_mh); // 1 - beta
+
     // from X (kmer skip)
     double a_xx = a_mx, la_xx = log(a_xx); // alpha, to seperate alpha, need to change here
     double a_xh = 1 - a_xx, la_xh = log(a_xh); // 1 - alpha

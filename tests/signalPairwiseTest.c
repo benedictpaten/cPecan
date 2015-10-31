@@ -1121,6 +1121,7 @@ static void test_continuousPairHmm(CuTest *testCase) {
                                                  continuousPairHmm_setKmerGapExpectation,
                                                  continuousPairHmm_getKmerGapExpectation,
                                                  emissions_discrete_getKmerIndex);
+
     // Add some transition expectations
     for (int64_t from = 0; from < cpHmm->stateNumber; from++) {
         for (int64_t to = 0; to < cpHmm->stateNumber; to++) {
@@ -1128,6 +1129,27 @@ static void test_continuousPairHmm(CuTest *testCase) {
             cpHmm->addToTransitionExpectationFcn(cpHmm, from, to, dummy);
         }
     }
+
+    // Add some emissions to the kmer skip probs
+    double dummyTotal = 0.0;
+    for (int64_t i = 0; i < cpHmm->symbolSetSize; i++) {
+        double dummy = (cpHmm->symbolSetSize * cpHmm->stateNumber) + i;
+        cpHmm->setEmissionExpectationFcn(cpHmm, 0, i, 0, dummy);
+        dummyTotal += dummy;
+    }
+
+    // dump the HMM to a file
+    char *tempFile = stString_print("./temp%" PRIi64 ".hmm", st_randomInt(0, INT64_MAX));
+    CuAssertTrue(testCase, !stFile_exists(tempFile)); //Quick check that we don't write over anything.
+    FILE *fH = fopen(tempFile, "w");
+    continuousPairHmm_writeToFile(cpHmm, fH);
+    fclose(fH);
+    continuousPairHmm_destruct(cpHmm);
+
+    //Load from a file
+    cpHmm = continuousPairHmm_loadFromFile(tempFile);
+    stFile_rmrf(tempFile);
+
     // Check the transition expectations
     for (int64_t from = 0; from < cpHmm->stateNumber; from++) {
         for (int64_t to = 0; to < cpHmm->stateNumber; to++) {
@@ -1136,13 +1158,14 @@ static void test_continuousPairHmm(CuTest *testCase) {
             CuAssertTrue(testCase, retrievedProb == correctProb);
         }
     }
-    // Add some emissions to the kmer skip probs
-    double dummyTotal = 0.0;
+
+    // check the kmer skip probs
     for (int64_t i = 0; i < cpHmm->symbolSetSize; i++) {
-        double dummy = (cpHmm->symbolSetSize * cpHmm->stateNumber) + i;
-        cpHmm->setEmissionExpectationFcn(cpHmm, 0, i, 0, dummy);
-        dummyTotal += dummy;
+        double received = cpHmm->getEmissionExpFcn(cpHmm, 0, i, 0);
+        double correct = (cpHmm->symbolSetSize * cpHmm->stateNumber) + i;
+        CuAssertDblEquals(testCase, received, correct, 0.0);
     }
+
 
     // normalize
     continuousPairHmm_normalize(cpHmm);
@@ -1425,6 +1448,6 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_vanillaHmm);
     //SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
-    SUITE_ADD_TEST(suite, test_vanillaHmm_em);
+    //SUITE_ADD_TEST(suite, test_vanillaHmm_em);
     return suite;
 }
