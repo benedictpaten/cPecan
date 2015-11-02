@@ -1189,36 +1189,63 @@ static void test_continuousPairHmm(CuTest *testCase) {
 }
 
 static void test_vanillaHmm(CuTest *testCase) {
-    Hmm *vHmm = vanillaHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, vanilla,
+    Hmm *hmm = vanillaHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, vanilla,
                                           vanillaHmm_addToKmerSkipBinExpectation,
                                           vanillaHmm_setKmerSkipBinExpectation,
-                                          vanillaHmm_getKmerSkipBinExpectation,
-                                          emissions_discrete_getKmerIndex);
+                                          vanillaHmm_getKmerSkipBinExpectation);
 
     // add some stuff to the kmer skip bins
     double dummyTotal = 0.0;
     for (int64_t i = 0; i < 30; i++) {
-        double dummy = (vHmm->symbolSetSize * vHmm->stateNumber) + i;
+        double dummy = (hmm->symbolSetSize * hmm->stateNumber) + i;
         dummyTotal += dummy;
-        vHmm->setTransitionFcn(vHmm, i, 0, dummy);
+        hmm->setTransitionFcn(hmm, i, 0, dummy);
     }
 
-    // check
+    // make a statemachine with the matchModel
+    char *templateModelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    StateMachine *sMt = getSignalStateMachine3Vanilla(templateModelFile);
+
+    // implant it into the hmm
+    vanillaHmm_implantMatchModelsintoHmm(sMt, hmm);
+
+    // dump to file
+    char *tempFile = stString_print("./temp%" PRIi64 ".hmm", st_randomInt(0, INT64_MAX));
+    CuAssertTrue(testCase, !stFile_exists(tempFile)); //Quick check that we don't write over anything.
+    FILE *fH = fopen(tempFile, "w");
+    vanillaHmm_writeToFile(hmm, fH);
+    fclose(fH);
+    vanillaHmm_destruct(hmm);
+
+    // load from disk
+    hmm = vanillaHmm_loadFromFile(tempFile);
+    stFile_rmrf(tempFile);
+
+    // check kmer skip bins
     for (int64_t i = 0; i < 30; i++) {
-        double correctProb = (vHmm->symbolSetSize * vHmm->stateNumber) + i;
-        double recievedProb = vHmm->getTransitionsExpFcn(vHmm, i, 0);
+        double correctProb = (hmm->symbolSetSize * hmm->stateNumber) + i;
+        double recievedProb = hmm->getTransitionsExpFcn(hmm, i, 0);
         CuAssertDblEquals(testCase, correctProb, recievedProb, 0.001);
     }
 
-    vanillaHmm_normalizeKmerSkipBins(vHmm);
+    VanillaHmm *vHmm = (VanillaHmm *)hmm;
+    // check match model
+    for (int64_t i = 0; i < 1 + (sMt->parameterSetSize * MODEL_PARAMS); i++) {
+        CuAssertDblEquals(testCase,
+                          vHmm->matchModel[i], sMt->EMISSION_MATCH_PROBS[i], 0.001);
+        CuAssertDblEquals(testCase,
+                          vHmm->scaledMatchModel[i], sMt->EMISSION_GAP_Y_PROBS[i], 0.001);
+    }
+
+    vanillaHmm_normalizeKmerSkipBins(hmm);
 
     // Recheck
     for (int64_t i = 0; i < 30; i++) {
-        double received = vHmm->getTransitionsExpFcn(vHmm, i, 0);
-        double correct = ((vHmm->symbolSetSize * vHmm->stateNumber) + i) / dummyTotal;
+        double received = hmm->getTransitionsExpFcn(hmm, i, 0);
+        double correct = ((hmm->symbolSetSize * hmm->stateNumber) + i) / dummyTotal;
         CuAssertDblEquals(testCase, received, correct, 0.001);
     }
-    vanillaHmm_destruct(vHmm);
+    vanillaHmm_destruct(hmm);
 }
 
 static void test_continuousPairHmm_em(CuTest *testCase) {
@@ -1302,7 +1329,7 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
             st_logInfo("Emission x %" PRIi64 " has expectation %f\n", x, cpHmm->getEmissionExpFcn(cpHmm, 0, x, 0));
 
         }
-        st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", cpHmm->likelihood, iter);
+        st_logInfo("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", cpHmm->likelihood, iter);
 
         // M step
         continuousPairHmm_loadTransitionsAndKmerGapProbs(sMt, cpHmm); //todo| make sure this is working by looking for
@@ -1344,8 +1371,7 @@ static void test_vanillaHmm_em(CuTest *testCase) {
     Hmm *vHmm = vanillaHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, vanilla,
                                           vanillaHmm_addToKmerSkipBinExpectation,
                                           vanillaHmm_setKmerSkipBinExpectation,
-                                          vanillaHmm_getKmerSkipBinExpectation,
-                                          emissions_discrete_getKmerIndex);
+                                          vanillaHmm_getKmerSkipBinExpectation);
 
     vanillaHmm_randomizeKmerSkipBins(vHmm);
 
@@ -1371,8 +1397,7 @@ static void test_vanillaHmm_em(CuTest *testCase) {
         vHmm = vanillaHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, vanilla,
                                          vanillaHmm_addToKmerSkipBinExpectation,
                                          vanillaHmm_setKmerSkipBinExpectation,
-                                         vanillaHmm_getKmerSkipBinExpectation,
-                                         emissions_discrete_getKmerIndex);
+                                         vanillaHmm_getKmerSkipBinExpectation);
 
         // E step
         // get anchors using lastz
@@ -1401,7 +1426,7 @@ static void test_vanillaHmm_em(CuTest *testCase) {
         for (int64_t bin = 0; bin < 30; bin++) {
             st_logInfo("bin %lld has prob %f\n", bin, vHmm->getTransitionsExpFcn(vHmm, bin, 0));
         }
-        st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", vHmm->likelihood, iter);
+        st_logInfo("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", vHmm->likelihood, iter);
 
         // M step
         vanillaHmm_loadKmerSkipBinExpectations(sMt, vHmm);
@@ -1426,28 +1451,28 @@ static void test_vanillaHmm_em(CuTest *testCase) {
 
 CuSuite *signalPairwiseTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-    //SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
-    //SUITE_ADD_TEST(suite, test_bivariateGaussPdfMatchProb);
-    //SUITE_ADD_TEST(suite, test_twoDistributionPdf);
-    //SUITE_ADD_TEST(suite, test_poissonPosteriorProb);
-    //SUITE_ADD_TEST(suite, test_strawMan_cell);
-    //SUITE_ADD_TEST(suite, test_vanilla_cell);
-    //SUITE_ADD_TEST(suite, test_echelon_cell);
-    //SUITE_ADD_TEST(suite, test_echelon_dpDiagonal);
-    //SUITE_ADD_TEST(suite, test_vanilla_dpDiagonal);
-    //SUITE_ADD_TEST(suite, test_strawMan_dpDiagonal);
-    //SUITE_ADD_TEST(suite, test_strawMan_diagonalDPCalculations);
-    //SUITE_ADD_TEST(suite, test_vanilla_diagonalDPCalculations);
-    //SUITE_ADD_TEST(suite, test_echelon_diagonalDPCalculations);
-    //SUITE_ADD_TEST(suite, test_scaleModel);
+    SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
+    SUITE_ADD_TEST(suite, test_bivariateGaussPdfMatchProb);
+    SUITE_ADD_TEST(suite, test_twoDistributionPdf);
+    SUITE_ADD_TEST(suite, test_poissonPosteriorProb);
+    SUITE_ADD_TEST(suite, test_strawMan_cell);
+    SUITE_ADD_TEST(suite, test_vanilla_cell);
+    SUITE_ADD_TEST(suite, test_echelon_cell);
+    SUITE_ADD_TEST(suite, test_echelon_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_vanilla_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_strawMan_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_strawMan_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_vanilla_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_echelon_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_scaleModel);
     //SUITE_ADD_TEST(suite, test_vanilla_strandAlignmentNoBanding);
     //SUITE_ADD_TEST(suite, test_echelon_strandAlignmentNoBanding);
-    //SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
-    //SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);
     //SUITE_ADD_TEST(suite, test_echelon_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_vanillaHmm);
-    //SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
-    //SUITE_ADD_TEST(suite, test_vanillaHmm_em);
+    SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
+    SUITE_ADD_TEST(suite, test_vanillaHmm_em);
     return suite;
 }

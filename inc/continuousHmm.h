@@ -61,10 +61,9 @@ void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle);
 Hmm *continuousPairHmm_loadFromFile(const char *fileName);
 
 Hmm *vanillaHmm_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
-                               void (*addToKmerBinExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
-                               void (*setKmerBinFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
-                               double (*getKmerBinExpFcn)(Hmm *hmm, int64_t from, int64_t to),
-                               int64_t (*getElementIndexFcn)(void *));
+                               void (*addToKmerBinExpFcn)(Hmm *hmm, int64_t bin, int64_t ignore, double p),
+                               void (*setKmerBinFcn)(Hmm *hmm, int64_t bin, int64_t ignore, double p),
+                               double (*getKmerBinExpFcn)(Hmm *hmm, int64_t bin, int64_t ignore));
 
 void vanillaHmm_addToKmerSkipBinExpectation(Hmm *hmm, int64_t bin, int64_t ignore, double p);
 
@@ -79,6 +78,10 @@ void vanillaHmm_randomizeKmerSkipBins(Hmm *hmm);
 void vanillaHmm_loadKmerSkipBinExpectations(StateMachine *sM, Hmm *hmm);
 
 void vanillaHmm_implantMatchModelsintoHmm(StateMachine *sM, Hmm *hmm);
+
+void vanillaHmm_writeToFile(Hmm *hmm, FILE *fileHandle);
+
+Hmm *vanillaHmm_loadFromFile(const char *fileName);
 
 void vanillaHmm_destruct(Hmm *hmm);
 

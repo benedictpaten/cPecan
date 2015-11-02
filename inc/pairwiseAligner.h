@@ -46,11 +46,13 @@ typedef struct sequence {
  * length 5.  *elements is a pointer to the char array, typically.  The
  * SequenceType is 0-nucleotide, 1-kmer, 2-event
 */
-Sequence *sequence_construct(int64_t length, void *elements, void (*getFcn));
+Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(void *, int64_t));
 
 void sequence_padSequence(Sequence *sequence);
 
-Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength, void (*getFcn));
+//slice a sequence object
+Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength,
+                                  void *(*getFcn)(void *, int64_t));
 
 void sequence_sequenceDestroy(Sequence *seq);
 
@@ -93,7 +95,9 @@ stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_
                         stList *(*getAnchorPairFcn)(void *, void *, PairwiseAlignmentParameters *),
                         bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
-stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignment *pA, int64_t trim);
+typedef struct PairwiseAlignment PairwiseAlignment; // added to remove invisibility warning
+
+stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(PairwiseAlignment *pA, int64_t trim);
 
 /*
  * Expectation calculation functions for EM algorithms.
@@ -104,8 +108,8 @@ void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, i
 void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *toCells, int64_t from, int64_t to,
                                                     double eP, double tP, void *extraArgs);
 
-void cell_signal_updateAlphaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
-                                 void *extraArgs);
+void cell_signal_updateBetaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
+                                void *extraArgs);
 
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
                      void *sX, void *sY, int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,

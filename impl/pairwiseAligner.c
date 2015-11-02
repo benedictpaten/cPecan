@@ -257,7 +257,7 @@ double logAdd(double x, double y) {
 //Sequence Object generalized way to represent a sequence of symbols or measurements (events)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Sequence *sequence_construct(int64_t length, void *elements, void (*getFcn)) {
+Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(void *, int64_t)) {
     Sequence *self = malloc(sizeof(Sequence));
 
     self->length = length;
@@ -271,13 +271,12 @@ void sequence_padSequence(Sequence *sequence) {
     sequence->elements = stString_print("%s%s", sequence->elements, endPadding);
 }
 
-Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength, void (*getFcn)) {
-    /*
-     * slice a sequence object
-     */
-    //size_t elementSize = sizeof(inputSequence->elements)/inputSequence->length;
-    void *elementSlice; // = malloc(elementSize* sliceLength);
-    elementSlice = &inputSequence->elements[start];
+Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength,
+                                  void *(*getFcn)(void *, int64_t)) {
+    size_t elementSize = sizeof(inputSequence->elements);
+    //void *elementSlice;
+    //elementSlice = &(inputSequence->elements[start * elementSize]); // equivalent
+    void *elementSlice = inputSequence->elements + (start * elementSize);
     Sequence* newSequence = sequence_construct(sliceLength, elementSlice, getFcn);
     return newSequence;
 }
@@ -288,10 +287,6 @@ void sequence_sequenceDestroy(Sequence *seq) {
 }
 
 void *sequence_getBase(void *elements, int64_t index) {
-    /*
-     * Returns a single base from a sequence object. This will likely be depreciated in favor of
-     * using only indexes for elements
-     */
     char* n;
     n = "n";
     return index >= 0 ? &(((char *)elements)[index]) : n;
@@ -314,9 +309,6 @@ void *sequence_getEvent(void *elements, int64_t index) {
 }
 
 int64_t sequence_correctSeqLength(int64_t length, SequenceType type) {
-    /*
-     * Correct the sequence length for non-nucleotide sequences, eg. kmers/events.
-     */
     // for trivial case
     if (length == 0) {
         return 0;
@@ -420,8 +412,8 @@ void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *t
     }
 }
 
-void cell_signal_updateAlphaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
-                                 void *extraArgs) {
+void cell_signal_updateBetaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
+                                void *extraArgs) {
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
     VanillaHmm *hmmExpectations = ((void **) extraArgs)[1];

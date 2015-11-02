@@ -1444,7 +1444,7 @@ StateMachine *getSignalStateMachine3Vanilla(const char *modelFile) {
                                                         emissions_signal_getKmerSkipProb,
                                                         emissions_signal_getEventMatchProbWithTwoDists,
                                                         emissions_signal_getEventMatchProbWithTwoDists,
-                                                        cell_signal_updateAlphaProb);
+                                                        cell_signal_updateBetaProb);
     emissions_signal_loadPoreModel(sM3v, modelFile, sM3v->type);
     return sM3v;
 }

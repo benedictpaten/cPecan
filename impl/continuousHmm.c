@@ -308,8 +308,7 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName) {
 Hmm *vanillaHmm_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
                                void (*addToKmerBinExpFcn)(Hmm *hmm, int64_t bin, int64_t ignore, double p),
                                void (*setKmerBinFcn)(Hmm *hmm, int64_t bin, int64_t ignore, double p),
-                               double (*getKmerBinExpFcn)(Hmm *hmm, int64_t bin, int64_t ignore),
-                               int64_t (*getElementIndexFcn)(void *)) {
+                               double (*getKmerBinExpFcn)(Hmm *hmm, int64_t bin, int64_t ignore)) {
     VanillaHmm *vHmm = st_malloc(sizeof(VanillaHmm));
 
     vHmm->baseContinuousHmm =  *hmmContinuous_constructEmpty(stateNumber, symbolSetSize, type,
@@ -319,7 +318,7 @@ Hmm *vanillaHmm_constructEmpty(double pseudocount, int64_t stateNumber, int64_t 
                                                              NULL,
                                                              NULL,
                                                              NULL,
-                                                             getElementIndexFcn);
+                                                             NULL);
     vHmm->kmerSkipBins = st_malloc(30 * sizeof(double));
     for (int64_t i = 0; i < 30; i++) {
         vHmm->kmerSkipBins[i] = pseudocount;
@@ -398,5 +397,152 @@ void vanillaHmm_destruct(Hmm *hmm) {
     free(vHmm->matchModel);
     free(vHmm->scaledMatchModel);
     free(vHmm->kmerSkipBins);
-    //free(vHmm);
+    free(vHmm);
+}
+
+void vanillaHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
+    /*
+     * Format:
+     * line 0: type \t stateNumber \t symbolSetSize \n
+     * line 1: skip bins \t likelihood \n
+     * line 2: [correlation coeff] \t [match model .. \t]  \n
+     * line 3: [correlation coeff] [extra event matchModel]
+     * See emissions_signal_loadPoreModel for description of matchModel
+     */
+    VanillaHmm *vHmm = (VanillaHmm *)hmm;
+
+    // Line 0 - write the basic stuff to disk (positions are line:item#, not line:col)
+    fprintf(fileHandle, "%i\t", vHmm->baseContinuousHmm.baseHmm.type); // type 0:0
+    fprintf(fileHandle, "%lld\t", vHmm->baseContinuousHmm.baseHmm.stateNumber); // stateNumber 0:1
+    fprintf(fileHandle, "%lld\t", vHmm->baseContinuousHmm.baseHmm.symbolSetSize); // symbolSetSize 0:2
+    fprintf(fileHandle, "\n"); // newLine
+
+
+    // Line 1 - write kmer skip bins to disk
+    for (int64_t i = 0; i < 30; i++) {
+        fprintf(fileHandle, "%f\t", vHmm->kmerSkipBins[i]); // kmer skip bins
+    }
+    fprintf(fileHandle, "%f\n", vHmm->baseContinuousHmm.baseHmm.likelihood); // likelihood, newline
+
+
+    // Line 2 - write matchModel to disk
+    int64_t nb_matchModelBuckets = 1 + (vHmm->baseContinuousHmm.baseHmm.symbolSetSize * MODEL_PARAMS);
+    for (int64_t i = 0; i < nb_matchModelBuckets; i++) {
+        fprintf(fileHandle, "%f\t", vHmm->matchModel[i]); // correlation coeff, matchModel
+    }
+    fprintf(fileHandle, "\n"); // newLine
+
+    // Line 3 - write extra event model to disk
+    for (int64_t i = 0; i < nb_matchModelBuckets; i++) {
+        fprintf(fileHandle, "%f\t", vHmm->scaledMatchModel[i]); // correlation coeff, extra event matchModel
+    }
+    fprintf(fileHandle, "\n"); // newLine
+}
+
+Hmm *vanillaHmm_loadFromFile(const char *fileName) {
+    // open file
+    FILE *fH = fopen(fileName, "r");
+
+    // line 0
+    char *string = stFile_getLineFromFile(fH);
+    stList *tokens = stString_split(string);
+    int type;
+    int64_t stateNumber, symbolSetSize;
+    int64_t j = sscanf(stList_get(tokens, 0), "%i", &type); // type
+    if (j != 1) {
+        st_errAbort("Failed to parse type (int) from string: %s\n", string);
+    }
+    int64_t s = sscanf(stList_get(tokens, 1), "%lld", &stateNumber); // stateNumber
+    if (s != 1) {
+        st_errAbort("Failed to parse state number (int) from string: %s\n", string);
+    }
+    int64_t n = sscanf(stList_get(tokens, 2), "%lld", &symbolSetSize); // symbolSetSize
+    if (n != 1) {
+        st_errAbort("Failed to parse symbol set size (int) from string: %s\n", string);
+    }
+
+    // make empty vanillaHmm
+    Hmm *hmm = vanillaHmm_constructEmpty(0.0, stateNumber, symbolSetSize, type,
+                                          vanillaHmm_addToKmerSkipBinExpectation,
+                                          vanillaHmm_setKmerSkipBinExpectation,
+                                          vanillaHmm_getKmerSkipBinExpectation);
+    // Downcast
+    VanillaHmm *vHmm = (VanillaHmm *)hmm;
+
+    // cleanup
+    free(string);
+    stList_destruct(tokens);
+
+    // kmer skip bins
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+
+    // check
+    if (stList_length(tokens) != 31) {
+        st_errAbort("Did not find the correct number of kmer skip bins and/or likelihood\n");
+    }
+    // load
+    for (int64_t i = 0; i < 30; i++) {
+        j = sscanf(stList_get(tokens, i), "%lf", &(vHmm->kmerSkipBins[i]));
+        if (j != 1) {
+            st_errAbort("Error parsing kmer skip bins from string %s\n", string);
+        }
+    }
+    // load likelihood
+    j = sscanf(stList_get(tokens, stList_length(tokens) - 1), "%lf", &(vHmm->baseContinuousHmm.baseHmm.likelihood));
+    if (j != 1) {
+        st_errAbort("error parsing likelihood from string %s\n", string);
+    }
+
+    // cleanup
+    free(string);
+    stList_destruct(tokens);
+
+    // match model
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+
+    // check
+    int64_t nb_matchModelBuckets = 1 + (vHmm->baseContinuousHmm.baseHmm.symbolSetSize * MODEL_PARAMS);
+    if (stList_length(tokens) != nb_matchModelBuckets) {
+        st_errAbort("incorrect number of members for match model in HMM %s got %lld instead of %lld",
+                    fileName, stList_length(tokens), nb_matchModelBuckets);
+
+    }
+    // load
+    for (int64_t i = 0; i < nb_matchModelBuckets; i++) {
+        j = sscanf(stList_get(tokens, i), "%lf", &(vHmm->matchModel[i]));
+        if (j != 1) {
+            st_errAbort("error parsing match model for string %s", string);
+        }
+    }
+
+    // cleanup
+    free(string);
+    stList_destruct(tokens);
+
+    // and finally, the extra event match model
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+
+    // check
+    if (stList_length(tokens) != nb_matchModelBuckets) {
+        st_errAbort("incorrect number of members for extra event match model in HMM %s got %lld instead of %lld",
+                    fileName, stList_length(tokens), nb_matchModelBuckets);
+
+    }
+    // load
+    for (int64_t i = 0; i < nb_matchModelBuckets; i++) {
+        j = sscanf(stList_get(tokens, i), "%lf", &(vHmm->scaledMatchModel[i]));
+        if (j != 1) {
+            st_errAbort("error parsing extra event match model for string %s", string);
+        }
+    }
+
+    // cleanup
+    free(string);
+    stList_destruct(tokens);
+    fclose(fH);
+
+    return (Hmm *)vHmm;
 }

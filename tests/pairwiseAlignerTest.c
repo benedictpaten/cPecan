@@ -321,8 +321,8 @@ static void test_dpMatrix(CuTest *testCase) {
 
 static void test_diagonalDPCalculations(CuTest *testCase) {
     // make some simple DNA sequences
-    const char *sX = "AGCG";
-    const char *sY = "AGTTCG";
+    char *sX = "AGCG";
+    char *sY = "AGTTCG";
     // set lX and lY to the lengths of those sequences
     int64_t lX = strlen(sX);
     int64_t lY = strlen(sY);
@@ -421,8 +421,8 @@ static void test_kmer_diagonalDPCalculations(CuTest *testCase) {
     /*
      * Broken right now
      */
-    const char *sX = "AGCG";
-    const char *sY = "AGTTCG";
+    char *sX = "AGCG";
+    char *sY = "AGTTCG";
 
     // set lX and lY to the lengths of those sequences
     int64_t slX = sequence_correctSeqLength(strlen(sX), kmer);
@@ -1282,7 +1282,7 @@ static void test_hmmDiscrete_EM_5State_symbols(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-    /*
+
     SUITE_ADD_TEST(suite, test_diagonal);
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_logAdd);
@@ -1309,6 +1309,6 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_kmers);
     SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
     //SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_kmers);
-    */
+
     return suite;
 }
