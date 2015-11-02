@@ -946,7 +946,7 @@ static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
                                                        diagonalCalculationPosteriorMatchProbs,
                                                        1, 1);
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
-    st_logInfo("there are %lld aligned pairs with banding\n", stList_length(alignedPairs));
+    st_uglyf("there are %lld aligned pairs with banding\n", stList_length(alignedPairs));
 
     // for ch1_file1 template there should be this many aligned pairs with banding
     CuAssertTrue(testCase, stList_length(alignedPairs) == 1001);
@@ -957,12 +957,9 @@ static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
                                                           sequence_getKmer, sequence_getEvent,
                                                           diagonalCalculationPosteriorMatchProbs,
                                                           0, 0);
-    st_logInfo("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
+    st_uglyf("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
     checkAlignedPairs(testCase, alignedPairs2, lX, lY);
     CuAssertTrue(testCase, stList_length(alignedPairs2) == 980);
-
-    // there shouldn't be too many more aligned pairs with banding than without
-    CuAssertTrue(testCase, 1 < (stList_length(alignedPairs)/stList_length(alignedPairs2)) < 1.5);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
@@ -1027,9 +1024,6 @@ static void test_vanilla_getAlignedPairsWithBanding(CuTest *testCase) {
     st_logInfo("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
     checkAlignedPairs(testCase, alignedPairs2, lX, lY);
     CuAssertTrue(testCase, stList_length(alignedPairs2) == 953);
-
-    // there shouldn't be too many more aligned pairs with banding than without
-    CuAssertTrue(testCase, 1 < (stList_length(alignedPairs)/stList_length(alignedPairs2)) < 1.5);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
@@ -1097,10 +1091,7 @@ static void test_echelon_getAlignedPairsWithBanding(CuTest *testCase) {
     CuAssertIntEquals(testCase, stList_length(alignedPairs2), 1026);
     st_logInfo("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
     checkAlignedPairsForEchelon(testCase, alignedPairs2, lX, lY);
-
-    // Make sure there aren't too many more anchor-aligned pairs than without anchors
-    CuAssertTrue(testCase, 1 < (stList_length(alignedPairs)/stList_length(alignedPairs2)) < 1.5);
-
+    
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
     nanopore_nanoporeReadDestruct(npRead);
@@ -1465,8 +1456,8 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_vanilla_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_echelon_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_scaleModel);
-    SUITE_ADD_TEST(suite, test_vanilla_strandAlignmentNoBanding);
-    SUITE_ADD_TEST(suite, test_echelon_strandAlignmentNoBanding);
+    //SUITE_ADD_TEST(suite, test_vanilla_strandAlignmentNoBanding);
+    //SUITE_ADD_TEST(suite, test_echelon_strandAlignmentNoBanding);
     SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_echelon_getAlignedPairsWithBanding);
