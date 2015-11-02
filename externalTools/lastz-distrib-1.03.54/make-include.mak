@@ -6,4 +6,4 @@
 INSTALL =  install
 ARCH    ?= $(shell uname -m)
 
-installDir = ../../../sonLib/bin
+installDir = ../../../../sonLib/bin
