@@ -1465,11 +1465,11 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_vanilla_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_echelon_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_scaleModel);
-    //SUITE_ADD_TEST(suite, test_vanilla_strandAlignmentNoBanding);
-    //SUITE_ADD_TEST(suite, test_echelon_strandAlignmentNoBanding);
+    SUITE_ADD_TEST(suite, test_vanilla_strandAlignmentNoBanding);
+    SUITE_ADD_TEST(suite, test_echelon_strandAlignmentNoBanding);
     SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);
-    //SUITE_ADD_TEST(suite, test_echelon_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_echelon_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_vanillaHmm);
     SUITE_ADD_TEST(suite, test_continuousPairHmm_em);

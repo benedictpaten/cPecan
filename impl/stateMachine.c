@@ -127,12 +127,12 @@ int64_t emissions_discrete_getKmerIndex(void *kmer) {
     int64_t i = 0;
     int64_t x = 0;
     while(l > 1) {
-        x += l * emissions_discrete_getBaseIndex(kmer + i);
+        x += l * emissions_discrete_getBaseIndex((char *)kmer + i);
         i += 1;
         l = l/SYMBOL_NUMBER_NO_N;
     }
     int64_t last = strlen(kmer)-1;
-    x += emissions_discrete_getBaseIndex(kmer + last);
+    x += emissions_discrete_getBaseIndex((char *)kmer + last);
 
     return x;
 }
@@ -501,7 +501,7 @@ double emissions_signal_getEventMatchProbWithTwoDists(const double *eventModel, 
 
     // get event mean, and noise
     double eventMean = *(double *) event;
-    double eventNoise = *(double *) (event + sizeof(double));
+    double eventNoise = *(double *) ((char *)event + sizeof(double));
 
     // get the kmer index
     int64_t kmerIndex = emissions_discrete_getKmerIndex(kmer_i);
@@ -528,10 +528,12 @@ double emissions_signal_multipleKmerMatchProb(const double *eventModel, void *km
     for (int64_t i = 0; i < n; i++) {
         // check if we're going to run off the end of the sequence
         int64_t l = (KMER_LENGTH * n);
-        char lastBase = *(char *) (kmers + l);
+        //char lastBase = *(char *) (kmers + l);
+        char lastBase = *((char *)kmers + l); // new way
         // if we're not, logAdd up all the probs for the next n kmers
         if (isupper(lastBase)) {
-            char *x_i = &kmers[i];
+            //char *x_i = &kmers[i];
+            char *x_i = ((char *)kmers + i); // new way
             p = logAdd(p, emissions_signal_getEventMatchProbWithTwoDists(eventModel, x_i, event));
         } else { // otherwise return zero prob of emitting this many kmers from this event
             return LOG_ZERO;
@@ -542,7 +544,7 @@ double emissions_signal_multipleKmerMatchProb(const double *eventModel, void *km
 }
 
 double emissions_signal_getDurationProb(void *event, int64_t n) {
-    double duration = *(double *) (event + (2 * sizeof(double)));
+    double duration = *(double *) ((char *)event + (2 * sizeof(double)));
     return emissions_signal_poissonPosteriorProb(n, duration);
 }
 
@@ -550,7 +552,7 @@ double emissions_signal_getBivariateGaussPdfMatchProb(const double *eventModel, 
     // this is meant to work with getKmer2
     // wrangle event data
     double eventMean = *(double *) event;
-    double eventNoise = *(double *) (event + sizeof(double)); // aaah pointers
+    double eventNoise = *(double *) ((char*)event + sizeof(double)); // aaah pointers
 
     // correlation coefficient is the 0th member of the event model
     double p = eventModel[0];
@@ -589,7 +591,7 @@ double emissions_signal_strawManGetKmerEventMatchProb(const double *eventModel, 
     // this is meant to work with getKmer (NOT getKmer2)
     // wrangle event data
     double eventMean = *(double *) event;
-    double eventNoise = *(double *) (event + sizeof(double)); // aaah pointers
+    double eventNoise = *(double *) ((char *)event + sizeof(double)); // aaah pointers
 
     // make temp kmer
     char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
@@ -1422,6 +1424,10 @@ StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs) {
                                                                        cell_updateExpectations);
         stateMachine5_loadAsymmetric(sM5, hmmD);
         return (StateMachine *) sM5;
+    }
+    else {
+        st_uglyf("SENTINAL - getStateMachine5 --> something didn't work\n");
+        return 0;
     }
 }
 

@@ -276,7 +276,8 @@ Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_
     size_t elementSize = sizeof(inputSequence->elements);
     //void *elementSlice;
     //elementSlice = &(inputSequence->elements[start * elementSize]); // equivalent
-    void *elementSlice = inputSequence->elements + (start * elementSize);
+    //void *elementSlice = inputSequence->elements + (start * elementSize);
+    void *elementSlice = (char *)inputSequence->elements + (start * elementSize);
     Sequence* newSequence = sequence_construct(sliceLength, elementSlice, getFcn);
     return newSequence;
 }
@@ -324,7 +325,8 @@ int64_t sequence_correctSeqLength(int64_t length, SequenceType type) {
     }
     return 0;
 }
-
+// tiny changes
+// go here
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Cell calculations
@@ -630,7 +632,6 @@ static void diagonalCalculation(StateMachine *sM,
                                 void *extraArgs) {
     Diagonal diagonal = dpDiagonal->diagonal;
     int64_t xmy = diagonal_getMinXmy(diagonal); // get the smallest x - y coordinate
-    int64_t maxXmY = diagonal_getMaxXmy(diagonal);
 
     // work from smallest to largest
     while (xmy <= diagonal_getMaxXmy(diagonal)) {

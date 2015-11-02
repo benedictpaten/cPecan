@@ -561,8 +561,13 @@ int main(int argc, char *argv[]) {
         bool flipStrand1 = !pA->strand1, flipStrand2 = !pA->strand2;
         int64_t coordinateShift1 = (pA->strand1 ? pA->start1 : pA->end1);
         int64_t coordinateShift2 = (pA->strand2 ? pA->start2 : pA->end2);
+
+        // Make sequence objects, slice 'em up
         char *subSeqX = getSubSequence(seqX, pA->start1, pA->end1, pA->strand1);
         char *subSeqY = getSubSequence(seqY, pA->start2, pA->end2, pA->strand2);
+        Sequence *SsubSeqX = sequence_construct((pA->end1 - pA->start1), subSeqX, sequence_getBase);
+        Sequence *SsubSeqY = sequence_construct((pA->end2 - pA->start2), subSeqY, sequence_getBase);
+
         rebasePairwiseAlignmentCoordinates(&(pA->start1), &(pA->end1), &(pA->strand1), -coordinateShift1, flipStrand1);
         rebasePairwiseAlignmentCoordinates(&(pA->start2), &(pA->end2), &(pA->strand2), -coordinateShift2, flipStrand2);
         checkPairwiseAlignment(pA);
@@ -574,12 +579,12 @@ int main(int argc, char *argv[]) {
         stList *filteredAnchoredPairs = stList_filter2(anchorPairs, matchFn, seqs);
         if(expectationsFile != NULL) {
             st_logInfo("Computing expectations\n");
-            getExpectationsUsingAnchors(sM, hmmExpectations, subSeqX, subSeqY, filteredAnchoredPairs,
+            getExpectationsUsingAnchors(sM, hmmExpectations, SsubSeqX, SsubSeqY, filteredAnchoredPairs,
                                 pairwiseAlignmentBandingParameters, diagonalCalculationExpectations, 1, 1);
         }
         else {
             //Get posterior prob pairs
-            stList *alignedPairs = getAlignedPairsUsingAnchors(sM, subSeqX, subSeqY, filteredAnchoredPairs,
+            stList *alignedPairs = getAlignedPairsUsingAnchors(sM, SsubSeqX, SsubSeqY, filteredAnchoredPairs,
                                                                pairwiseAlignmentBandingParameters,
                                                                diagonalCalculationPosteriorMatchProbs,
                                                                1, 1);
