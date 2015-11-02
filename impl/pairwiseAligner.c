@@ -1051,12 +1051,14 @@ stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatM
         // change the path here to local lastz folder
         command =
                 stString_print(
-                        "/Users/Rand/projects/marginAlign/cPecan/sonLib-LASTONLY/bin/lastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s %s",
+                        "./cPecanLastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s %s",
+                        //"/Users/Rand/projects/marginAlign/cPecan/sonLib-LASTONLY/bin/lastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s %s",
                         tempFile1, tempFile2);
     } else {
         command =
                 stString_print(
-                        "echo '>b\n%s\n' | /Users/Rand/projects/marginAlign/cPecan/sonLib-LASTONLY/bin/lastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s",
+                        "echo '>b\n%s\n' | ./cPecanLastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s",
+                        //"echo '>b\n%s\n' | /Users/Rand/projects/marginAlign/cPecan/sonLib-LASTONLY/bin/lastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s",
                         sY, tempFile1);
     }
     FILE *fileHandle = popen(command, "r");
