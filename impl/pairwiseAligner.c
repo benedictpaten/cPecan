@@ -1053,13 +1053,11 @@ stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatM
         command =
                 stString_print(
                         "./cPecanLastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s %s",
-                        //"/Users/Rand/projects/marginAlign/cPecan/sonLib-LASTONLY/bin/lastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s %s",
                         tempFile1, tempFile2);
     } else {
         command =
                 stString_print(
                         "echo '>b\n%s\n' | ./cPecanLastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s",
-                        //"echo '>b\n%s\n' | /Users/Rand/projects/marginAlign/cPecan/sonLib-LASTONLY/bin/lastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s",
                         sY, tempFile1);
     }
     FILE *fileHandle = popen(command, "r");
@@ -1085,7 +1083,6 @@ stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatM
     free(command);
 
     stList_sort(alignedPairs, sortByXPlusYCoordinate); //Ensure the coordinates are increasing
-
     //Remove old files
     st_system("rm %s", tempFile1);
     free(tempFile1);

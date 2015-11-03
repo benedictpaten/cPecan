@@ -8,8 +8,8 @@ libTests = tests/*.c
 cPecanDependencies =  ${basicLibsDependencies}
 cPecanLibs = ${basicLibs}
 
-all : ${libPath}/cPecanLib.a ${binPath}/cPecanLibTests ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/signalAlign
-	#cd externalTools && make all
+all : ${libPath}/cPecanLib.a ${binPath}/cPecanLibTests ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/vanillaAlign
+	cd externalTools && make all
 	
 clean : 
 	rm -f ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/cPecanLibTests  ${libPath}/cPecanLib.a
@@ -21,8 +21,8 @@ test : all
 ${binPath}/cPecanRealign : cPecanRealign.c ${libPath}/cPecanLib.a ${cPecanDependencies} 
 	${cxx} ${cflags} -I inc -I${libPath} -o ${binPath}/cPecanRealign cPecanRealign.c ${libPath}/cPecanLib.a ${cPecanLibs}
 
-${binPath}/signalAlign : signalAlign.c ${libPath}/cPecanLib.a ${cPecanDependencies} 
-	${cxx} ${cflags} -I inc -I${libPath} -o ${binPath}/signalAlign signalAlign.c ${libPath}/cPecanLib.a ${cPecanLibs}
+${binPath}/vanillaAlign : vanillaAlign.c ${libPath}/cPecanLib.a ${cPecanDependencies} 
+	${cxx} ${cflags} -I inc -I${libPath} -o ${binPath}/vanillaAlign vanillaAlign.c ${libPath}/cPecanLib.a ${cPecanLibs}
 
 ${binPath}/cPecanEm : cPecanEm.py
 	cp cPecanEm.py ${binPath}/cPecanEm

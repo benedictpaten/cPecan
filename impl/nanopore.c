@@ -199,7 +199,7 @@ stList *nanopore_remapAnchorPairs(stList *blastPairs, int64_t *eventMap) {
         //           stIntTuple_construct2(stIntTuple_get(pair, 0), eventMap[stIntTuple_get(pair, 1)]));
         stList_append(mappedPairs,
                       stIntTuple_construct2(stIntTuple_get(pair, 0), eventMap[stIntTuple_get(pair, 1)]));
-        stIntTuple_destruct(pair);
+        //stIntTuple_destruct(pair);
     }
 
     return mappedPairs;

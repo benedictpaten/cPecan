@@ -208,8 +208,8 @@ stList *splitPairwiseAlignment(const struct PairwiseAlignment *pA, const int64_t
     return ret;
 }
 
-void rebasePairwiseAlignmentCoordinates(int64_t *start, int64_t *end, int64_t *strand, int64_t coordinateShift,
-bool flipStrand) {
+void rebasePairwiseAlignmentCoordinates(int64_t *start, int64_t *end, int64_t *strand,
+                                        int64_t coordinateShift, bool flipStrand) {
     *start += coordinateShift;
     *end += coordinateShift;
     if (flipStrand) {

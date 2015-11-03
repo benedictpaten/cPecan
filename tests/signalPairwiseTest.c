@@ -946,7 +946,7 @@ static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
                                                        diagonalCalculationPosteriorMatchProbs,
                                                        1, 1);
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
-    st_uglyf("there are %lld aligned pairs with banding\n", stList_length(alignedPairs));
+
 
     // for ch1_file1 template there should be this many aligned pairs with banding
     CuAssertTrue(testCase, stList_length(alignedPairs) == 1001);
@@ -957,7 +957,7 @@ static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
                                                           sequence_getKmer, sequence_getEvent,
                                                           diagonalCalculationPosteriorMatchProbs,
                                                           0, 0);
-    st_uglyf("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
+
     checkAlignedPairs(testCase, alignedPairs2, lX, lY);
     CuAssertTrue(testCase, stList_length(alignedPairs2) == 980);
 
@@ -1091,7 +1091,7 @@ static void test_echelon_getAlignedPairsWithBanding(CuTest *testCase) {
     CuAssertIntEquals(testCase, stList_length(alignedPairs2), 1026);
     st_logInfo("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
     checkAlignedPairsForEchelon(testCase, alignedPairs2, lX, lY);
-    
+
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
     nanopore_nanoporeReadDestruct(npRead);
