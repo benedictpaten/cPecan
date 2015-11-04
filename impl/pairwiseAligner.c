@@ -414,8 +414,8 @@ void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *t
     }
 }
 
-void cell_signal_updateBetaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
-                                void *extraArgs) {
+void cell_signal_updateBetaAndAlphaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP,
+                                        double tP, void *extraArgs) {
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
     VanillaHmm *hmmExpectations = ((void **) extraArgs)[1];
@@ -425,8 +425,11 @@ void cell_signal_updateBetaProb(double *fromCells, double *toCells, int64_t from
 
     // Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
-    // update
-    if (to == shortGapX) {
+    // update beta
+    if (from == match && to == shortGapX) {
+        hmmExpectations->baseContinuousHmm.baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, x, 0, p);
+    }
+    if (from == shortGapX && to == shortGapX) {
         hmmExpectations->baseContinuousHmm.baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, x, 0, p);
     }
 }

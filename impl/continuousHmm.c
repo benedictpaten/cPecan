@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "discreteHmm.h"
+#include "emissionMatrix.h"
 #include "stateMachine.h"
 #include "continuousHmm.h"
 
@@ -45,7 +46,7 @@ static HmmContinuous *hmmContinuous_constructEmpty(
 
     return hmmC;
 }
-
+///////////////////////////////////////////// Continuous Pair HMM /////////////////////////////////////////////////////
 Hmm *continuousPairHmm_constructEmpty(
         double pseudocount, int64_t stateNumber,
         int64_t symbolSetSize, StateMachineType type,
@@ -57,6 +58,9 @@ Hmm *continuousPairHmm_constructEmpty(
         double (*getKmerGapExpFcn)(Hmm *hmm, int64_t state, int64_t ki, int64_t ignore),
         int64_t (*getElementIndexFcn)(void *)) {
     // malloc
+    if (type != threeState) {
+        st_errAbort("ContinuousPair HMM construct: Wrong HMM type for this function got: %i", type);
+    }
     ContinuousPairHmm *cpHmm = st_malloc(sizeof(ContinuousPairHmm));
     cpHmm->baseContinuousHmm =  *hmmContinuous_constructEmpty(stateNumber, symbolSetSize, type,
                                                               addToTransitionExpFcn,
@@ -305,10 +309,15 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName) {
 
 }
 
+////////////////////////////////////////////////// Vanilla HMM ///////////////////////////////////////////////////////
 Hmm *vanillaHmm_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
                                void (*addToKmerBinExpFcn)(Hmm *hmm, int64_t bin, int64_t ignore, double p),
                                void (*setKmerBinFcn)(Hmm *hmm, int64_t bin, int64_t ignore, double p),
                                double (*getKmerBinExpFcn)(Hmm *hmm, int64_t bin, int64_t ignore)) {
+    if (type != vanilla) {
+        st_errAbort("Vanilla HMM construct: Wrong HMM type for this function got: %i", type);
+    }
+
     VanillaHmm *vHmm = st_malloc(sizeof(VanillaHmm));
 
     vHmm->baseContinuousHmm =  *hmmContinuous_constructEmpty(stateNumber, symbolSetSize, type,
@@ -319,8 +328,8 @@ Hmm *vanillaHmm_constructEmpty(double pseudocount, int64_t stateNumber, int64_t 
                                                              NULL,
                                                              NULL,
                                                              NULL);
-    vHmm->kmerSkipBins = st_malloc(30 * sizeof(double));
-    for (int64_t i = 0; i < 30; i++) {
+    vHmm->kmerSkipBins = st_malloc(60 * sizeof(double));
+    for (int64_t i = 0; i < 60; i++) {
         vHmm->kmerSkipBins[i] = pseudocount;
     }
     // make a variable to make life easier, add 1 because of the correlation param
@@ -353,17 +362,17 @@ double vanillaHmm_getKmerSkipBinExpectation(Hmm *hmm, int64_t bin, int64_t ignor
 // normalize/randomize
 void vanillaHmm_normalizeKmerSkipBins(Hmm *hmm) {
     double total = 0.0;
-    for (int64_t i = 0; i < 30; i++) {
+    for (int64_t i = 0; i < 60; i++) {
         total += hmm->getTransitionsExpFcn(hmm, i, 0);
     }
-    for (int64_t i = 0; i < 30; i++) {
+    for (int64_t i = 0; i < 60; i++) {
         double newProb = hmm->getTransitionsExpFcn(hmm, i, 0) / total;
         hmm->setTransitionFcn(hmm, i, 0, newProb);
     }
 }
 
 void vanillaHmm_randomizeKmerSkipBins(Hmm *hmm) {
-    for (int64_t i = 0; i < 30; i++) {
+    for (int64_t i = 0; i < 60; i++) {
         hmm->setTransitionFcn(hmm, i, 0, st_random());
     }
     vanillaHmm_normalizeKmerSkipBins(hmm);
@@ -385,8 +394,12 @@ void vanillaHmm_implantMatchModelsintoHmm(StateMachine *sM, Hmm *hmm) {
 
 // load into stateMachine
 void vanillaHmm_loadKmerSkipBinExpectations(StateMachine *sM, Hmm *hmm) {
+    if (hmm->type != vanilla) {
+        st_errAbort("you gave me the wrong type of HMM");
+    }
     StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *)sM; // might be able to make this vanilla/echelon agnostic
-    for (int64_t i = 0; i < 30; i++) {
+    // made this 60 so that it loads alpha and beta probs
+    for (int64_t i = 0; i < 60; i++) {
         sM3v->model.EMISSION_GAP_X_PROBS[i] = hmm->getTransitionsExpFcn(hmm, i, 0);
     }
 }
@@ -404,7 +417,7 @@ void vanillaHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
     /*
      * Format:
      * line 0: type \t stateNumber \t symbolSetSize \n
-     * line 1: skip bins \t likelihood \n
+     * line 1: skip bins (alpha and beta) \t likelihood \n
      * line 2: [correlation coeff] \t [match model .. \t]  \n
      * line 3: [correlation coeff] [extra event matchModel]
      * See emissions_signal_loadPoreModel for description of matchModel
@@ -419,7 +432,7 @@ void vanillaHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
 
 
     // Line 1 - write kmer skip bins to disk
-    for (int64_t i = 0; i < 30; i++) {
+    for (int64_t i = 0; i < 60; i++) {
         fprintf(fileHandle, "%f\t", vHmm->kmerSkipBins[i]); // kmer skip bins
     }
     fprintf(fileHandle, "%f\n", vHmm->baseContinuousHmm.baseHmm.likelihood); // likelihood, newline
@@ -440,6 +453,7 @@ void vanillaHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
 }
 
 Hmm *vanillaHmm_loadFromFile(const char *fileName) {
+
     // open file
     FILE *fH = fopen(fileName, "r");
 
@@ -478,11 +492,11 @@ Hmm *vanillaHmm_loadFromFile(const char *fileName) {
     tokens = stString_split(string);
 
     // check
-    if (stList_length(tokens) != 31) {
+    if (stList_length(tokens) != 61) {
         st_errAbort("Did not find the correct number of kmer skip bins and/or likelihood\n");
     }
     // load
-    for (int64_t i = 0; i < 30; i++) {
+    for (int64_t i = 0; i < 60; i++) {
         j = sscanf(stList_get(tokens, i), "%lf", &(vHmm->kmerSkipBins[i]));
         if (j != 1) {
             st_errAbort("Error parsing kmer skip bins from string %s\n", string);
@@ -545,4 +559,83 @@ Hmm *vanillaHmm_loadFromFile(const char *fileName) {
     fclose(fH);
 
     return (Hmm *)vHmm;
+}
+
+///////////////////////////////////////////////// CORE FUNCTIONS //////////////////////////////////////////////////////
+Hmm *hmmContinuous_loadSignalHmm(const char *fileName, StateMachineType type) {
+    assert((type == vanilla) || (type == threeState));
+    if (type == vanilla) {
+        Hmm *hmm = vanillaHmm_loadFromFile(fileName);
+        return hmm;
+    }
+    if (type == threeState) {
+        Hmm *hmm = continuousPairHmm_loadFromFile(fileName);
+        return hmm;
+    }
+    return 0;
+}
+
+void hmmContinuous_loadExpectations(StateMachine *sM, Hmm *hmm, StateMachineType type) {
+    assert((type == vanilla) || (type == threeState));
+    if (type == vanilla) {
+        vanillaHmm_loadKmerSkipBinExpectations(sM, hmm);
+    }
+    if (type == threeState) {
+        continuousPairHmm_loadTransitionsAndKmerGapProbs(sM, hmm);
+    }
+}
+
+void hmmContinuous_destruct(Hmm *hmm, StateMachineType type) {
+    assert((type == vanilla) || (type == threeState));
+    if (type == vanilla) {
+        vanillaHmm_destruct(hmm);
+    }
+    if (type == threeState) {
+        continuousPairHmm_destruct(hmm);
+    }
+}
+
+Hmm *hmmContinuous_getEmptyHmm(StateMachineType type) {
+    assert((type == vanilla) || (type == threeState));
+    if (type == vanilla) {
+        Hmm *hmm = vanillaHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, vanilla,
+                                              vanillaHmm_addToKmerSkipBinExpectation,
+                                              vanillaHmm_setKmerSkipBinExpectation,
+                                              vanillaHmm_getKmerSkipBinExpectation);
+        return hmm;
+    }
+    if (type == threeState) {
+        Hmm *hmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState,
+                                                    continuousPairHmm_addToTransitionsExpectation,
+                                                    continuousPairHmm_setTransitionExpectation,
+                                                    continuousPairHmm_getTransitionExpectation,
+                                                    continuousPairHmm_addToKmerGapExpectation,
+                                                    continuousPairHmm_setKmerGapExpectation,
+                                                    continuousPairHmm_getKmerGapExpectation,
+                                                    emissions_discrete_getKmerIndexFromKmer);
+        return hmm;
+    }
+    return 0;
+}
+
+void hmmContinuous_normalize(Hmm *hmm, StateMachineType type) {
+    assert((type == vanilla) || (type == threeState));
+    if (type == vanilla) {
+        vanillaHmm_normalizeKmerSkipBins(hmm);
+    }
+    if (type == threeState) {
+        continuousPairHmm_normalize(hmm);
+    }
+}
+
+void hmmContinuous_writeToFile(const char *outFile, Hmm *hmm, StateMachineType type) {
+    assert((type == vanilla) || (type == threeState));
+    FILE *fH = fopen(outFile, "w");
+    if (type == vanilla) {
+        vanillaHmm_writeToFile(hmm, fH);
+    }
+    if (type == threeState) {
+        continuousPairHmm_writeToFile(hmm, fH);
+    }
+    fclose(fH);
 }

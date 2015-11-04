@@ -1187,7 +1187,7 @@ static void test_vanillaHmm(CuTest *testCase) {
 
     // add some stuff to the kmer skip bins
     double dummyTotal = 0.0;
-    for (int64_t i = 0; i < 30; i++) {
+    for (int64_t i = 0; i < 60; i++) {
         double dummy = (hmm->symbolSetSize * hmm->stateNumber) + i;
         dummyTotal += dummy;
         hmm->setTransitionFcn(hmm, i, 0, dummy);
@@ -1213,7 +1213,7 @@ static void test_vanillaHmm(CuTest *testCase) {
     stFile_rmrf(tempFile);
 
     // check kmer skip bins
-    for (int64_t i = 0; i < 30; i++) {
+    for (int64_t i = 0; i < 60; i++) {
         double correctProb = (hmm->symbolSetSize * hmm->stateNumber) + i;
         double recievedProb = hmm->getTransitionsExpFcn(hmm, i, 0);
         CuAssertDblEquals(testCase, correctProb, recievedProb, 0.001);
@@ -1231,7 +1231,7 @@ static void test_vanillaHmm(CuTest *testCase) {
     vanillaHmm_normalizeKmerSkipBins(hmm);
 
     // Recheck
-    for (int64_t i = 0; i < 30; i++) {
+    for (int64_t i = 0; i < 60; i++) {
         double received = hmm->getTransitionsExpFcn(hmm, i, 0);
         double correct = ((hmm->symbolSetSize * hmm->stateNumber) + i) / dummyTotal;
         CuAssertDblEquals(testCase, received, correct, 0.001);

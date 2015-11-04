@@ -108,8 +108,9 @@ void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, i
 void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *toCells, int64_t from, int64_t to,
                                                     double eP, double tP, void *extraArgs);
 
-void cell_signal_updateBetaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
-                                void *extraArgs);
+void cell_signal_updateBetaAndAlphaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP,
+                                        double tP,
+                                        void *extraArgs);
 
 void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
                      void *sX, void *sY, int64_t lX, int64_t lY, PairwiseAlignmentParameters *p,

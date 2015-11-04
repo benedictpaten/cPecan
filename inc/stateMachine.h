@@ -153,7 +153,7 @@ typedef struct _StateMachine3vanilla {
     double DEFAULT_END_FROM_X_PROB; //0.19652425498269727;  // skip_prob
     double DEFAULT_END_FROM_Y_PROB; //0.013316862192910478; // stay_prob
 
-    double (*getKmerSkipProb)(StateMachine *sM, void *kmerList);
+    double (*getKmerSkipProb)(StateMachine *sM, void *kmerList, bool getAlpha);
     double (*getScaledMatchProbFcn)(const double *scaledEventModel, void *kmer, void *event);
     double (*getMatchProbFcn)(const double *eventModel, void *kmer, void *event);
 } StateMachine3Vanilla;
@@ -205,7 +205,7 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
 
 StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t parameterSetSize,
                                              void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
-                                             double (*xSkipProbFcn)(StateMachine *, void *),
+                                             double (*xSkipProbFcn)(StateMachine *, void *, bool),
                                              double (*scaledMatchProbFcn)(const double *, void *, void *),
                                              double (*matchProbFcn)(const double *, void *, void *),
                                              void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
@@ -258,6 +258,8 @@ double emissions_kmer_getGapProb(const double *emissionGapProbs, void *kmer);
 double emissions_kmer_getMatchProb(const double *emissionMatchProbs, void *x, void *y);
 
 int64_t emissions_signal_getKmerSkipBin(double *matchModel, void *kmers);
+
+double emissions_signal_getBetaOrAlphaSkipProb(StateMachine *sM, void *kmers, bool getAlpha);
 
 double emissions_signal_getKmerSkipProb(StateMachine *sM, void *kmers);
 

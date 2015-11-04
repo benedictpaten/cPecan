@@ -85,4 +85,16 @@ Hmm *vanillaHmm_loadFromFile(const char *fileName);
 
 void vanillaHmm_destruct(Hmm *hmm);
 
+Hmm *hmmContinuous_loadSignalHmm(const char *fileName, StateMachineType type);
+
+void hmmContinuous_loadExpectations(StateMachine *sM, Hmm *hmm, StateMachineType type);
+
+void hmmContinuous_destruct(Hmm *hmm, StateMachineType type);
+
+Hmm *hmmContinuous_getEmptyHmm(StateMachineType type);
+
+void hmmContinuous_normalize(Hmm *hmm, StateMachineType type);
+
+void hmmContinuous_writeToFile(const char *outFile, Hmm *hmm, StateMachineType type);
+
 #endif
