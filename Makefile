@@ -26,6 +26,7 @@ ${binPath}/vanillaAlign : vanillaAlign.c ${libPath}/cPecanLib.a ${cPecanDependen
 
 ${binPath}/trainModels : ${rootPath}scripts/trainModels.py
 	cp ${rootPath}scripts/trainModels.py ${binPath}/trainModels
+	cp ${rootPath}scripts/nanoporeLib.py ${sonLibRootPath}/nanoporeLib.py
 	chmod +x ${binPath}/trainModels
 
 ${binPath}/cPecanEm : cPecanEm.py

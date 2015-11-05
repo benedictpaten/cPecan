@@ -4,6 +4,7 @@
 #include "stateMachine.h"
 #include "nanopore.h"
 #include "continuousHmm.h"
+
 typedef enum _strand {
     template = 0,
     complement = 1
@@ -174,7 +175,7 @@ Hmm *performBaumWelchTrainingP(const char *model, const char *inputHmm, StateMac
         pLikelihood = hmm->likelihood;
         i++;
     }
-    fprintf(stderr, "\nvanillaAlign - finished iterations\n\n");
+    fprintf(stderr, "\nvanillaAlign - finished iterations\n");
 
     return hmm;
 }
@@ -301,7 +302,7 @@ int main(int argc, char *argv[]) {
 
     // get anchors
     stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(targetSeq, npRead->twoDread, p);
-
+    
     // EM training routine //
     if ((templateTrainedHmmFile != NULL) || (complementTrainedHmmFile != NULL)) {
         if (templateTrainedHmmFile != NULL) {
@@ -310,7 +311,7 @@ int main(int argc, char *argv[]) {
                                                                npRead->templateParams, npRead->templateEvents,
                                                                npRead->nbTemplateEvents, npRead->templateEventMap,
                                                                targetSeq, p, anchorPairs, iter);
-            fprintf(stderr, "vanillaAlign - writing hmm to file: %s\n", templateTrainedHmmFile);
+            fprintf(stderr, "vanillaAlign - writing hmm to file: %s\n\n", templateTrainedHmmFile);
             hmmContinuous_writeToFile(templateTrainedHmmFile, templateTrainedHmm, sMtype);
         }
         if (complementTrainedHmmFile != NULL) {
@@ -319,6 +320,7 @@ int main(int argc, char *argv[]) {
                                                                  npRead->complementParams, npRead->complementEvents,
                                                                  npRead->nbComplementEvents, npRead->complementEventMap,
                                                                  rc_targetSeq, p, anchorPairs, iter);
+            fprintf(stderr, "vanillaAlign - writing hmm to file: %s\n\n", complementTrainedHmmFile);
             hmmContinuous_writeToFile(complementTrainedHmmFile, complementTrainedHmm, sMtype);
         }
     } else {

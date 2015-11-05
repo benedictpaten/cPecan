@@ -43,6 +43,9 @@ def parse_args():
     parser.add_argument('--iterations', '-t', action='store', dest='iter',
                         required=False, type=str, default='50')
 
+    parser.add_argument('--strawMan', '-sm', action='store_true', dest='strawMan',
+                        required=False, default=False)
+
     args = parser.parse_args()
     return args
 
@@ -166,11 +169,12 @@ def cull_training_files(directory, training_amount):
     return training_files
 
 
-def doEM(in_fast5, reference, destination, strand="Template", bwa_index=None, in_hmm=None, iterations=50):
+def doEM(in_fast5, reference, destination, strawMan_flag, strand="Template", bwa_index=None, in_hmm=None, iterations=50):
     """
     :param in_fast5: path to the fast5 file
     :param reference: path to the reference sequence (fasta)
     :param strand, string, "Template" or "Complement"
+    :param strawMan_flag, set to True to use straw man model
     :param bwa_index: path to index files (no suffix)
     :param in_hmm: input hmm to continue training
     :param destination: place to put the trained hmm
@@ -202,6 +206,7 @@ def doEM(in_fast5, reference, destination, strand="Template", bwa_index=None, in
     command = "{bwaDir}bwa mem -x ont2d {index} {query}".format(bwaDir=bwa_dir, index=bwa_ref_index,
                                                                 query=temp_2d_read)
     # this is a small SAM file that comes from bwa
+    print("trainModels - mapping read from {inFile}".format(inFile=in_fast5), file=sys.stderr)
     aln = subprocess.check_output(command.split())
     aln = aln.split("\t") # split
 
@@ -215,7 +220,7 @@ def doEM(in_fast5, reference, destination, strand="Template", bwa_index=None, in
 
     # didn't map
     elif (aln[7] != "0") and (aln[7] != "16"):
-        print("trainModels - read didn't map", file=sys.stderr)
+        print("\n\ntrainModels - read didn't map", file=sys.stderr)
         return
 
     # EM training routine: now we can run the training, we run training on either the template or
@@ -234,22 +239,29 @@ def doEM(in_fast5, reference, destination, strand="Template", bwa_index=None, in
     if strand == "Complement":
         strand_flags = ["-z", "-c"]
 
-    print("\ntrainModels - starting B-W on file: {inFile}".format(inFile=in_fast5), end="\n", file=sys.stderr)
+    use_strawMan_model = ""
+    if strawMan_flag is True:
+        use_strawMan_model = "--s "
+
+    print("trainModels - starting B-W on file: {inFile}".format(inFile=in_fast5), end="\n", file=sys.stderr)
     # training commands
-    em_command_start = "{vanillaAlign} -r {ref} -q {npRead} {outHmmFlag} {outHmm} -i {iter}".format(
-        vanillaAlign=path_to_vanillaAlign, ref=temp_ref_seq, npRead=temp_np_read,
+    em_command_start = "{vanillaAlign} {straw}-r {ref} -q {npRead} {outHmmFlag} {outHmm} -i {iter}".format(
+        vanillaAlign=path_to_vanillaAlign, straw=use_strawMan_model, ref=temp_ref_seq, npRead=temp_np_read,
         outHmmFlag=strand_flags[1], outHmm=training_hmm, iter=iterations)
-    em_command_continue = "{vanillaAlign} -r {ref} -q {npRead} {inHmmFlag} {inHmm} {outHmmFlag} {outHmm} -i {iter}"\
-        .format(vanillaAlign=path_to_vanillaAlign, inHmmFlag=strand_flags[0], inHmm=in_hmm,
+    em_command_continue = \
+        "{vanillaAlign} {straw}-r {ref} -q {npRead} {inHmmFlag} {inHmm} {outHmmFlag} {outHmm} -i {iter}"\
+        .format(vanillaAlign=path_to_vanillaAlign, straw=use_strawMan_model, inHmmFlag=strand_flags[0], inHmm=in_hmm,
                 ref=temp_ref_seq, npRead=temp_np_read, outHmmFlag=strand_flags[1],
                 outHmm=training_hmm, iter=iterations)
 
     # if we are given an input HMM
     if in_hmm is None:
+        print("running command", em_command_start, end="\n")
         os.system(em_command_start)
 
     # if we're starting from scratch
     else:
+        print("running command", em_command_continue, end="\n")
         os.system(em_command_continue)
 
 
@@ -262,17 +274,18 @@ def main(args):
     Directory with training files: {files_dir}
     Training on {amount} bases.
     Using reference sequence: {ref}
-    Was given hmm {inHmm} to start with.
+    Input hmm: {inHmm}
     Writing trained hmm to: {outLoc}
     Training on strand: {strand}
     Performing {iterations} iterations.
+    Using strawMan model: {straw}
     \n
     """.format(files_dir=args.files_dir, amount=args.amount, ref=args.ref, inHmm=args.inHmm,
-               outLoc=args.out, strand=args.strand, iterations=args.iter)
+               outLoc=args.out, strand=args.strand, iterations=args.iter, straw=args.strawMan)
     print(start_message, file=sys.stderr)
 
     # make directory to put temporary files
-    temp_dir = args.out + "tempFiles_{strand}/".format(srand=args.strand)
+    temp_dir = args.out + "tempFiles_{strand}/".format(strand=args.strand)
     # make the temp directory, if needed
     if not os.path.isdir(temp_dir):
         os.system("mkdir {dir}".format(dir=temp_dir))
@@ -280,9 +293,11 @@ def main(args):
     # index the reference for bwa, if needed
     bwa_ref_index = ''
     if args.bwa_index is None:
+        print("trainModels - indexing reference", file=sys.stderr)
         bwa = Bwa(args.ref)
         bwa.build_index(temp_dir)
         bwa_ref_index = temp_dir + "temp_bwaIndex"
+        print("trainModels - indexing reference, done\n", file=sys.stderr)
     else:
         bwa_ref_index = args.bwa_index
 
@@ -295,18 +310,18 @@ def main(args):
     if args.inHmm is None:
         get_started_file = training_file_list.pop()
         doEM(in_fast5=get_started_file, reference=args.ref, strand=args.strand, bwa_index=bwa_ref_index,
-             in_hmm=None, destination=args.out, iterations=args.iter)
+             in_hmm=None, destination=args.out, iterations=args.iter, strawMan_flag=args.strawMan)
 
     # otherwise train with the input hmm on one file
     if args.inHmm is not None:
         get_started_file = training_file_list.pop()
         doEM(in_fast5=get_started_file, reference=args.ref, strand=args.strand, bwa_index=bwa_ref_index,
-             in_hmm=args.inHmm, destination=args.out, iterations=args.iter)
+             in_hmm=args.inHmm, destination=args.out, iterations=args.iter, strawMan_flag=args.strawMan)
 
     # train on the rest of the files
     for training_file in training_file_list:
         doEM(in_fast5=training_file, reference=args.ref, strand=args.strand, bwa_index=bwa_ref_index,
-             in_hmm=training_hmm, destination=args.out, iterations=args.iter)
+             in_hmm=training_hmm, destination=args.out, iterations=args.iter, strawMan_flag=args.strawMan)
 
     print("\nFinished Training routine, exiting.\n", file=sys.stderr)
 
