@@ -215,7 +215,7 @@ def doEM(in_fast5, reference, destination, strand="Template", bwa_index=None, in
 
     # didn't map
     elif (aln[7] != "0") and (aln[7] != "16"):
-        print("read didn't map", file=sys.stderr)
+        print("trainModels - read didn't map", file=sys.stderr)
         return
 
     # EM training routine: now we can run the training, we run training on either the template or
@@ -257,8 +257,22 @@ def main(args):
     # parse command line arguments
     args = parse_args()
 
+    start_message = """\n
+    Starting Baum-Welch training.
+    Directory with training files: {files_dir}
+    Training on {amount} bases.
+    Using reference sequence: {ref}
+    Was given hmm {inHmm} to start with.
+    Writing trained hmm to: {outLoc}
+    Training on strand: {strand}
+    Performing {iterations} iterations.
+    \n
+    """.format(files_dir=args.files_dir, amount=args.amount, ref=args.ref, inHmm=args.inHmm,
+               outLoc=args.out, strand=args.strand, iterations=args.iter)
+    print(start_message, file=sys.stderr)
+
     # make directory to put temporary files
-    temp_dir = args.out + "tempFiles/"
+    temp_dir = args.out + "tempFiles_{strand}/".format(srand=args.strand)
     # make the temp directory, if needed
     if not os.path.isdir(temp_dir):
         os.system("mkdir {dir}".format(dir=temp_dir))
@@ -278,12 +292,12 @@ def main(args):
     training_hmm = args.out + "{strand}_trained.hmm".format(strand=args.strand)
 
     # get started. if there is no input training hmm, then we start from scratch, and train on one file
-    # othewise train with the input hmm on one file
     if args.inHmm is None:
         get_started_file = training_file_list.pop()
         doEM(in_fast5=get_started_file, reference=args.ref, strand=args.strand, bwa_index=bwa_ref_index,
              in_hmm=None, destination=args.out, iterations=args.iter)
 
+    # otherwise train with the input hmm on one file
     if args.inHmm is not None:
         get_started_file = training_file_list.pop()
         doEM(in_fast5=get_started_file, reference=args.ref, strand=args.strand, bwa_index=bwa_ref_index,
@@ -293,6 +307,8 @@ def main(args):
     for training_file in training_file_list:
         doEM(in_fast5=training_file, reference=args.ref, strand=args.strand, bwa_index=bwa_ref_index,
              in_hmm=training_hmm, destination=args.out, iterations=args.iter)
+
+    print("\nFinished Training routine, exiting.\n", file=sys.stderr)
 
 
 if __name__ == "__main__":

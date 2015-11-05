@@ -310,6 +310,7 @@ int main(int argc, char *argv[]) {
                                                                npRead->templateParams, npRead->templateEvents,
                                                                npRead->nbTemplateEvents, npRead->templateEventMap,
                                                                targetSeq, p, anchorPairs, iter);
+            fprintf(stderr, "vanillaAlign - writing hmm to file: %s\n", templateTrainedHmmFile);
             hmmContinuous_writeToFile(templateTrainedHmmFile, templateTrainedHmm, sMtype);
         }
         if (complementTrainedHmmFile != NULL) {
