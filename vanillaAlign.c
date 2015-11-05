@@ -302,7 +302,7 @@ int main(int argc, char *argv[]) {
 
     // get anchors
     stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(targetSeq, npRead->twoDread, p);
-    
+
     // EM training routine //
     if ((templateTrainedHmmFile != NULL) || (complementTrainedHmmFile != NULL)) {
         if (templateTrainedHmmFile != NULL) {
@@ -335,8 +335,10 @@ int main(int argc, char *argv[]) {
                                                                 npRead->nbComplementEvents, npRead->complementEventMap,
                                                                 rc_targetSeq, p, anchorPairs);
         if (posteriorProbsFile != NULL) {
-            fprintf(stderr, "vanillaAlign - writing %lld template aligned pairs", stList_length(templateAlignedPairs));
-            fprintf(stderr, "vanillaAlign - writing %lld complement aligned pairs\n", stList_length(complementAlignedPairs));
+            fprintf(stderr, "vanillaAlign - writing %lld template aligned pairs\n",
+                    stList_length(templateAlignedPairs));
+            fprintf(stderr, "vanillaAlign - writing %lld complement aligned pairs\n",
+                    stList_length(complementAlignedPairs));
             writePosteriorProbs(posteriorProbsFile, templateAlignedPairs, template);
             writePosteriorProbs(posteriorProbsFile, complementAlignedPairs, complement);
         }

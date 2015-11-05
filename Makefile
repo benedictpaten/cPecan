@@ -8,7 +8,7 @@ libTests = tests/*.c
 cPecanDependencies =  ${basicLibsDependencies}
 cPecanLibs = ${basicLibs}
 
-all : ${libPath}/cPecanLib.a ${binPath}/cPecanLibTests ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/vanillaAlign ${binPath}/trainModels
+all : ${libPath}/cPecanLib.a ${binPath}/cPecanLibTests ${binPath}/vanillaAlign ${binPath}/trainModels ${binPath}/signalAlign ${sonLibrootPath}/nanoporelib.py
 	#cd externalTools && make all
 	
 clean : 
@@ -26,8 +26,15 @@ ${binPath}/vanillaAlign : vanillaAlign.c ${libPath}/cPecanLib.a ${cPecanDependen
 
 ${binPath}/trainModels : ${rootPath}scripts/trainModels.py
 	cp ${rootPath}scripts/trainModels.py ${binPath}/trainModels
-	cp ${rootPath}scripts/nanoporeLib.py ${sonLibRootPath}/nanoporeLib.py
+	#cp ${rootPath}scripts/nanoporeLib.py ${sonLibRootPath}/nanoporeLib.py
 	chmod +x ${binPath}/trainModels
+	
+${binPath}/signalAlign : ${rootPath}scripts/signalAlign.py
+	cp ${rootPath}scripts/signalAlign.py ${binPath}/signalAlign
+	chmod +x ${binPath}/signalAlign
+
+${sonLibrootPath}/nanoporelib.py : ${rootPath}scripts/nanoporeLib.py
+	cp ${rootPath}scripts/nanoporeLib.py ${sonLibRootPath}/nanoporeLib.py
 
 ${binPath}/cPecanEm : cPecanEm.py
 	cp cPecanEm.py ${binPath}/cPecanEm

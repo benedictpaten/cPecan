@@ -9,7 +9,7 @@ import sys
 sys.path.append("../")
 from serviceCourse.parsers import read_fasta
 from serviceCourse.sequenceTools import reverse_complement
-from nanoporeLib import NanoporeRead, NanoporeModel
+from nanoporeLib import *
 from argparse import ArgumentParser
 from random import shuffle
 
@@ -50,97 +50,6 @@ def parse_args():
     return args
 
 
-def make_temp_npRead(fast5, npRead_dest, twod_read_dest):
-    """process a MinION .fast5 file into a npRead file for use with signalAlign also extracts
-    the 2D read into fasta format
-    """
-    # setup
-    out_file = open(npRead_dest, 'w')
-    temp_fasta = open(twod_read_dest, "w")
-
-    # load and transform
-    npRead = NanoporeRead(fast5)
-    npRead.get_2D_event_map()
-    npRead.transform_events(npRead.template_events, npRead.template_drift)
-    npRead.transform_events(npRead.complement_events, npRead.complement_drift)
-
-    # output
-
-    # line 1
-    print(len(npRead.twoD_read_sequence), end=' ', file=out_file) # 2D read length
-    print(len(npRead.template_events), end=' ', file=out_file)    # nb of template events
-    print(len(npRead.complement_events), end=' ', file=out_file)  # nb of complement events
-    print(npRead.template_scale, end=' ', file=out_file)          # template scale
-    print(npRead.template_shift, end=' ', file=out_file)          # template shift
-    print(npRead.template_var, end=' ', file=out_file)            # template var
-    print(npRead.template_scale_sd, end=' ', file=out_file)       # template scale_sd
-    print(npRead.template_var_sd, end=' ', file=out_file)         # template var_sd
-    print(npRead.complement_scale, end=' ', file=out_file)        # complement scale
-    print(npRead.complement_shift, end=' ', file=out_file)        # complement shift
-    print(npRead.complement_var, end=' ', file=out_file)          # complement var
-    print(npRead.complement_scale_sd, end=' ', file=out_file)     # complement scale_sd
-    print(npRead.complement_var_sd, end='\n', file=out_file)      # complement var_sd
-
-    # line 2
-    print(npRead.twoD_read_sequence, end='\n', file=out_file)
-
-    # line 3
-    for _ in npRead.template_event_map:
-        print(_, end=' ', file=out_file)
-    print("", end="\n", file=out_file)
-
-    # line 4
-    for mean, start, stdev, length in npRead.template_events:
-        print(mean, stdev, length, sep=' ', end=' ', file=out_file)
-    print("", end="\n", file=out_file)
-
-    # line 5
-    for _ in npRead.complement_event_map:
-        print(_, end=' ', file=out_file)
-    print("", end="\n", file=out_file)
-
-    # line 6
-    for mean, start, stdev, length in npRead.complement_events:
-        print(mean, stdev, length, sep=' ', end=' ', file=out_file)
-    print("", end="\n", file=out_file)
-
-    # make temp read
-    npRead.extract_2d_read(temp_fasta)
-    npRead.close()
-    return
-
-
-def make_temp_sequence(fasta, forward, destination):
-    """extract the sequence from a fasta and put into a simple file that is used by signalAlign
-    """
-    out_file = open(destination, "w")
-    for header, comment, sequence in read_fasta(fasta):
-        if forward is False:
-            sequence = reverse_complement(sequence)
-        print(sequence, end='\n', file=out_file)
-
-
-class Bwa(object):
-    """run BWA easily
-    """
-    def __init__(self, target):
-        self.target = target
-        self.bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"
-        self.db_handle = ''
-
-    def build_index(self, destination):
-        # make a place to put the database
-        path_to_bwa_index = destination
-
-        # build database
-        self.db_handle = path_to_bwa_index + '/temp_bwaIndex'
-        os.system("{0}bwa index -p {1} {2}".format(self.bwa_dir, self.db_handle, self.target))
-
-    def run(self, query):
-        # run alignment
-        os.system("{0}bwa mem -x ont2d {1} {2}".format(self.bwa_dir, self.db_handle, query))
-
-
 def get_2d_length(fast5):
     read = h5.File(fast5, 'r')
     read_length = 0
@@ -154,7 +63,9 @@ def get_2d_length(fast5):
         read.close()
         return read_length
 
+
 def cull_training_files(directory, training_amount):
+    print("trainModels - culling training files.  ", end="", file=sys.stderr)
     fast5s = [x for x in os.listdir(directory) if x.endswith(".fast5")]
     shuffle(fast5s)
     training_files = []
@@ -165,6 +76,8 @@ def cull_training_files(directory, training_amount):
         total_amount += get_2d_length(directory+fast5s[i])
         if total_amount >= training_amount:
             break
+    print("Culled {nb_files} training files.".format(nb_files=len(training_files)),
+          end="\n", file=sys.stderr)
 
     return training_files
 
@@ -185,13 +98,13 @@ def doEM(in_fast5, reference, destination, strawMan_flag, strand="Template", bwa
     # it align to the reference as it is in the fastA or to the reverse complement
 
     # containers and defaults
-    temp_dir = destination + "tempFiles/"
+    temp_dir = destination + "tempFiles_{strand}/".format(strand=strand)
     # make the temp directory, if needed
     if not os.path.isdir(temp_dir):
         os.system("mkdir {dir}".format(dir=temp_dir))
     temp_np_read = temp_dir + "temp_nanoporeRead.npRead"
     temp_2d_read = temp_dir + "temp_2d_read.fa"
-    make_temp_npRead(in_fast5, temp_np_read, temp_2d_read)
+    make_npRead_and_2d_seq(in_fast5, temp_np_read, temp_2d_read)
 
     # if there is no bwa index given, make one
     if bwa_index is None:
@@ -202,33 +115,36 @@ def doEM(in_fast5, reference, destination, strawMan_flag, strand="Template", bwa
         bwa_ref_index = bwa_index
 
     # align with bwa
-    bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"  # todo require bwa in path remove this
-    command = "{bwaDir}bwa mem -x ont2d {index} {query}".format(bwaDir=bwa_dir, index=bwa_ref_index,
-                                                                query=temp_2d_read)
+    #bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"  # todo require bwa in path remove this
+    #command = "{bwaDir}bwa mem -x ont2d {index} {query}".format(bwaDir=bwa_dir, index=bwa_ref_index,
+    #                                                            query=temp_2d_read)
     # this is a small SAM file that comes from bwa
-    print("trainModels - mapping read from {inFile}".format(inFile=in_fast5), file=sys.stderr)
-    aln = subprocess.check_output(command.split())
-    aln = aln.split("\t") # split
+    #print("trainModels - mapping read from {inFile}".format(inFile=in_fast5), file=sys.stderr)
+    #aln = subprocess.check_output(command.split())
+    #aln = aln.split("\t") # split
+
+    # migrated function outside
+    orientation = orient_read_with_bwa(bwa_index=bwa_ref_index, query=temp_2d_read)
 
     # forward strand
-    if aln[7] == "0":
+    if orientation == 0:
         forward = True
 
     # backward strand
-    if aln[7] == "16":
+    if orientation == 16:
         forward = False
 
     # didn't map
-    elif (aln[7] != "0") and (aln[7] != "16"):
+    elif (orientation != 0) and (orientation != 16):
         print("\n\ntrainModels - read didn't map", file=sys.stderr)
-        return
+        return  # todo double check if this works correctly
 
     # EM training routine: now we can run the training, we run training on either the template or
     # complement, so that we can run this program in parallel and really do both at once
 
     # containers and defaults
     temp_ref_seq = temp_dir + "temp_ref_seq.txt"
-    path_to_vanillaAlign = "./vanillaAlign"  # todo could also require sonlib/bin in path
+    path_to_vanillaAlign = "./vanillaAlign"
     strand_flags = ["-y", "-t"]
     training_hmm = destination + "{strand}_trained.hmm".format(strand=strand)
 
@@ -256,12 +172,12 @@ def doEM(in_fast5, reference, destination, strawMan_flag, strand="Template", bwa
 
     # if we are given an input HMM
     if in_hmm is None:
-        print("running command", em_command_start, end="\n")
+        print("trainModels - running command", em_command_start, end="\n", file=sys.stderr)
         os.system(em_command_start)
 
     # if we're starting from scratch
     else:
-        print("running command", em_command_continue, end="\n")
+        print("trainModels - running command", em_command_continue, end="\n", file=sys.stderr)
         os.system(em_command_continue)
 
 
@@ -294,9 +210,7 @@ def main(args):
     bwa_ref_index = ''
     if args.bwa_index is None:
         print("trainModels - indexing reference", file=sys.stderr)
-        bwa = Bwa(args.ref)
-        bwa.build_index(temp_dir)
-        bwa_ref_index = temp_dir + "temp_bwaIndex"
+        bwa_ref_index = get_bwa_index(args.ref, temp_dir)
         print("trainModels - indexing reference, done\n", file=sys.stderr)
     else:
         bwa_ref_index = args.bwa_index

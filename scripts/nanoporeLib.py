@@ -5,6 +5,10 @@
 from __future__ import print_function
 from numpy import log2, power
 from itertools import islice, izip
+import subprocess
+from serviceCourse.sequenceTools import reverse_complement
+from serviceCourse.parsers import read_fasta
+import os
 import h5py
 import sys
 
@@ -14,6 +18,115 @@ def kmer_iterator(dna, k):
         kmer = dna[i:(i+k)]
         if len(kmer) == k:
             yield kmer
+
+
+def orient_read_with_bwa(bwa_index, query):
+    # align with bwa
+    bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"  # todo require bwa in path remove this
+    command = "{bwaDir}bwa mem -x ont2d {index} {query}".format(bwaDir=bwa_dir, index=bwa_index,
+                                                                query=query)
+    # this is a small SAM file that comes from bwa
+    aln = subprocess.check_output(command.split())
+    aln = aln.split("\t") # split
+
+    return int(aln[7])
+
+def get_bwa_index(reference, dest):
+    bwa = Bwa(reference)
+    bwa.build_index(dest)
+    bwa_ref_index = dest + "temp_bwaIndex"
+    return bwa_ref_index
+
+
+def make_npRead_and_2d_seq(fast5, npRead_dest, twod_read_dest):
+    """process a MinION .fast5 file into a npRead file for use with signalAlign also extracts
+    the 2D read into fasta format
+    """
+    # setup
+    out_file = open(npRead_dest, 'w')
+    temp_fasta = open(twod_read_dest, "w")
+
+    # load and transform
+    npRead = NanoporeRead(fast5)
+    npRead.get_2D_event_map()
+    npRead.transform_events(npRead.template_events, npRead.template_drift)
+    npRead.transform_events(npRead.complement_events, npRead.complement_drift)
+
+    # output
+
+    # line 1
+    print(len(npRead.twoD_read_sequence), end=' ', file=out_file) # 2D read length
+    print(len(npRead.template_events), end=' ', file=out_file)    # nb of template events
+    print(len(npRead.complement_events), end=' ', file=out_file)  # nb of complement events
+    print(npRead.template_scale, end=' ', file=out_file)          # template scale
+    print(npRead.template_shift, end=' ', file=out_file)          # template shift
+    print(npRead.template_var, end=' ', file=out_file)            # template var
+    print(npRead.template_scale_sd, end=' ', file=out_file)       # template scale_sd
+    print(npRead.template_var_sd, end=' ', file=out_file)         # template var_sd
+    print(npRead.complement_scale, end=' ', file=out_file)        # complement scale
+    print(npRead.complement_shift, end=' ', file=out_file)        # complement shift
+    print(npRead.complement_var, end=' ', file=out_file)          # complement var
+    print(npRead.complement_scale_sd, end=' ', file=out_file)     # complement scale_sd
+    print(npRead.complement_var_sd, end='\n', file=out_file)      # complement var_sd
+
+    # line 2
+    print(npRead.twoD_read_sequence, end='\n', file=out_file)
+
+    # line 3
+    for _ in npRead.template_event_map:
+        print(_, end=' ', file=out_file)
+    print("", end="\n", file=out_file)
+
+    # line 4
+    for mean, start, stdev, length in npRead.template_events:
+        print(mean, stdev, length, sep=' ', end=' ', file=out_file)
+    print("", end="\n", file=out_file)
+
+    # line 5
+    for _ in npRead.complement_event_map:
+        print(_, end=' ', file=out_file)
+    print("", end="\n", file=out_file)
+
+    # line 6
+    for mean, start, stdev, length in npRead.complement_events:
+        print(mean, stdev, length, sep=' ', end=' ', file=out_file)
+    print("", end="\n", file=out_file)
+
+    # make temp read
+    npRead.extract_2d_read(temp_fasta)
+    npRead.close()
+    return
+
+
+def make_temp_sequence(fasta, forward, destination):
+    """extract the sequence from a fasta and put into a simple file that is used by signalAlign
+    """
+    out_file = open(destination, "w")
+    for header, comment, sequence in read_fasta(fasta):
+        if forward is False:
+            sequence = reverse_complement(sequence)
+        print(sequence, end='\n', file=out_file)
+
+
+class Bwa(object):
+    """run BWA easily
+    """
+    def __init__(self, target):
+        self.target = target
+        self.bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"
+        self.db_handle = ''
+
+    def build_index(self, destination):
+        # make a place to put the database
+        path_to_bwa_index = destination
+
+        # build database
+        self.db_handle = path_to_bwa_index + '/temp_bwaIndex'
+        os.system("{0}bwa index -p {1} {2}".format(self.bwa_dir, self.db_handle, self.target))
+
+    def run(self, query):
+        # run alignment
+        os.system("{0}bwa mem -x ont2d {1} {2}".format(self.bwa_dir, self.db_handle, query))
 
 
 def get_proceding_kmers(kmer, alphabet="ACGT"):
