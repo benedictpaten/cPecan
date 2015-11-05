@@ -197,6 +197,8 @@ int main(int argc, char *argv[]) {
     StateMachineType sMtype = vanilla;
     int64_t j;
     int64_t iter = 0;
+    char *templateModelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    char *complementModelFile = stString_print("../../cPecan/models/complement_median68pA_pop2.model");
     char *npReadFile = NULL;
     char *targetFile = NULL;
     char *posteriorProbsFile = NULL;
@@ -210,6 +212,8 @@ int main(int argc, char *argv[]) {
         static struct option long_options[] = {
                 {"help",                    no_argument,        0,  'h'},
                 {"strawMan",                no_argument,        0,  's'},
+                {"templateModel",           required_argument,  0,  'T'},
+                {"complementModel",         required_argument,  0,  'C'},
                 {"npRead",                  required_argument,  0,  'q'},
                 {"target",                  required_argument,  0,  'r'},
                 {"posteriors",              required_argument,  0,  'u'},
@@ -222,7 +226,7 @@ int main(int argc, char *argv[]) {
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:s:q:r:u:y:z:t:c:i:", long_options, &option_index);
+        key = getopt_long(argc, argv, "h:s:T:C:q:r:u:y:z:t:c:i:", long_options, &option_index);
 
         if (key == -1) {
             //usage();
@@ -234,6 +238,12 @@ int main(int argc, char *argv[]) {
                 return 0;
             case 's':
                 sMtype = threeState;
+                break;
+            case 'T':
+                templateModelFile = stString_copy(optarg);
+                break;
+            case 'C':
+                complementModelFile = stString_copy(optarg);
                 break;
             case 'q':
                 npReadFile = stString_copy(optarg);
@@ -289,25 +299,24 @@ int main(int argc, char *argv[]) {
     // get anchors
     stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(targetSeq, npRead->twoDread, p);
 
-    char *templateModelFile = stString_print("../../cPecan/models/template_median68pA.model");
-    char *complementModelFile = stString_print("../../cPecan/models/complement_median68pA_pop2.model");
-
     // EM training routine //
-    if (templateTrainedHmmFile != NULL) {
-        st_uglyf("starting training for template hmm\n");
-        Hmm *templateTrainedHmm = performBaumWelchTraining(templateModelFile, templateHmmFile, sMtype,
-                                                           npRead->templateParams, npRead->templateEvents,
-                                                           npRead->nbTemplateEvents, npRead->templateEventMap,
-                                                           targetSeq, p, anchorPairs, iter);
-        hmmContinuous_writeToFile(templateTrainedHmmFile, templateTrainedHmm, sMtype);
-    }
-    if (complementTrainedHmmFile != NULL) {
-        st_uglyf("starting training for complement hmm\n");
-        Hmm *complementTrainedHmm = performBaumWelchTraining(complementModelFile, complementHmmFile, sMtype,
-                                                             npRead->complementParams, npRead->complementEvents,
-                                                             npRead->nbComplementEvents, npRead->complementEventMap,
-                                                             rc_targetSeq, p, anchorPairs, iter);
-        hmmContinuous_writeToFile(complementTrainedHmmFile, complementTrainedHmm, sMtype);
+    if ((templateTrainedHmmFile != NULL) || (complementTrainedHmmFile != NULL)) {
+        if (templateTrainedHmmFile != NULL) {
+            st_uglyf("starting training for template hmm\n");
+            Hmm *templateTrainedHmm = performBaumWelchTraining(templateModelFile, templateHmmFile, sMtype,
+                                                               npRead->templateParams, npRead->templateEvents,
+                                                               npRead->nbTemplateEvents, npRead->templateEventMap,
+                                                               targetSeq, p, anchorPairs, iter);
+            hmmContinuous_writeToFile(templateTrainedHmmFile, templateTrainedHmm, sMtype);
+        }
+        if (complementTrainedHmmFile != NULL) {
+            st_uglyf("starting training for complement hmm\n");
+            Hmm *complementTrainedHmm = performBaumWelchTraining(complementModelFile, complementHmmFile, sMtype,
+                                                                 npRead->complementParams, npRead->complementEvents,
+                                                                 npRead->nbComplementEvents, npRead->complementEventMap,
+                                                                 rc_targetSeq, p, anchorPairs, iter);
+            hmmContinuous_writeToFile(complementTrainedHmmFile, complementTrainedHmm, sMtype);
+        }
     } else {
         st_uglyf("starting alignment\n");
         stList *templateAlignedPairs = performSignalAlignment(templateModelFile, templateHmmFile, sMtype,

@@ -35,6 +35,7 @@ class NanoporeRead(object):
         #self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
         if twoD_read_sequence_address in self.fastFive:
             self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
+            self.twoD_id = self.fastFive[twoD_read_sequence_address][()].split()[0:2][0][1:]
 
         # get the 2D alignment table
         twoD_alignment_table_address = "/Analyses/Basecall_2D_000/BaseCalled_2D/Alignment"
@@ -207,6 +208,10 @@ class NanoporeRead(object):
             delta_time = event[1] - start_time
             event[0] -= (delta_time * drift)
         return
+
+    def extract_2d_read(self, destination):
+        print(">", self.twoD_id, sep="", end="\n", file=destination)
+        print(self.twoD_read_sequence, end="\n", file=destination)
 
     def close(self):
         self.fastFive.close()

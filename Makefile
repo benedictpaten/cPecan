@@ -8,7 +8,7 @@ libTests = tests/*.c
 cPecanDependencies =  ${basicLibsDependencies}
 cPecanLibs = ${basicLibs}
 
-all : ${libPath}/cPecanLib.a ${binPath}/cPecanLibTests ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/vanillaAlign
+all : ${libPath}/cPecanLib.a ${binPath}/cPecanLibTests ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/vanillaAlign ${binPath}/trainModels
 	#cd externalTools && make all
 	
 clean : 
@@ -23,6 +23,10 @@ ${binPath}/cPecanRealign : cPecanRealign.c ${libPath}/cPecanLib.a ${cPecanDepend
 
 ${binPath}/vanillaAlign : vanillaAlign.c ${libPath}/cPecanLib.a ${cPecanDependencies} 
 	${cxx} ${cflags} -I inc -I${libPath} -o ${binPath}/vanillaAlign vanillaAlign.c ${libPath}/cPecanLib.a ${cPecanLibs}
+
+${binPath}/trainModels : ${rootPath}scripts/trainModels.py
+	cp ${rootPath}scripts/trainModels.py ${binPath}/trainModels
+	chmod +x ${binPath}/trainModels
 
 ${binPath}/cPecanEm : cPecanEm.py
 	cp cPecanEm.py ${binPath}/cPecanEm

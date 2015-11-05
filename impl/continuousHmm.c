@@ -598,14 +598,14 @@ void hmmContinuous_destruct(Hmm *hmm, StateMachineType type) {
 Hmm *hmmContinuous_getEmptyHmm(StateMachineType type) {
     assert((type == vanilla) || (type == threeState));
     if (type == vanilla) {
-        Hmm *hmm = vanillaHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, vanilla,
-                                              vanillaHmm_addToKmerSkipBinExpectation,
-                                              vanillaHmm_setKmerSkipBinExpectation,
-                                              vanillaHmm_getKmerSkipBinExpectation);
+        Hmm *hmm = vanillaHmm_constructEmpty(0.000000000001, 3, NUM_OF_KMERS, vanilla,
+                                             vanillaHmm_addToKmerSkipBinExpectation,
+                                             vanillaHmm_setKmerSkipBinExpectation,
+                                             vanillaHmm_getKmerSkipBinExpectation);
         return hmm;
     }
     if (type == threeState) {
-        Hmm *hmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState,
+        Hmm *hmm = continuousPairHmm_constructEmpty(0.000000000001, 3, NUM_OF_KMERS, threeState,
                                                     continuousPairHmm_addToTransitionsExpectation,
                                                     continuousPairHmm_setTransitionExpectation,
                                                     continuousPairHmm_getTransitionExpectation,
