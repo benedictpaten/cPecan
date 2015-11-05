@@ -123,7 +123,7 @@ Hmm *performBaumWelchTrainingP(const char *model, const char *inputHmm, StateMac
 
     // load HMM if given
     if (inputHmm != NULL) {
-        fprintf(stderr, "loading HMM from file, %s\n", inputHmm);
+        fprintf(stderr, "vanillaAlign - loading HMM from file, %s\n", inputHmm);
         loadHmmRoutine(inputHmm, sM, type);
     }
 
@@ -139,7 +139,8 @@ Hmm *performBaumWelchTrainingP(const char *model, const char *inputHmm, StateMac
     int64_t i = 0;
 
     // EM
-    st_uglyf("about to start EM, set to %lld iterations\n", iterations);
+    fprintf(stderr, "vanillaAlign - about to start EM, set to %lld iterations\n", iterations);
+    fprintf(stderr, "vanillaAlign - likelihoods:\n");
 
     while ((pLikelihood < hmm->likelihood) || i <= iterations) {
         hmmContinuous_destruct(hmm, type);
@@ -160,7 +161,7 @@ Hmm *performBaumWelchTrainingP(const char *model, const char *inputHmm, StateMac
         // normalize
         hmmContinuous_normalize(hmm, type);
 
-        st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", hmm->likelihood, i);
+        fprintf(stderr, "%f ", hmm->likelihood);
 
         // M Step
         hmmContinuous_loadExpectations(sM, hmm, type);
@@ -173,6 +174,8 @@ Hmm *performBaumWelchTrainingP(const char *model, const char *inputHmm, StateMac
         pLikelihood = hmm->likelihood;
         i++;
     }
+    fprintf(stderr, "\nvanillaAlign - finished iterations\n\n");
+
     return hmm;
 }
 
@@ -279,10 +282,10 @@ int main(int argc, char *argv[]) {
     }
 
     if (sMtype == threeState) {
-        st_uglyf("using strawMan model\n");
+        fprintf(stderr, "vanillaAlign - using strawMan model\n");
     }
     if (sMtype == vanilla) {
-        st_uglyf("using vanilla model\n");
+        fprintf(stderr, "vanillaAlign - using vanilla model\n");
     }
 
     // load target sequence (reference sequence)
@@ -302,7 +305,7 @@ int main(int argc, char *argv[]) {
     // EM training routine //
     if ((templateTrainedHmmFile != NULL) || (complementTrainedHmmFile != NULL)) {
         if (templateTrainedHmmFile != NULL) {
-            st_uglyf("starting training for template hmm\n");
+            fprintf(stderr, "vanillaAlign - starting training for template hmm\n");
             Hmm *templateTrainedHmm = performBaumWelchTraining(templateModelFile, templateHmmFile, sMtype,
                                                                npRead->templateParams, npRead->templateEvents,
                                                                npRead->nbTemplateEvents, npRead->templateEventMap,
@@ -310,7 +313,7 @@ int main(int argc, char *argv[]) {
             hmmContinuous_writeToFile(templateTrainedHmmFile, templateTrainedHmm, sMtype);
         }
         if (complementTrainedHmmFile != NULL) {
-            st_uglyf("starting training for complement hmm\n");
+            fprintf(stderr, "vanillaAlign - starting training for complement hmm\n");
             Hmm *complementTrainedHmm = performBaumWelchTraining(complementModelFile, complementHmmFile, sMtype,
                                                                  npRead->complementParams, npRead->complementEvents,
                                                                  npRead->nbComplementEvents, npRead->complementEventMap,
@@ -318,7 +321,7 @@ int main(int argc, char *argv[]) {
             hmmContinuous_writeToFile(complementTrainedHmmFile, complementTrainedHmm, sMtype);
         }
     } else {
-        st_uglyf("starting alignment\n");
+        fprintf(stderr, "vanillaAlign - starting alignment\n");
         stList *templateAlignedPairs = performSignalAlignment(templateModelFile, templateHmmFile, sMtype,
                                                               npRead->templateParams, npRead->templateEvents,
                                                               npRead->nbTemplateEvents, npRead->templateEventMap,
@@ -329,8 +332,8 @@ int main(int argc, char *argv[]) {
                                                                 npRead->nbComplementEvents, npRead->complementEventMap,
                                                                 rc_targetSeq, p, anchorPairs);
         if (posteriorProbsFile != NULL) {
-            st_uglyf("writing %lld template aligned pairs", stList_length(templateAlignedPairs));
-            st_uglyf(" writing %lld complement aligned pairs\n", stList_length(complementAlignedPairs));
+            fprintf(stderr, "vanillaAlign - writing %lld template aligned pairs", stList_length(templateAlignedPairs));
+            fprintf(stderr, "vanillaAlign - writing %lld complement aligned pairs\n", stList_length(complementAlignedPairs));
             writePosteriorProbs(posteriorProbsFile, templateAlignedPairs, template);
             writePosteriorProbs(posteriorProbsFile, complementAlignedPairs, complement);
         }

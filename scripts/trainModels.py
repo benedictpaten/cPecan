@@ -234,6 +234,7 @@ def doEM(in_fast5, reference, destination, strand="Template", bwa_index=None, in
     if strand == "Complement":
         strand_flags = ["-z", "-c"]
 
+    print("\ntrainModels - starting B-W on file: {inFile}".format(inFile=in_fast5), end="\n", file=sys.stderr)
     # training commands
     em_command_start = "{vanillaAlign} -r {ref} -q {npRead} {outHmmFlag} {outHmm} -i {iter}".format(
         vanillaAlign=path_to_vanillaAlign, ref=temp_ref_seq, npRead=temp_np_read,
