@@ -59,6 +59,7 @@ def main(args):
     # todo check
 
     for f in files:
+        print("Processing: ", f, end="\n", file=sys.stderr)
         tsv = args.files_dir + f
         f = f.split(".")
         name = f[0] + "." + f[1] + ".fast5"  # there is a better way to deal with this
@@ -73,8 +74,13 @@ def main(args):
         npRead = NanoporeRead(args.fast5s+name)
 
         # make the models
-        template_model = TemplateModel(args.fast5s+name).get_model_dict()
-        complement_model = ComplementModel(args.fast5s+name).get_model_dict()
+        template_ = TemplateModel(args.fast5s+name)
+        template_model = template_.get_model_dict()
+        template_.close()
+
+        complement_ = ComplementModel(args.fast5s+name)
+        complement_model = complement_.get_model_dict()
+        complement_.close()
 
         for x, y, p, strand in parse_signalAlign_output(tsv):
             # get the reference kmer

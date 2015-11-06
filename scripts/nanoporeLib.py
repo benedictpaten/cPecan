@@ -20,6 +20,14 @@ def kmer_iterator(dna, k):
             yield kmer
 
 
+def list_twoD_event_map(self):
+        """Print out tab separated mapping of the strand events to the 2D kmers
+        """
+        for te, ce, kmer in izip(self.template_event_map, self.complement_event_map,
+                                 kmer_iterator(self.twoD_read_sequence, self.kmer_length)):
+            print(te, ce, kmer, sep="\t")
+
+
 def orient_read_with_bwa(bwa_index, query):
     # align with bwa
     #bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"  # todo require bwa in path remove this
@@ -48,54 +56,74 @@ def make_npRead_and_2d_seq(fast5, npRead_dest, twod_read_dest):
 
     # load and transform
     npRead = NanoporeRead(fast5)
-    npRead.get_2D_event_map()
-    npRead.transform_events(npRead.template_events, npRead.template_drift)
-    npRead.transform_events(npRead.complement_events, npRead.complement_drift)
+    if npRead.is_open is False:
+        print("problem opeining file {filename}".format(filename=fast5), file=sys.stderr)
+        npRead.close()
+        return False
 
-    # output
+    if npRead.get_2D_event_map() and npRead.get_template_events() and npRead.get_complement_evnets():
+        # get model params
+        t_model_bool = npRead.get_template_model_adjustments()
+        c_model_bool = npRead.get_complement_model_adjustments()
+        if t_model_bool is False or c_model_bool is False:
+            return False
 
-    # line 1
-    print(len(npRead.twoD_read_sequence), end=' ', file=out_file) # 2D read length
-    print(len(npRead.template_events), end=' ', file=out_file)    # nb of template events
-    print(len(npRead.complement_events), end=' ', file=out_file)  # nb of complement events
-    print(npRead.template_scale, end=' ', file=out_file)          # template scale
-    print(npRead.template_shift, end=' ', file=out_file)          # template shift
-    print(npRead.template_var, end=' ', file=out_file)            # template var
-    print(npRead.template_scale_sd, end=' ', file=out_file)       # template scale_sd
-    print(npRead.template_var_sd, end=' ', file=out_file)         # template var_sd
-    print(npRead.complement_scale, end=' ', file=out_file)        # complement scale
-    print(npRead.complement_shift, end=' ', file=out_file)        # complement shift
-    print(npRead.complement_var, end=' ', file=out_file)          # complement var
-    print(npRead.complement_scale_sd, end=' ', file=out_file)     # complement scale_sd
-    print(npRead.complement_var_sd, end='\n', file=out_file)      # complement var_sd
+        # transform events
+        t_transformed = npRead.transform_events(npRead.template_events, npRead.template_drift)
+        c_transformed = npRead.transform_events(npRead.complement_events, npRead.complement_drift)
 
-    # line 2
-    print(npRead.twoD_read_sequence, end='\n', file=out_file)
+        # check if that worked
+        if t_transformed is False or c_transformed is False:
+            return False
 
-    # line 3
-    for _ in npRead.template_event_map:
-        print(_, end=' ', file=out_file)
-    print("", end="\n", file=out_file)
+        # output
 
-    # line 4
-    for mean, start, stdev, length in npRead.template_events:
-        print(mean, stdev, length, sep=' ', end=' ', file=out_file)
-    print("", end="\n", file=out_file)
+        # line 1
+        print(len(npRead.twoD_read_sequence), end=' ', file=out_file) # 2D read length
+        print(len(npRead.template_events), end=' ', file=out_file)    # nb of template events
+        print(len(npRead.complement_events), end=' ', file=out_file)  # nb of complement events
+        print(npRead.template_scale, end=' ', file=out_file)          # template scale
+        print(npRead.template_shift, end=' ', file=out_file)          # template shift
+        print(npRead.template_var, end=' ', file=out_file)            # template var
+        print(npRead.template_scale_sd, end=' ', file=out_file)       # template scale_sd
+        print(npRead.template_var_sd, end=' ', file=out_file)         # template var_sd
+        print(npRead.complement_scale, end=' ', file=out_file)        # complement scale
+        print(npRead.complement_shift, end=' ', file=out_file)        # complement shift
+        print(npRead.complement_var, end=' ', file=out_file)          # complement var
+        print(npRead.complement_scale_sd, end=' ', file=out_file)     # complement scale_sd
+        print(npRead.complement_var_sd, end='\n', file=out_file)      # complement var_sd
 
-    # line 5
-    for _ in npRead.complement_event_map:
-        print(_, end=' ', file=out_file)
-    print("", end="\n", file=out_file)
+        # line 2
+        print(npRead.twoD_read_sequence, end='\n', file=out_file)
 
-    # line 6
-    for mean, start, stdev, length in npRead.complement_events:
-        print(mean, stdev, length, sep=' ', end=' ', file=out_file)
-    print("", end="\n", file=out_file)
+        # line 3
+        for _ in npRead.template_event_map:
+            print(_, end=' ', file=out_file)
+        print("", end="\n", file=out_file)
 
-    # make temp read
-    npRead.extract_2d_read(temp_fasta)
-    npRead.close()
-    return
+        # line 4
+        for mean, start, stdev, length in npRead.template_events:
+            print(mean, stdev, length, sep=' ', end=' ', file=out_file)
+        print("", end="\n", file=out_file)
+
+        # line 5
+        for _ in npRead.complement_event_map:
+            print(_, end=' ', file=out_file)
+        print("", end="\n", file=out_file)
+
+        # line 6
+        for mean, start, stdev, length in npRead.complement_events:
+            print(mean, stdev, length, sep=' ', end=' ', file=out_file)
+        print("", end="\n", file=out_file)
+
+        # make temp read
+        npRead.extract_2d_read(temp_fasta)
+        npRead.close()
+        return True
+    else:
+        npRead.close()
+        print("problem makeing npRead for {fast5}".format(fast5=fast5), file=sys.stderr)
+        return False
 
 
 def make_temp_sequence(fasta, forward, destination):
@@ -106,6 +134,7 @@ def make_temp_sequence(fasta, forward, destination):
         if forward is False:
             sequence = reverse_complement(sequence)
         print(sequence, end='\n', file=out_file)
+        break
 
 
 class Bwa(object):
@@ -142,56 +171,39 @@ def get_proceding_kmers(kmer, alphabet="ACGT"):
 class NanoporeRead(object):
     def __init__(self, fast_five_file):
         # load the fast5
-        self.fastFive = h5py.File(fast_five_file, 'r')
+        self.filename = fast_five_file
+        self.is_open = self.open()
+        self.template_event_map = []
+        self.complement_event_map = []
 
-        # get the 2D read sequence
+    def open(self):
+        try:
+            self.fastFive = h5py.File(self.filename, 'r')
+            return True
+        except Exception, e:
+            self.close()
+            print("Error opening file {filename}".format(filename=self.filename), file=sys.stderr)
+            return False
+
+    def initialize_2d(self):
+        # init
+        self.has2D = False
+        self.has2D_alignment_table = False
+
         twoD_read_sequence_address = "/Analyses/Basecall_2D_000/BaseCalled_2D/Fastq"
 
-        #self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
         if twoD_read_sequence_address in self.fastFive:
+            self.has2D = True
             self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
             self.twoD_id = self.fastFive[twoD_read_sequence_address][()].split()[0:2][0][1:]
 
-        # get the 2D alignment table
         twoD_alignment_table_address = "/Analyses/Basecall_2D_000/BaseCalled_2D/Alignment"
         if twoD_alignment_table_address in self.fastFive:
             self.twoD_alignment_table = self.fastFive[twoD_alignment_table_address]
+            if len(self.twoD_alignment_table) > 0:
+                self.has2D_alignment_table = True
             self.kmer_length = len(self.twoD_alignment_table[0][2])
 
-        # need the event tables for comparing probs
-        template_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_template/Events'
-        if template_event_table_address in self.fastFive:
-            self.template_event_table = self.fastFive[template_event_table_address]
-            self.template_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
-                                    for e in self.template_event_table]
-
-        complement_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_complement/Events'
-        if complement_event_table_address in self.fastFive:
-            self.complement_event_table = self.fastFive[complement_event_table_address]
-            self.complement_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
-                                      for e in self.complement_event_table]
-
-        # need the scale and shift
-        template_model_address = "/Analyses/Basecall_2D_000/BaseCalled_template/Model"
-        if template_model_address in self.fastFive:
-            self.template_scale = self.fastFive[template_model_address].attrs["scale"]
-            self.template_shift = self.fastFive[template_model_address].attrs["shift"]
-            self.template_drift = self.fastFive[template_model_address].attrs["drift"]
-            self.template_var = self.fastFive[template_model_address].attrs["var"]
-            self.template_scale_sd = self.fastFive[template_model_address].attrs["scale_sd"]
-            self.template_var_sd = self.fastFive[template_model_address].attrs["var_sd"]
-
-        complement_model_address = "/Analyses/Basecall_2D_000/BaseCalled_complement/Model"
-        if complement_model_address in self.fastFive:
-            self.complement_scale = self.fastFive[complement_model_address].attrs["scale"]
-            self.complement_shift = self.fastFive[complement_model_address].attrs["shift"]
-            self.complement_drift = self.fastFive[complement_model_address].attrs["drift"]
-            self.complement_var = self.fastFive[complement_model_address].attrs["var"]
-            self.complement_scale_sd = self.fastFive[complement_model_address].attrs["scale_sd"]
-            self.complement_var_sd = self.fastFive[complement_model_address].attrs["var_sd"]
-
-        self.template_event_map = []
-        self.complement_event_map = []
 
     def get_strand_event_map(self):
         """Maps the events from the template and complement strands to their base called kmers the map
@@ -231,6 +243,11 @@ class NanoporeRead(object):
         nb_template_gaps = 0
         previous_complement_event = None
         previous_template_event = None
+
+        self.initialize_2d()
+
+        if not (self.has2D and self.has2D_alignment_table):
+            return False
 
         # go thought the kmers in the read sequence and match up the events
         for i, seq_kmer in enumerate(kmer_iterator(self.twoD_read_sequence, self.kmer_length)):
@@ -306,23 +323,78 @@ class NanoporeRead(object):
         # check that we have mapped all of the bases in the 2D read
         assert(len(self.template_event_map) == len(self.twoD_read_sequence))
         assert(len(self.complement_event_map) == len(self.twoD_read_sequence))
-        return
-
-    def list_twoD_event_map(self):
-        """Print out tab separated mapping of the strand events to the 2D kmers
-        """
-        for te, ce, kmer in izip(self.template_event_map, self.complement_event_map,
-                                 kmer_iterator(self.twoD_read_sequence, self.kmer_length)):
-            print(te, ce, kmer, sep="\t")
+        return True
 
     def transform_events(self, events, drift):
         """Adjust event means by drift
         """
+        if (events == None or drift == None):
+            return False
+
+        # transform events by time
         start_time = events[0][1]
         for event in events:
             delta_time = event[1] - start_time
             event[0] -= (delta_time * drift)
-        return
+        return True
+
+    def get_template_events(self):
+        template_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_template/Events'
+
+        if template_event_table_address in self.fastFive:
+            #self.has_template_events = True
+            self.template_event_table = self.fastFive[template_event_table_address]
+            # maybe move to transform function
+            self.template_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
+                                    for e in self.template_event_table]
+            return True
+
+        if template_event_table_address not in self.fastFive:
+            return False
+
+    def get_complement_evnets(self):
+        complement_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_complement/Events'
+
+        if complement_event_table_address in self.fastFive:
+            self.has_complement_events = True
+            self.complement_event_table = self.fastFive[complement_event_table_address]
+            self.complement_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
+                                      for e in self.complement_event_table]
+            return True
+
+        if complement_event_table_address not in self.fastFive:
+            return False
+
+    def get_template_model_adjustments(self):
+        template_model_address = "/Analyses/Basecall_2D_000/BaseCalled_template/Model"
+
+        if template_model_address in self.fastFive:
+            self.has_template_model = True
+            self.template_scale = self.fastFive[template_model_address].attrs["scale"]
+            self.template_shift = self.fastFive[template_model_address].attrs["shift"]
+            self.template_drift = self.fastFive[template_model_address].attrs["drift"]
+            self.template_var = self.fastFive[template_model_address].attrs["var"]
+            self.template_scale_sd = self.fastFive[template_model_address].attrs["scale_sd"]
+            self.template_var_sd = self.fastFive[template_model_address].attrs["var_sd"]
+            return True
+
+        if template_model_address not in self.fastFive:
+            return False
+
+    def get_complement_model_adjustments(self):
+        complement_model_address = "/Analyses/Basecall_2D_000/BaseCalled_complement/Model"
+
+        if complement_model_address in self.fastFive:
+            self.has_complement_model = True
+            self.complement_scale = self.fastFive[complement_model_address].attrs["scale"]
+            self.complement_shift = self.fastFive[complement_model_address].attrs["shift"]
+            self.complement_drift = self.fastFive[complement_model_address].attrs["drift"]
+            self.complement_var = self.fastFive[complement_model_address].attrs["var"]
+            self.complement_scale_sd = self.fastFive[complement_model_address].attrs["scale_sd"]
+            self.complement_var_sd = self.fastFive[complement_model_address].attrs["var_sd"]
+            return True
+        if complement_model_address not in self.fastFive:
+            return False
 
     def extract_2d_read(self, destination):
         print(">", self.twoD_id, sep="", end="\n", file=destination)

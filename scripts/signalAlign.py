@@ -48,17 +48,19 @@ def parse_args():
 def do_alignment(in_fast5, reference, destination, strawMan_flag, posteriors_file,
                  bwa_index=None, in_Template_hmm=None, in_Complement_hmm=None,
                  in_Template_model=None, in_Complement_model=None):
-    ## Preamble ##
+    # Preamble set up before doing the alignment
 
     # containers and defaults
-    temp_dir = destination + "tempFiles_alignment/"
+    temp_dir = destination + "tempFiles_alignment/"  # where the temp files go
     # make directory if it doesn't exist
     if not os.path.isdir(temp_dir):
         os.system("mkdir {dir}".format(dir=temp_dir))
-    temp_np_read = temp_dir + "temp_nanoporeRead.npRead"
-    temp_2d_read = temp_dir + "temp_2d_read.fa"
+    temp_np_read = temp_dir + "temp_nanoporeRead.npRead"  # where the npRead goes
+    temp_2d_read = temp_dir + "temp_2d_read.fa"  # where the fasta for the read goes
+    # make the npRead and fasta
     make_npRead_and_2d_seq(in_fast5, npRead_dest=temp_np_read, twod_read_dest=temp_2d_read)
 
+    # check if we have a bwa index, and make one if needed
     if bwa_index is None:
         bwa = Bwa(reference)
         bwa.build_index(temp_dir)
@@ -72,12 +74,15 @@ def do_alignment(in_fast5, reference, destination, strawMan_flag, posteriors_fil
     # posteriors file handling
     posteriors_dest = ''
     model_label = ''
+
+    # add an indicator for the model being used
     if strawMan_flag is True:
         model_label = ".sm"
     else:
         model_label = ".vl"
 
     # forward strand
+    # this gives the format: /directory/for/files/file.model.orientation.tsv
     if orientation == 0:
         forward = True
         posteriors_dest = destination + posteriors_file + model_label + ".forward.tsv"
@@ -90,15 +95,16 @@ def do_alignment(in_fast5, reference, destination, strawMan_flag, posteriors_fil
     # didn't map
     elif (orientation != 0) and (orientation != 16):
         print("\n\ntrainModels - read didn't map", file=sys.stderr)
-        return  # todo double check if this works correctly
+        return False
 
-    ## Alignment routine ##
+    # Alignment routine
 
     # containers and defaults
-    temp_ref_seq = temp_dir + "temp_ref_seq.txt"
+    temp_ref_seq = temp_dir + "temp_ref_seq.txt" # temp file for vanillaAlign
     path_to_vanillaAlign = "./vanillaAlign"
 
-    # make sequence for vanillaAlign
+    # make sequence for vanillaAlign, we orient the sequence so that the template events align to the
+    # reference and the complement events align to the reverse complement of the reference
     make_temp_sequence(reference, forward, temp_ref_seq)
 
     # alignment flags
@@ -189,6 +195,7 @@ def main(args):
 
         # go through all the files and align them
         for i in xrange(nb_files):
+            print("On file:{}\n".format(i), file=sys.stderr)
             f = fast5s[i]
             f_name = f.split("/")[-1][:-6]
             f = args.files_dir + f

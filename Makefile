@@ -9,7 +9,7 @@ cPecanDependencies =  ${basicLibsDependencies}
 cPecanLibs = ${basicLibs}
 
 all : ${libPath}/cPecanLib.a ${binPath}/cPecanLibTests ${binPath}/vanillaAlign ${binPath}/trainModels ${binPath}/signalAlign ${sonLibrootPath}/nanoporelib.py
-	cd externalTools && make all
+	#cd externalTools && make all
 	
 clean : 
 	rm -f ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/cPecanLibTests  ${libPath}/cPecanLib.a
