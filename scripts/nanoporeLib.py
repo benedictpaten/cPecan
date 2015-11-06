@@ -22,9 +22,9 @@ def kmer_iterator(dna, k):
 
 def orient_read_with_bwa(bwa_index, query):
     # align with bwa
-    bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"  # todo require bwa in path remove this
-    command = "{bwaDir}bwa mem -x ont2d {index} {query}".format(bwaDir=bwa_dir, index=bwa_index,
-                                                                query=query)
+    #bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"  # todo require bwa in path remove this
+    #command = "{bwaDir}bwa mem -x ont2d {index} {query}".format(bwaDir=bwa_dir, index=bwa_index, query=query)
+    command = "bwa mem -x ont2d {index} {query}".format(index=bwa_index, query=query)
     # this is a small SAM file that comes from bwa
     aln = subprocess.check_output(command.split())
     aln = aln.split("\t") # split
@@ -113,7 +113,7 @@ class Bwa(object):
     """
     def __init__(self, target):
         self.target = target
-        self.bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"
+        #self.bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"
         self.db_handle = ''
 
     def build_index(self, destination):
@@ -122,11 +122,13 @@ class Bwa(object):
 
         # build database
         self.db_handle = path_to_bwa_index + '/temp_bwaIndex'
-        os.system("{0}bwa index -p {1} {2}".format(self.bwa_dir, self.db_handle, self.target))
+        #os.system("{0}bwa index -p {1} {2}".format(self.bwa_dir, self.db_handle, self.target))
+        os.system("bwa index -p {0} {1}".format(self.db_handle, self.target))
 
     def run(self, query):
         # run alignment
-        os.system("{0}bwa mem -x ont2d {1} {2}".format(self.bwa_dir, self.db_handle, query))
+        #os.system("{0}bwa mem -x ont2d {1} {2}".format(self.bwa_dir, self.db_handle, query))
+        os.system("bwa mem -x ont2d {0} {1}".format(self.db_handle, query))
 
 
 def get_proceding_kmers(kmer, alphabet="ACGT"):
