@@ -385,6 +385,9 @@ class NanoporeModel(object):
             model_dict[kmer] = (level_mean, level_stdev, sd_mean, sd_stdev)
         return model_dict
 
+    def close(self):
+        self.fastFive.close()
+
 
 class TemplateModel(NanoporeModel):
     def __init__(self, fast5File):

@@ -29,7 +29,7 @@ void writePosteriorProbs(char *posteriorProbsFile, stList *alignedPairs, Strand 
     FILE *fH = fopen(posteriorProbsFile, "a");
     for(int64_t i=0;i<stList_length(alignedPairs); i++) {
         stIntTuple *aPair = stList_get(alignedPairs, i);
-        fprintf(fH, "%s " "%" PRIi64 "\t%" PRIi64 "\t%f\n", strandLabel, stIntTuple_get(aPair, 1), stIntTuple_get(aPair, 2), ((double)stIntTuple_get(aPair, 0))/PAIR_ALIGNMENT_PROB_1);
+        fprintf(fH, "%s\t" "%" PRIi64 "\t%" PRIi64 "\t%f\n", strandLabel, stIntTuple_get(aPair, 1), stIntTuple_get(aPair, 2), ((double)stIntTuple_get(aPair, 0))/PAIR_ALIGNMENT_PROB_1);
     }
     fclose(fH);
 }
