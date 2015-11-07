@@ -1048,6 +1048,20 @@ static double stateMachine3Vanilla_endStateProb(StateMachine *sM, int64_t state)
     return 0.0;
 }
 
+static double stateMachine3Vanilla_raggedEndStateProb(StateMachine *sM, int64_t state) {
+    StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *) sM;
+    state_check(sM, state);
+    switch (state) {
+        case match:
+            return (sM3v->DEFAULT_END_FROM_X_PROB + sM3v->DEFAULT_END_FROM_Y_PROB) / 2.0;
+        case shortGapX:
+            return sM3v->DEFAULT_END_FROM_X_PROB;
+        case shortGapY:
+            return sM3v->DEFAULT_END_FROM_Y_PROB;
+    }
+    return 0.0;
+}
+
 static double stateMachineEchelon_startStateProb(StateMachine *sM, int64_t state) {
     //Match state is like going to a match.
     state_check(sM, state);
@@ -1300,7 +1314,7 @@ StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t para
     sM3v->model.startStateProb = stateMachine3_startStateProb;
     sM3v->model.raggedStartStateProb = stateMachine3_raggedStartStateProb;
     sM3v->model.endStateProb = stateMachine3Vanilla_endStateProb;
-    sM3v->model.raggedEndStateProb = stateMachine3Vanilla_endStateProb;
+    sM3v->model.raggedEndStateProb = stateMachine3Vanilla_raggedEndStateProb;
     sM3v->model.cellCalculate = stateMachine3Vanilla_cellCalculate;
     sM3v->model.cellCalculateUpdateExpectations = cellCalcUpdateExpFcn;
 

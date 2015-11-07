@@ -944,7 +944,7 @@ static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
     // do alignment of template events
     stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
                                                        diagonalCalculationPosteriorMatchProbs,
-                                                       1, 1);
+                                                       0, 0);
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
 
 
@@ -1009,7 +1009,7 @@ static void test_vanilla_getAlignedPairsWithBanding(CuTest *testCase) {
     // do alignment of template events
     stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
                                                        diagonalCalculationPosteriorMatchProbs,
-                                                       1, 1);
+                                                       0, 0);
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
     st_logInfo("there are %lld aligned pairs with banding\n", stList_length(alignedPairs));
     // for ch1_file1 template there should be this many aligned pairs with banding

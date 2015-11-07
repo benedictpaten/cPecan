@@ -72,6 +72,16 @@ def main(args):
 
         # load the nanopore read
         npRead = NanoporeRead(args.fast5s+name)
+        if npRead.is_open is False:
+            continue
+        has_t_events = npRead.get_template_events()
+        has_c_events = npRead.get_complement_evnets()
+
+        t_model_bool = npRead.get_template_model_adjustments()
+        c_model_bool = npRead.get_complement_model_adjustments()
+
+        if has_t_events is False or has_c_events is False or t_model_bool is False or c_model_bool is False:
+            continue
 
         # make the models
         template_ = TemplateModel(args.fast5s+name)
@@ -128,7 +138,7 @@ def main(args):
                 #noise_E_o = np.sqrt(power(noise_E_u, 3) / noise_lam)
 
             # print the output
-            print(orientation, x, k_x, name, strand, e_u, e_o, e_t, p, level_E_u, noise_E_u,
+            print(model, orientation, x, k_x, name, strand, e_u, e_o, e_t, p, level_E_u, noise_E_u,
                   sep="\t", end="\n", file=sys.stdout)
 
             # close files

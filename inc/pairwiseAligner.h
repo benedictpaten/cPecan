@@ -303,6 +303,8 @@ void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations,
 
 int sortByXPlusYCoordinate(const void *i, const void *j);
 
+int sortByXPlusYCoordinate2(const void *i, const void *j);
+
 stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatMask);
 
 stList *getBlastPairsForPairwiseAlignmentParameters(void *sX, void *sY, PairwiseAlignmentParameters *p);

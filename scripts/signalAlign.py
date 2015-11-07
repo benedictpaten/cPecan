@@ -58,7 +58,11 @@ def do_alignment(in_fast5, reference, destination, strawMan_flag, posteriors_fil
     temp_np_read = temp_dir + "temp_nanoporeRead.npRead"  # where the npRead goes
     temp_2d_read = temp_dir + "temp_2d_read.fa"  # where the fasta for the read goes
     # make the npRead and fasta
-    make_npRead_and_2d_seq(in_fast5, npRead_dest=temp_np_read, twod_read_dest=temp_2d_read)
+    temp_file_success = make_npRead_and_2d_seq(in_fast5,
+                                               npRead_dest=temp_np_read,
+                                               twod_read_dest=temp_2d_read)
+    if temp_file_success is False:
+        return False
 
     # check if we have a bwa index, and make one if needed
     if bwa_index is None:
@@ -135,16 +139,20 @@ def do_alignment(in_fast5, reference, destination, strawMan_flag, posteriors_fil
     else:
         complement_hmm_flag = ""
 
+    # read label
+    read_label = in_fast5.split("/")[-1]
+
     # alignment commands
     alignment_command = \
-        "{vanillaAlign} {straw}-r {ref} -q {npRead} {t_model_flag}{c_model_flag}{t_hmm}{c_hmm} -u {posteriors}"\
-        .format(vanillaAlign=path_to_vanillaAlign, straw=use_strawMan_flag, ref=temp_ref_seq,
+        "{vA} {straw}-r {ref} -q {npRead} {t_model_flag}{c_model_flag}{t_hmm}{c_hmm} -u {posteriors} -L {readLabel}"\
+        .format(vA=path_to_vanillaAlign, straw=use_strawMan_flag, ref=temp_ref_seq, readLabel=read_label,
                 npRead=temp_np_read, t_model_flag=template_model_flag, c_model_flag=complement_model_flag,
                 t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag, posteriors=posteriors_dest)
 
     # run
     print("signalAlign - running command", alignment_command, end="\n", file=sys.stderr)
     os.system(alignment_command)
+    return True
 
 
 def main(args):
@@ -177,9 +185,13 @@ def main(args):
         in_file_name = args.single_file.split("/")[-1]
 
         # run the alignment
-        do_alignment(in_fast5=args.single_file, reference=args.ref, destination=args.out,
-                     strawMan_flag=args.strawMan, posteriors_file=in_file_name, bwa_index=bwa_ref_index,
-                     in_Template_hmm=args.in_T_Hmm, in_Complement_hmm=args.in_C_Hmm)
+        aln_ = do_alignment(in_fast5=args.single_file, reference=args.ref, destination=args.out,
+                            strawMan_flag=args.strawMan, posteriors_file=in_file_name, bwa_index=bwa_ref_index,
+                            in_Template_hmm=args.in_T_Hmm, in_Complement_hmm=args.in_C_Hmm)
+        if aln_ is True:
+            print("signalAlign - aligned read {f} successfully".format(f=args.single_file), file=sys.stderr)
+        if aln_ is False:
+            print("signalALign - error while aligning {f}".format(f=args.single_file), file=sys.stderr)
     else:
         # get all the fast5s in the directory
         fast5s = [x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
@@ -200,9 +212,13 @@ def main(args):
             f_name = f.split("/")[-1][:-6]
             f = args.files_dir + f
             # run the alignment
-            do_alignment(in_fast5=f, reference=args.ref, destination=args.out, strawMan_flag=args.strawMan,
-                         posteriors_file=f_name, bwa_index=bwa_ref_index, in_Template_hmm=args.in_T_Hmm,
-                         in_Complement_hmm=args.in_C_Hmm)
+            aln_ = do_alignment(in_fast5=f, reference=args.ref, destination=args.out, strawMan_flag=args.strawMan,
+                                posteriors_file=f_name, bwa_index=bwa_ref_index, in_Template_hmm=args.in_T_Hmm,
+                                in_Complement_hmm=args.in_C_Hmm)
+            if aln_ is True:
+                print("signalAlign - aligned read {f} successfully".format(f=f), file=sys.stderr)
+            if aln_ is False:
+                print("signalALign - error while aligning {f}".format(f=f), file=sys.stderr)
 
 
 if __name__ == "__main__":

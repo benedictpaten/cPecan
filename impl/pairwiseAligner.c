@@ -981,6 +981,12 @@ int sortByXPlusYCoordinate(const void *i, const void *j) {
     return k > l ? 1 : (k < l ? -1 : 0);
 }
 
+int sortByXPlusYCoordinate2(const void *i, const void *j) {
+    int64_t k = stIntTuple_get((stIntTuple *) i, 1) + stIntTuple_get((stIntTuple *) i, 2);
+    int64_t l = stIntTuple_get((stIntTuple *) j, 1) + stIntTuple_get((stIntTuple *) j, 2);
+    return k > l ? 1 : (k < l ? -1 : 0);
+}
+
 static char *makeUpperCase(const char *s, int64_t l) {
     char *s2 = stString_copy(s);
     for (int64_t i = 0; i < l; i++) {
