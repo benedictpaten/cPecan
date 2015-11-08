@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <nanopore.h>
+#include <inttypes.h>
+#include "nanopore.h"
 #include "pairwiseAligner.h"
 #include "nanopore.h"
 

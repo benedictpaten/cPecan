@@ -48,20 +48,20 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
         int64_t targetKmerIndex = emissions_discrete_getKmerIndexFromKmer(k_i);
 
         // get the observations from the events
-        //double eventMean = *(events + y);
         double eventMean = events[(y * NB_EVENT_PARAMS)];
-        //double eventNoise = *(events + (y + 1));
         double eventNoise = events[(y * NB_EVENT_PARAMS) + 1];
-        //double eventDuration = *(events + (y + 2));
         double eventDuration = events[(y * NB_EVENT_PARAMS) + 2];
 
         // get the expected event mean amplitude and noise
         double E_levelu = matchModel[1 + (targetKmerIndex * MODEL_PARAMS)];
         double E_noiseu = matchModel[1 + (targetKmerIndex * MODEL_PARAMS + 2)];
 
-        fprintf(fH, "%lld\t%lld\t%s\t%s\t%s\t%f\t%f\t%f\t%f\t%f\t%f\n", x, y, k_i, readFile, strandLabel, eventMean, eventNoise,
-                eventDuration, p, E_levelu, E_noiseu);
-        //fprintf(fH, "%s\t" "%" PRIi64 "\t%" PRIi64 "\t%f\n", strandLabel, stIntTuple_get(aPair, 1), stIntTuple_get(aPair, 2), ((double)stIntTuple_get(aPair, 0))/PAIR_ALIGNMENT_PROB_1);
+        //st_uglyf("%lld\t%lld\t%s\t%s\t%s\t%f\t%f\t%f\t%f\t%f\t%f\n", x, y, k_i, readFile, strandLabel, eventMean,
+        //        eventNoise, eventDuration, p, E_levelu, E_noiseu);
+
+        fprintf(fH, "%lld\t%lld\t%s\t%s\t%s\t%f\t%f\t%f\t%f\t%f\t%f\n", x, y, k_i, readFile, strandLabel, eventMean,
+                eventNoise, eventDuration, p, E_levelu, E_noiseu);
+        free(k_i);
     }
     fclose(fH);
 }
@@ -133,7 +133,6 @@ stList *performSignalAlignment(StateMachine *sM, const char *hmmFile, double *ev
     }
 
     // do alignment
-    st_uglyf("SENTINAL - about to start alignmentp\n");
     if (sM->type == vanilla) {
         stList *alignedPairs = performSignalAlignmentP(sM, events, nbEvents, eventMap, target, p, unmappedAncors,
                                                        sequence_getKmer2);
@@ -361,7 +360,7 @@ int main(int argc, char *argv[]) {
             hmmContinuous_writeToFile(complementTrainedHmmFile, complementTrainedHmm, sMtype);
         }
     } else {
-        fprintf(stderr, "vanillaAlign - starting alignment\n");
+        fprintf(stderr, "vanillaAlign - starting template alignment\n");
         // Template alignment
         // load template stateMachine
         StateMachine *sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype);
@@ -373,27 +372,35 @@ int main(int argc, char *argv[]) {
         stList_sort(templateAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
         // write to file
         if (posteriorProbsFile != NULL) {
-            fprintf(stderr, "vanillaAlign - writing %lld template aligned pairs\n",
-                    stList_length(templateAlignedPairs));
             writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_PROBS, npRead->templateEvents,
                                 targetSeq, templateAlignedPairs, template);
         }
+
+        // intermediate clean up
+        stateMachine_destruct(sMt);
+        stList_destruct(templateAlignedPairs);
+
         // Complement alignment
         // load complement stateMachine
+        fprintf(stderr, "vanillaAlign - starting complement alignment\n");
         StateMachine *sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype);
         // get aligned pairs
         stList *complementAlignedPairs = performSignalAlignment(sMc, complementHmmFile, npRead->complementEvents,
                                                                 npRead->nbComplementEvents, npRead->complementEventMap,
                                                                 rc_targetSeq, p, anchorPairs);
+
         // sort
         stList_sort(complementAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
         // write to file
         if (posteriorProbsFile != NULL) {
-            fprintf(stderr, "vanillaAlign - writing %lld complement aligned pairs\n",
-                    stList_length(complementAlignedPairs));
-            writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_PROBS, npRead->complementEvents,
+            writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_PROBS, npRead->complementEvents,
                                 rc_targetSeq, complementAlignedPairs, complement);
         }
+
+        // final alignment clean up
+        stateMachine_destruct(sMc);
+        stList_destruct(complementAlignedPairs);
+        fprintf(stderr, "vanillaAlign - SUCCESS: finished alignment of query %s, exiting\n", readLabel);
     }
 
     return 0;

@@ -982,8 +982,8 @@ int sortByXPlusYCoordinate(const void *i, const void *j) {
 }
 
 int sortByXPlusYCoordinate2(const void *i, const void *j) {
-    int64_t k = stIntTuple_get((stIntTuple *) i, 1) + stIntTuple_get((stIntTuple *) i, 2);
-    int64_t l = stIntTuple_get((stIntTuple *) j, 1) + stIntTuple_get((stIntTuple *) j, 2);
+    int64_t k = stIntTuple_get((stIntTuple *)i, 1) + stIntTuple_get((stIntTuple *)i, 2);
+    int64_t l = stIntTuple_get((stIntTuple *)j, 1) + stIntTuple_get((stIntTuple *)j, 2);
     return k > l ? 1 : (k < l ? -1 : 0);
 }
 

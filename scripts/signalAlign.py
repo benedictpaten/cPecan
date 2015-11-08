@@ -5,6 +5,7 @@ from __future__ import print_function
 import sys
 sys.path.append("../")
 from nanoporeLib import *
+from serviceCourse.file_handlers import FolderHandler
 from argparse import ArgumentParser
 from random import shuffle
 
@@ -46,12 +47,13 @@ def parse_args():
 
 
 def do_alignment(in_fast5, reference, destination, strawMan_flag, posteriors_file,
-                 bwa_index=None, in_Template_hmm=None, in_Complement_hmm=None,
+                 bwa_index, in_Template_hmm=None, in_Complement_hmm=None,
                  in_Template_model=None, in_Complement_model=None):
     # Preamble set up before doing the alignment
 
     # containers and defaults
-    temp_dir = destination + "tempFiles_alignment/"  # where the temp files go
+    read_label = in_fast5.split("/")[-1]
+    temp_dir = destination + "tempFiles_{readLabel}/".format(readLabel=read_label)  # where the temp files go
     # make directory if it doesn't exist
     if not os.path.isdir(temp_dir):
         os.system("mkdir {dir}".format(dir=temp_dir))
@@ -65,12 +67,13 @@ def do_alignment(in_fast5, reference, destination, strawMan_flag, posteriors_fil
         return False
 
     # check if we have a bwa index, and make one if needed
-    if bwa_index is None:
-        bwa = Bwa(reference)
-        bwa.build_index(temp_dir)
-        bwa_ref_index = temp_dir + "temp_bwaIndex"
-    else:
-        bwa_ref_index = bwa_index
+    #if bwa_index is None:
+    #    bwa = Bwa(reference)
+    #    bwa.build_index(temp_dir)
+    #    bwa_ref_index = temp_dir + "temp_bwaIndex"
+    #else:
+    #    bwa_ref_index = bwa_index
+    bwa_ref_index = bwa_index
 
     # get orientation from BWA
     orientation = orient_read_with_bwa(bwa_index=bwa_ref_index, query=temp_2d_read)
@@ -139,9 +142,6 @@ def do_alignment(in_fast5, reference, destination, strawMan_flag, posteriors_fil
     else:
         complement_hmm_flag = ""
 
-    # read label
-    read_label = in_fast5.split("/")[-1]
-
     # alignment commands
     alignment_command = \
         "{vA} {straw}-r {ref} -q {npRead} {t_model_flag}{c_model_flag}{t_hmm}{c_hmm} -u {posteriors} -L {readLabel}"\
@@ -175,7 +175,7 @@ def main(args):
     if args.bwa_index is None:
         print("signalAlign - indexing reference", file=sys.stderr)
         bwa_ref_index = get_bwa_index(args.ref, temp_dir)
-        print("signalAlign - indexing reference, done\n", file=sys.stderr)
+        print("signalAlign - indexing reference, done", file=sys.stderr)
     else:
         bwa_ref_index = args.bwa_index
 
@@ -216,9 +216,11 @@ def main(args):
                                 posteriors_file=f_name, bwa_index=bwa_ref_index, in_Template_hmm=args.in_T_Hmm,
                                 in_Complement_hmm=args.in_C_Hmm)
             if aln_ is True:
-                print("signalAlign - aligned read {f} successfully".format(f=f), file=sys.stderr)
+                continue
+                #print("signalAlign - aligned read {f} successfully".format(f=f), file=sys.stderr)
             if aln_ is False:
                 print("signalALign - error while aligning {f}".format(f=f), file=sys.stderr)
+                continue
 
 
 if __name__ == "__main__":

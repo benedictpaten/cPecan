@@ -122,7 +122,7 @@ def make_npRead_and_2d_seq(fast5, npRead_dest, twod_read_dest):
         return True
     else:
         npRead.close()
-        print("problem makeing npRead for {fast5}".format(fast5=fast5), file=sys.stderr)
+        print("problem making npRead for {fast5}".format(fast5=fast5), file=sys.stderr)
         return False
 
 
