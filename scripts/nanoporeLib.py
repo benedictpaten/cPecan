@@ -46,22 +46,25 @@ def get_bwa_index(reference, dest):
     return bwa_ref_index
 
 
-def make_npRead_and_2d_seq(fast5, npRead_dest, twod_read_dest):
+def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path, template_model_path, complement_model_path):
     """process a MinION .fast5 file into a npRead file for use with signalAlign also extracts
     the 2D read into fasta format
     """
     # setup
-    out_file = open(npRead_dest, 'w')
-    temp_fasta = open(twod_read_dest, "w")
+    out_file = open(npRead_path, 'w')
+    temp_fasta = open(twod_read_path, "w")
+    template_model_file = open(template_model_path, "w")
+    complement_model_file = open(complement_model_path, "w")
 
-    # load and transform
+
+    # load MinION read
     npRead = NanoporeRead(fast5)
     if npRead.is_open is False:
         print("problem opeining file {filename}".format(filename=fast5), file=sys.stderr)
         npRead.close()
         return False
 
-    if npRead.get_2D_event_map() and npRead.get_template_events() and npRead.get_complement_evnets():
+    if npRead.get_2d_event_map() and npRead.get_template_events() and npRead.get_complement_evnets():
         # get model params
         t_model_bool = npRead.get_template_model_adjustments()
         c_model_bool = npRead.get_complement_model_adjustments()
@@ -118,6 +121,9 @@ def make_npRead_and_2d_seq(fast5, npRead_dest, twod_read_dest):
 
         # make temp read
         npRead.extract_2d_read(temp_fasta)
+        got_template_model = npRead.export_template_model(template_model_file)
+        got_complement_model = npRead.export_complement_model(complement_model_file)
+        # todo need checks or something
         npRead.close()
         return True
     else:
@@ -175,6 +181,10 @@ class NanoporeRead(object):
         self.is_open = self.open()
         self.template_event_map = []
         self.complement_event_map = []
+        self.stay_prob = 0
+        self.skip_prob_bins = []
+        self.template_model_name = ""
+        self.complement_model_name = ""
 
     def open(self):
         try:
@@ -203,7 +213,6 @@ class NanoporeRead(object):
             if len(self.twoD_alignment_table) > 0:
                 self.has2D_alignment_table = True
             self.kmer_length = len(self.twoD_alignment_table[0][2])
-
 
     def get_strand_event_map(self):
         """Maps the events from the template and complement strands to their base called kmers the map
@@ -234,7 +243,7 @@ class NanoporeRead(object):
         self.complement_strand_event_map = make_map(self.complement_event_table)
         return
 
-    def get_2D_event_map(self):
+    def get_2d_event_map(self):
         """Maps the kmers in the 2D basecalled read to events in the template and complement strand reads
         """
         # initialize
@@ -396,6 +405,72 @@ class NanoporeRead(object):
         if complement_model_address not in self.fastFive:
             return False
 
+    @staticmethod
+    def calculate_lambda(noise_mean, noise_stdev):
+        return (power(noise_mean, 3)) / (power(noise_stdev, 2))
+
+
+    def export_model(self, skip_bins, model_address, destination):
+        """Exports the model to a file. Format:
+        line 1: [correlation coefficient] [level_mean] [level_sd] [noise_mean]
+                    [noise_sd] [noise_lambda ] (.../kmer) \n
+        line 2: skip bins \n
+        line 3: [correlation coefficient] [level_mean] [level_sd, scaled]
+                    [noise_mean] [noise_sd] [noise_lambda ] (.../kmer) \n
+        """
+
+        assert self.is_open
+
+        lambdas = []
+
+        if model_address in self.fastFive:
+            model = self.fastFive[model_address]
+            # line 1
+            print("0", end=' ', file=destination) # placeholder for correlation parameter
+            for kmer, level_mean, level_sd, noise_mean, noise_sd, weight in model:
+                lam = self.calculate_lambda(noise_mean, noise_sd)
+                lambdas.append(lam)
+                print(level_mean, level_sd, noise_mean, noise_sd, lam, end=' ', file=destination)
+            print("", end="\n", file=destination)
+            # line 2
+            for p in skip_bins:
+                print(p, end=' ', file=destination)
+            print("", end="\n", file=destination)
+            # line 3
+            print("0", end=' ', file=destination) # placeholder for correlation parameter
+            i = 0
+            for kmer, level_mean, level_sd, noise_mean, noise_sd, weight in model:
+                #lam = self.calculate_lambda(noise_mean, noise_sd)
+                lam = lambdas[i]
+                print(level_mean, (level_sd * 1.75), noise_mean, noise_sd, lam, end=' ', file=destination)
+                i += 1
+            print("", end="\n", file=destination)
+            return True
+        else:
+            return False
+
+    def export_template_model(self, destination):
+        template_model_address = "/Analyses/Basecall_2D_000/BaseCalled_template/Model"
+
+        t_skip_prob_bins = [0.487, 0.412, 0.311, 0.229, 0.174, 0.134, 0.115, 0.103, 0.096, 0.092,
+                            0.088, 0.087, 0.084, 0.085, 0.083, 0.082, 0.085, 0.083, 0.084, 0.082,
+                            0.080, 0.085, 0.088, 0.086, 0.087, 0.089, 0.085, 0.090, 0.087, 0.096]
+
+        got_model = self.export_model(t_skip_prob_bins, template_model_address, destination)
+
+        return got_model
+
+    def export_complement_model(self, destination):
+        complement_model_address = "/Analyses/Basecall_2D_000/BaseCalled_complement/Model"
+
+        c_skip_prob_bins = [0.531, 0.478, 0.405, 0.327, 0.257, 0.207, 0.172, 0.154, 0.138, 0.132,
+                            0.127, 0.123, 0.117, 0.115, 0.113, 0.113, 0.115, 0.109, 0.109, 0.107,
+                            0.104, 0.105, 0.108, 0.106, 0.111, 0.114, 0.118, 0.119, 0.110, 0.119]
+
+        got_model = self.export_model(c_skip_prob_bins, complement_model_address, destination)
+
+        return got_model
+
     def extract_2d_read(self, destination):
         print(">", self.twoD_id, sep="", end="\n", file=destination)
         print(self.twoD_read_sequence, end="\n", file=destination)
@@ -469,8 +544,8 @@ class TemplateModel(NanoporeModel):
         self.model = self.fastFive['/Analyses/Basecall_2D_000/BaseCalled_template/Model']
         self.stay_prob = log2(self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_template/Model"].attrs["stay_prob"])
         self.skip_prob_bins = [0.487, 0.412, 0.311, 0.229, 0.174, 0.134, 0.115, 0.103, 0.096, 0.092,
-                          0.088, 0.087, 0.084, 0.085, 0.083, 0.082, 0.085, 0.083, 0.084, 0.082,
-                          0.080, 0.085, 0.088, 0.086, 0.087, 0.089, 0.085, 0.090, 0.087, 0.096]
+                               0.088, 0.087, 0.084, 0.085, 0.083, 0.082, 0.085, 0.083, 0.084, 0.082,
+                               0.080, 0.085, 0.088, 0.086, 0.087, 0.089, 0.085, 0.090, 0.087, 0.096]
         self.parse_model_name()
 
     def parse_model_name(self):

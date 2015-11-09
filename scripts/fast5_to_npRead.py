@@ -26,7 +26,7 @@ def main():
         out_file = open(sys.argv[2], 'w')
         # load and transform
         npRead = NanoporeRead(sys.argv[1])
-        npRead.get_2D_event_map()
+        npRead.get_2d_event_map()
         npRead.transform_events(npRead.template_events, npRead.template_drift)
         npRead.transform_events(npRead.complement_events, npRead.complement_drift)
         # output

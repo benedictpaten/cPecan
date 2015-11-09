@@ -104,7 +104,7 @@ def doEM(in_fast5, reference, destination, strawMan_flag, strand="Template", bwa
         os.system("mkdir {dir}".format(dir=temp_dir))
     temp_np_read = temp_dir + "temp_nanoporeRead.npRead"
     temp_2d_read = temp_dir + "temp_2d_read.fa"
-    make_npRead_and_2d_seq(in_fast5, temp_np_read, temp_2d_read)
+    get_npRead_2dseq_and_models(in_fast5, temp_np_read, temp_2d_read)
 
     # if there is no bwa index given, make one
     if bwa_index is None:
