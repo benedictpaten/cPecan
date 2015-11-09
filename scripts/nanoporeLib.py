@@ -53,9 +53,6 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path, template_mod
     # setup
     out_file = open(npRead_path, 'w')
     temp_fasta = open(twod_read_path, "w")
-    template_model_file = open(template_model_path, "w")
-    complement_model_file = open(complement_model_path, "w")
-
 
     # load MinION read
     npRead = NanoporeRead(fast5)
@@ -121,11 +118,27 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path, template_mod
 
         # make temp read
         npRead.extract_2d_read(temp_fasta)
-        got_template_model = npRead.export_template_model(template_model_file)
-        got_complement_model = npRead.export_complement_model(complement_model_file)
+
+        # handle models
+        if npRead.get_model_id("/Analyses/Basecall_2D_000/Summary/basecall_1d_template") == \
+                "template_median68pA.model":
+            print("found default template model")
+            template_model_path = None
+        else:
+            template_model_file = open(template_model_path, "w")
+            got_template_model = npRead.export_template_model(template_model_file)
+
+        if npRead.get_model_id("/Analyses/Basecall_2D_000/Summary/basecall_1d_complement") == \
+            "complement_median68pA_pop2.model":
+            print("found default complement model")
+            complement_model_path = None
+        else:
+            complement_model_file = open(complement_model_path, "w")
+            got_complement_model = npRead.export_complement_model(complement_model_file)
+
         # todo need checks or something
         npRead.close()
-        return True
+        return True, template_model_path, complement_model_path
     else:
         npRead.close()
         print("problem making npRead for {fast5}".format(fast5=fast5), file=sys.stderr)
@@ -470,6 +483,14 @@ class NanoporeRead(object):
         got_model = self.export_model(c_skip_prob_bins, complement_model_address, destination)
 
         return got_model
+
+    def get_model_id(self, address):
+        if address in self.fastFive:
+            model_name = self.fastFive[address].attrs["model_file"]
+            model_name = model_name.split('/')[-1]
+            return model_name
+        else:
+            return None
 
     def extract_2d_read(self, destination):
         print(">", self.twoD_id, sep="", end="\n", file=destination)

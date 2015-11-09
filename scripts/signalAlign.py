@@ -42,8 +42,6 @@ def parse_args():
                         required=False, type=str, default=None,
                         help="input HMM for complement events, if you don't want the default")
 
-    # TODO make functionality to force use of new match model
-
     # output
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
@@ -82,13 +80,16 @@ class SignalAlignment(object):
 
 
         # make the npRead and fasta todo make this assert
-        temp_file_success = get_npRead_2dseq_and_models(fast5=in_fast5,
-                                                        npRead_path=temp_np_read,
-                                                        twod_read_path=temp_2d_read,
-                                                        template_model_path=temp_t_model,
-                                                        complement_model_path=temp_c_model)
+        success, temp_t_model, temp_c_model = get_npRead_2dseq_and_models(fast5=in_fast5,
+                                                                          npRead_path=temp_np_read,
+                                                                          twod_read_path=temp_2d_read,
+                                                                          template_model_path=temp_t_model,
+                                                                          complement_model_path=temp_c_model)
 
-        if temp_file_success is False:
+        print("temp template model", temp_t_model)
+        print("temp complement model", temp_c_model)
+
+        if success is False:
             return False
 
         # add an indicator for the model being used
@@ -123,7 +124,6 @@ class SignalAlignment(object):
         # Alignment routine
 
         # containers and defaults
-        #temp_ref_seq = temp_dir + "temp_ref_seq.txt" # temp file for vanillaAlign
         temp_ref_seq = temp_folder.add_file_path("temp_ref_seq.txt")
 
         path_to_vanillaAlign = "./vanillaAlign"  # todo could require this in path
@@ -137,12 +137,16 @@ class SignalAlignment(object):
         # input (match) models
         if self.in_templateModel is not None:
             template_model_flag = "-T {model_loc} ".format(model_loc=self.in_templateModel)
-        else:
+        if temp_t_model is not None:
             template_model_flag = "-T {t_model} ".format(t_model=temp_t_model)
+        else:
+            template_model_flag = ""
         if self.in_complementModel is not None:
             complement_model_flag = "-C {model_loc} ".format(model_loc=self.in_complementModel)
-        else:
+        if temp_c_model is not None:
             complement_model_flag = "-C {c_model} ".format(c_model=temp_c_model)
+        else:
+            complement_model_flag = ""
 
         # input HMMs
         if self.in_templateHmm is not None:
@@ -164,7 +168,7 @@ class SignalAlignment(object):
         # run
         print("signalAlign - running command", alignment_command, end="\n", file=sys.stderr)
         os.system(alignment_command)
-        temp_folder.remove_folder()
+        #temp_folder.remove_folder()
         return True
 
 
@@ -190,19 +194,28 @@ def main(args):
         bwa_ref_index = args.bwa_index
 
     # if only one file is specified for alignment
-    if args.files_dir is None:
-        # file handling
-        in_file_name = args.single_file.split("/")[-1]
 
+    alignment_args = {
+            "reference": args.ref,
+            "destination": temp_dir_path, #+ args.out,
+            "strawman": args.strawMan,
+            "bwa_index": bwa_ref_index,
+            "in_templateHmm": args.in_T_Hmm,
+            "in_complementHmm": args.in_C_Hmm,
+    }
+
+    alignment = SignalAlignment(**alignment_args)
+
+    if args.files_dir is None:
         # run the alignment
-        #aln_ = do_alignment(in_fast5=args.single_file, reference=args.ref, destination=args.out,
-        #                    strawMan_flag=args.strawMan, bwa_index=bwa_ref_index,
-        #                    in_Template_hmm=args.in_T_Hmm, in_Complement_hmm=args.in_C_Hmm)
-        #if aln_ is True:
-        #    print("signalAlign - aligned read {f} successfully".format(f=args.single_file), file=sys.stderr)
-        #if aln_ is False:
-        #    print("signalALign - error while aligning {f}".format(f=args.single_file), file=sys.stderr)
+        aln_ = alignment.do_alignment(in_fast5=args.single_file)
+
+        if aln_ is True:
+            print("signalAlign - aligned read {f} successfully".format(f=args.single_file), file=sys.stderr)
+        if aln_ is False:
+            print("signalALign - error while aligning {f}".format(f=args.single_file), file=sys.stderr)
         #temp_folder.remove_folder()
+
     else:
         # get all the fast5s in the directory
         fast5s = [x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
@@ -216,42 +229,21 @@ def main(args):
         if nb_files > len(fast5s):
             nb_files = len(fast5s)
 
-        alignment_args = {
-            "reference": args.ref,
-            "destination": args.out,
-            "strawman": args.strawMan,
-            "bwa_index": bwa_ref_index,
-            "in_templateHmm": args.in_T_Hmm,
-            "in_complementHmm": args.in_C_Hmm,
-        }
-
-        alignment = SignalAlignment(**alignment_args)
-
-        fast5s = [fast5s[x:x+args.threads] for x in xrange(0, len(fast5s), args.threads)]
-
-        for _ in fast5s:
-            threads = [Thread(target=alignment.do_alignment, args=(args.files_dir + x,)) for x in _]
-            for t in threads: t.start()
-            for t in threads: t.join()
-
         # go through all the files and align them
-        #for i in xrange(nb_files):
-        #    # log which file we're on
-        #    print("On file:{}".format(i), file=sys.stderr)
+        for i in xrange(nb_files):
+            # log which file we're on
+            print("On file:{}".format(i), file=sys.stderr)
 
-        #    f = fast5s[i]  # get the file from the list
-        #    f = args.files_dir + f  # add the path to it
+            f = fast5s[i]  # get the file from the list
+            f = args.files_dir + f  # add the path to it
 
-        #    pool = Pool(processes=2)
+            aln_ = alignment.do_alignment(in_fast5=f)
 
-
-        #    aln_ = do_alignment(in_fast5=f, **alignment_args)
-
-        #    if aln_ is True:
-        #        continue  # successful alignment log is within vanillaAlign
-        #    if aln_ is False:
-        #        print("signalAlign - error while aligning {f}".format(f=f), file=sys.stderr)
-        #        continue
+            if aln_ is True:
+                continue  # successful alignment log is within vanillaAlign
+            if aln_ is False:
+                print("signalAlign - error while aligning {f}".format(f=f), file=sys.stderr)
+                continue
 
 
 if __name__ == "__main__":
