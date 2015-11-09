@@ -8,6 +8,7 @@ from itertools import islice, izip
 import subprocess
 from serviceCourse.sequenceTools import reverse_complement
 from serviceCourse.parsers import read_fasta
+from serviceCourse.file_handlers import FolderHandler
 import os
 import h5py
 import sys
@@ -591,3 +592,123 @@ class ComplementModel(NanoporeModel):
         model_name = model_name.split('/')[-1]
         self.model_name = model_name
         return
+
+
+class SignalAlignment(object):
+    def __init__(self, in_fast5, reference, destination, strawman, bwa_index, in_templateHmm, in_complementHmm):
+        self.reference = reference
+        self.destination = destination
+        self.strawman = strawman
+        self.bwa_index = bwa_index
+        self.in_templateHmm = in_templateHmm
+        self.in_complementHmm = in_complementHmm
+        self.in_fast5 = in_fast5
+        self.in_templateModel = None
+        self.in_complementModel = None
+
+    def do_alignment(self):
+        # Preamble set up before doing the alignment
+
+        # containers and defaults
+        read_label = self.in_fast5.split("/")[-1]  # used in the posteriors file
+        read_name = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
+        temp_folder = FolderHandler()
+        temp_dir_path = temp_folder.open_folder(self.destination + "tempFiles_{readLabel}".format(readLabel=read_label))
+
+        temp_np_read = temp_folder.add_file_path("temp_{read}.npRead".format(read=read_label))
+        temp_2d_read = temp_folder.add_file_path("temp_2Dseq_{read}.fa".format(read=read_label))
+        temp_t_model = temp_folder.add_file_path("template_model.model")
+        temp_c_model = temp_folder.add_file_path("complement_model.model")
+
+
+        # make the npRead and fasta todo make this assert
+        success, temp_t_model, temp_c_model = get_npRead_2dseq_and_models(fast5=self.in_fast5,
+                                                                          npRead_path=temp_np_read,
+                                                                          twod_read_path=temp_2d_read,
+                                                                          template_model_path=temp_t_model,
+                                                                          complement_model_path=temp_c_model)
+
+        print("temp template model", temp_t_model)
+        print("temp complement model", temp_c_model)
+
+        if success is False:
+            return False
+
+        # add an indicator for the model being used
+        if self.strawman is True:
+            model_label = ".sm"
+            use_strawMan_flag = "--s "
+        else:
+            model_label = ".vl"
+            use_strawMan_flag = ""
+
+        # this gives the format: /directory/for/files/file.model.orientation.tsv
+        posteriors_file_path = ''
+
+        # get orientation from BWA
+        orientation = orient_read_with_bwa(bwa_index=self.bwa_index, query=temp_2d_read)
+
+        # forward strand
+        if orientation == 0:
+            forward = True
+            posteriors_file_path = self.destination + read_name + model_label + ".forward.tsv"
+
+        # backward strand
+        if orientation == 16:
+            forward = False
+            posteriors_file_path = self.destination + read_name + model_label + ".backward.tsv"
+
+        # didn't map
+        elif (orientation != 0) and (orientation != 16):
+            print("\n\ntrainModels - read didn't map", file=sys.stderr)
+            return False
+
+        # Alignment routine
+
+        # containers and defaults
+        temp_ref_seq = temp_folder.add_file_path("temp_ref_seq.txt")
+
+        path_to_vanillaAlign = "./vanillaAlign"  # todo could require this in path
+
+        # make sequence for vanillaAlign, we orient the sequence so that the template events align to the
+        # reference and the complement events align to the reverse complement of the reference
+        make_temp_sequence(self.reference, forward, temp_ref_seq)
+
+        # alignment flags
+
+        # input (match) models
+        if self.in_templateModel is not None:
+            template_model_flag = "-T {model_loc} ".format(model_loc=self.in_templateModel)
+        if temp_t_model is not None:
+            template_model_flag = "-T {t_model} ".format(t_model=temp_t_model)
+        else:
+            template_model_flag = ""
+        if self.in_complementModel is not None:
+            complement_model_flag = "-C {model_loc} ".format(model_loc=self.in_complementModel)
+        if temp_c_model is not None:
+            complement_model_flag = "-C {c_model} ".format(c_model=temp_c_model)
+        else:
+            complement_model_flag = ""
+
+        # input HMMs
+        if self.in_templateHmm is not None:
+            template_hmm_flag = "-y {hmm_loc} ".format(hmm_loc=self.in_templateHmm)
+        else:
+            template_hmm_flag = ""
+        if self.in_complementHmm is not None:
+            complement_hmm_flag = "-z {hmm_loc} ".format(hmm_loc=self.in_complementHmm)
+        else:
+            complement_hmm_flag = ""
+
+        # alignment commands
+        alignment_command = \
+            "{vA} {straw}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm} -u {posteriors} -L {readLabel}"\
+            .format(vA=path_to_vanillaAlign, straw=use_strawMan_flag, ref=temp_ref_seq, readLabel=read_label,
+                    npRead=temp_np_read, t_model=template_model_flag, c_model=complement_model_flag,
+                    t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag, posteriors=posteriors_file_path)
+
+        # run
+        print("signalAlign - running command", alignment_command, end="\n", file=sys.stderr)
+        os.system(alignment_command)
+        #temp_folder.remove_folder()
+        return True
