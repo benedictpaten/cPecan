@@ -5,7 +5,7 @@ from __future__ import print_function
 import sys
 sys.path.append("../")
 from nanoporeLib import *
-from multiprocessing import Process, Queue, current_process
+from multiprocessing import Process, Queue, current_process, Manager
 from serviceCourse.file_handlers import FolderHandler
 from argparse import ArgumentParser
 from random import shuffle
@@ -80,12 +80,12 @@ def main(args):
         bwa_ref_index = args.bwa_index
 
     workers = args.nb_jobs
-    work_queue = Queue()
-    done_queue = Queue()
+    work_queue = Manager().Queue()
+    done_queue = Manager().Queue()
     jobs = []
 
     fast5s = [x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
-        
+
     nb_files = args.nb_files
     if nb_files < len(fast5s):
         shuffle(fast5s)
