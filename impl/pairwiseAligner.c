@@ -257,12 +257,24 @@ double logAdd(double x, double y) {
 //Sequence Object generalized way to represent a sequence of symbols or measurements (events)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+static double _NULLEVENT[] = {LOG_ZERO, 0};
+static double *NULLEVENT = _NULLEVENT;
+
 Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(void *, int64_t)) {
     Sequence *self = malloc(sizeof(Sequence));
-
     self->length = length;
     self->elements = elements;
     self->get = getFcn;
+    return self;
+}
+
+Sequence *sequence_construct2(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
+                              Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t)) {
+    Sequence *self = malloc(sizeof(Sequence));
+    self->length = length;
+    self->elements = elements;
+    self->get = getFcn;
+    self->sliceFcn = sliceFcn;
     return self;
 }
 
@@ -271,14 +283,35 @@ void sequence_padSequence(Sequence *sequence) {
     sequence->elements = stString_print("%s%s", sequence->elements, endPadding);
 }
 
-Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength,
-                                  void *(*getFcn)(void *, int64_t)) {
-    size_t elementSize = sizeof(inputSequence->elements);
-    //void *elementSlice;
-    //elementSlice = &(inputSequence->elements[start * elementSize]); // equivalent
-    //void *elementSlice = inputSequence->elements + (start * elementSize);
+Sequence *sequence_sliceNucleotideSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength,
+                                           void *(*getFcn)(void *, int64_t)) {
+    size_t elementSize = sizeof(char);
     void *elementSlice = (char *)inputSequence->elements + (start * elementSize);
-    Sequence* newSequence = sequence_construct(sliceLength, elementSlice, getFcn);
+    Sequence *newSequence = sequence_construct(sliceLength, elementSlice, getFcn);
+    return newSequence;
+}
+
+Sequence *sequence_sliceNucleotideSequence2(Sequence *inputSequence, int64_t start, int64_t sliceLength) {
+    size_t elementSize = sizeof(char);
+    void *elementSlice = (char *)inputSequence->elements + (start * elementSize);
+    Sequence *newSequence = sequence_construct2(sliceLength, elementSlice,
+                                                inputSequence->get, inputSequence->sliceFcn);
+    return newSequence;
+}
+
+Sequence *sequence_sliceEventSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength,
+                                      void *(*getFcn)(void *, int64_t)) {
+    size_t elementSize = sizeof(double);
+    void *elementSlice = (char *)inputSequence->elements + ((start * NB_EVENT_PARAMS) * elementSize);
+    Sequence *newSequence = sequence_construct(sliceLength, elementSlice, getFcn);
+    return newSequence;
+}
+
+Sequence *sequence_sliceEventSequence2(Sequence *inputSequence, int64_t start, int64_t sliceLength) {
+    size_t elementSize = sizeof(double);
+    void *elementSlice = (char *)inputSequence->elements + ((start * NB_EVENT_PARAMS) * elementSize);
+    Sequence *newSequence = sequence_construct2(sliceLength, elementSlice,
+                                                inputSequence->get, inputSequence->sliceFcn);
     return newSequence;
 }
 
@@ -300,13 +333,18 @@ void *sequence_getKmer(void *elements, int64_t index) {
 }
 
 void *sequence_getKmer2(void *elements, int64_t index) {
+    //char *n = "NNNNNN";
+    if (index < 0){
+        //return n;
+        return &(((char *) elements)[0]);
+    }
     return index > 0 ? &(((char *) elements)[index - 1]) : &(((char *) elements)[index]);
 }
 
 void *sequence_getEvent(void *elements, int64_t index) {
     index = index * NB_EVENT_PARAMS;
-    return index >= 0 ? &(((double *)elements)[index]) : NULL;
-    //return &(((double *)elements)[index]);
+    //return index >= 0 ? &(((double *)elements)[index]) : NULL;
+    return index >= 0 ? &(((double *)elements)[index]) : NULLEVENT;
 }
 
 int64_t sequence_correctSeqLength(int64_t length, SequenceType type) {
@@ -639,11 +677,13 @@ static void diagonalCalculation(StateMachine *sM,
     // work from smallest to largest
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
         // get the position in the sequence based on the diagonals
+
         int64_t indexX = getXposition(sX, diagonal_getXay(diagonal), xmy) - 1;
         int64_t indexY = getYposition(sY, diagonal_getXay(diagonal), xmy) - 1;
 
         // get the element from the sequence at that position. At this point the element is still a void, so
         // it could be anything (base, kmer, event, etc.)
+
         void* x = sX->get(sX->elements, indexX);
         void* y = sY->get(sY->elements, indexY);
 
@@ -654,6 +694,7 @@ static void diagonalCalculation(StateMachine *sM,
         double *upper = dpDiagonalM1 == NULL ? NULL : dpDiagonal_getCell(dpDiagonalM1, xmy + 1);
         cellCalculation(sM, current, lower, middle, upper, x, y, extraArgs);
         xmy += 2;
+
     }
 }
 
@@ -838,7 +879,7 @@ void diagonalCalculation_signal_Expectations(StateMachine *sM, int64_t xay,
 
 void getPosteriorProbsWithBanding(StateMachine *sM,
                                   stList *anchorPairs,
-                                  Sequence* sX, Sequence* sY,
+                                  Sequence *sX, Sequence *sY,
                                   PairwiseAlignmentParameters *p,
                                   bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd,
                                   void (*diagonalPosteriorProbFn)(StateMachine *, int64_t, DpMatrix *, DpMatrix *,
@@ -870,12 +911,15 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
 
     int64_t tracedBackTo = 0;
     int64_t totalPosteriorCalculations = 0;
+
     while (1) { //Loop that moves through the matrix forward
+
         Diagonal diagonal = bandIterator_getNext(forwardBandIterator);
 
         //Forward calculation
         dpDiagonal_zeroValues(dpMatrix_createDiagonal(forwardDpMatrix, diagonal));
         diagonalCalculationForward(sM, diagonal_getXay(diagonal), forwardDpMatrix, sX, sY);
+
         //Condition true at the end of the matrix
         bool atEnd = diagonal_getXay(diagonal) == diagonalNumber;
         //Condition true when we want to do an intermediate traceback.
@@ -1062,11 +1106,13 @@ stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatM
         command =
                 stString_print(
                         "./cPecanLastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s %s",
+                        //"./cPecanLastz --hspthresh=1800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s %s",
                         tempFile1, tempFile2);
     } else {
         command =
                 stString_print(
                         "echo '>b\n%s\n' | ./cPecanLastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s",
+                        //"echo '>b\n%s\n' | ./cPecanLastz --hspthresh=1800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s",
                         sY, tempFile1);
     }
     FILE *fileHandle = popen(command, "r");
@@ -1345,8 +1391,10 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         int64_t x2 = stIntTuple_get(subRegion, 2);
         int64_t y2 = stIntTuple_get(subRegion, 3);
 
-        Sequence* sX3 = sequence_getSubSequence(SsX, x1, x2 - x1, SsX->get);
-        Sequence* sY3 = sequence_getSubSequence(SsY, y1, y2 - y1, SsY->get);
+        //Sequence *sX3 = sequence_sliceNucleotideSequence(SsX, x1, x2 - x1, SsX->get);
+        //Sequence *sY3 = sequence_sliceEventSequence(SsY, y1, y2 - y1, SsY->get);
+        Sequence *sX3 = SsX->sliceFcn(SsX, x1, x2 - x1);
+        Sequence *sY3 = SsY->sliceFcn(SsY, y1, y2 - y1);
 
         //List of anchor pairs
         stList *subListOfAnchorPoints = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
@@ -1369,6 +1417,7 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
                                      (alignmentHasRaggedLeftEnd || i > 0),
                                      (alignmentHasRaggedRightEnd || i < stList_length(splitPoints) - 1),
                                      diagonalPosteriorProbFn, extraArgs);
+
         if (coordinateCorrectionFn != NULL) {
             coordinateCorrectionFn(x1, y1, extraArgs);
         }
@@ -1452,8 +1501,10 @@ stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_
     //stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(cX, cY, p);
     stList *anchorPairs = getAnchorPairFcn(cX, cY, p);
 
-    Sequence *SsX = sequence_construct(lX, cX, getXFcn);
-    Sequence *SsY = sequence_construct(lY, cY, getYFcn);
+    //Sequence *SsX = sequence_construct(lX, cX, getXFcn);
+    //Sequence *SsY = sequence_construct(lY, cY, getYFcn);
+    Sequence *SsX = sequence_construct2(lX, cX, getXFcn, sequence_sliceNucleotideSequence2);
+    Sequence *SsY = sequence_construct2(lY, cY, getYFcn, sequence_sliceNucleotideSequence2);
 
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, SsX, SsY,
                                                        anchorPairs, p,
@@ -1553,8 +1604,10 @@ void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
     // get anchors
     stList *anchorPairs = getAnchorPairFcn(sX, sY, p);
     // make Sequence objects
-    Sequence *SsX = sequence_construct(lX, sX, getFcn);
-    Sequence *SsY = sequence_construct(lY, sY, getFcn);
+    //Sequence *SsX = sequence_construct(lX, sX, getFcn);
+    //Sequence *SsY = sequence_construct(lY, sY, getFcn);
+    Sequence *SsX = sequence_construct2(lX, sX, getFcn, sequence_sliceNucleotideSequence2);
+    Sequence *SsY = sequence_construct2(lY, sY, getFcn, sequence_sliceNucleotideSequence2);
 
     getExpectationsUsingAnchors(sM, hmmExpectations, SsX, SsY,
                                 anchorPairs, p,

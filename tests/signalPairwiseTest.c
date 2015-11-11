@@ -668,8 +668,7 @@ static void test_vanilla_diagonalDPCalculations(CuTest *testCase) {
     stSortedSet *alignedPairsSet = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
                                                           (void (*)(void *)) stIntTuple_destruct);
 
-    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(0, 1));
-    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 2));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 0));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 3));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(5, 4));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(6, 5));
@@ -682,7 +681,7 @@ static void test_vanilla_diagonalDPCalculations(CuTest *testCase) {
         st_logInfo("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
         CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
-    CuAssertIntEquals(testCase, 6, (int) stList_length(alignedPairs));
+    CuAssertIntEquals(testCase, 5, (int) stList_length(alignedPairs));
 
     // clean up
     stateMachine_destruct(sM);
@@ -938,8 +937,10 @@ static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
     stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
 
     // make Sequences for reference and template events
-    Sequence *refSeq = sequence_construct(lX, ZymoReferenceSeq, sequence_getKmer);
-    Sequence *templateSeq = sequence_construct(lY, npRead->templateEvents, sequence_getEvent);
+    Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer,
+                                           sequence_sliceNucleotideSequence2);
+    Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
+                                                sequence_sliceEventSequence2);
 
     // do alignment of template events
     stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
@@ -1003,15 +1004,17 @@ static void test_vanilla_getAlignedPairsWithBanding(CuTest *testCase) {
     stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
 
     // make Sequences for reference and template events
-    Sequence *refSeq = sequence_construct(lX, ZymoReferenceSeq, sequence_getKmer2);
-    Sequence *templateSeq = sequence_construct(lY, npRead->templateEvents, sequence_getEvent);
+    Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer2,
+                                           sequence_sliceNucleotideSequence2);
+    Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
+                                                sequence_sliceEventSequence2);
 
     // do alignment of template events
     stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
                                                        diagonalCalculationPosteriorMatchProbs,
                                                        0, 0);
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
-    st_logInfo("there are %lld aligned pairs with banding\n", stList_length(alignedPairs));
+    //st_uglyf("there are %lld aligned pairs with banding\n", stList_length(alignedPairs));
     // for ch1_file1 template there should be this many aligned pairs with banding
     CuAssertTrue(testCase, stList_length(alignedPairs) == 961);
 
@@ -1021,7 +1024,7 @@ static void test_vanilla_getAlignedPairsWithBanding(CuTest *testCase) {
                                                           sequence_getKmer2, sequence_getEvent,
                                                           diagonalCalculationPosteriorMatchProbs,
                                                           0, 0);
-    st_logInfo("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
+    //st_uglyf("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
     checkAlignedPairs(testCase, alignedPairs2, lX, lY);
     CuAssertTrue(testCase, stList_length(alignedPairs2) == 953);
 
@@ -1067,10 +1070,12 @@ static void test_echelon_getAlignedPairsWithBanding(CuTest *testCase) {
     stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
 
     // make Sequences for reference and template events
-    Sequence *refSeq = sequence_construct(lX, ZymoReferenceSeq, sequence_getKmer2);
+    Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer2,
+                                           sequence_sliceNucleotideSequence2);
     // add padding to end of sequence for echelon
     sequence_padSequence(refSeq);
-    Sequence *templateSeq = sequence_construct(lY, npRead->templateEvents, sequence_getEvent);
+    Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
+                                                sequence_sliceEventSequence2);
 
     // do alignment with anchors
     stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
@@ -1079,7 +1084,7 @@ static void test_echelon_getAlignedPairsWithBanding(CuTest *testCase) {
     checkAlignedPairsForEchelon(testCase, alignedPairs, lX, lY);
     // for ch1_file1 template there should be this many aligned pairs with banding
     CuAssertIntEquals(testCase, stList_length(alignedPairs), 1031);
-    st_logInfo("there are %lld aligned pairs using anchors\n", stList_length(alignedPairs));
+    //st_uglyf("there are %lld aligned pairs using anchors\n", stList_length(alignedPairs));
 
     // do alignment without banding
     stList *alignedPairs2 = getAlignedPairsWithoutBanding(sMt, ZymoReferenceSeq, npRead->templateEvents, lX,
@@ -1089,7 +1094,7 @@ static void test_echelon_getAlignedPairsWithBanding(CuTest *testCase) {
                                                           0, 0);
     // for ch1_file1 template there should be this many aligned pairs with banding
     CuAssertIntEquals(testCase, stList_length(alignedPairs2), 1026);
-    st_logInfo("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
+    //st_uglyf("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
     checkAlignedPairsForEchelon(testCase, alignedPairs2, lX, lY);
 
     // clean
@@ -1283,7 +1288,7 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
     // close hmm
     continuousPairHmm_destruct(cpHmm);
 
-    for (int64_t iter = 0; iter < 50; iter++) {
+    for (int64_t iter = 0; iter < 10; iter++) {
         cpHmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState,
                                                  continuousPairHmm_addToTransitionsExpectation,
                                                  continuousPairHmm_setTransitionExpectation,
@@ -1301,8 +1306,10 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
         stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
 
         // make Sequences for reference and template events
-        Sequence *refSeq = sequence_construct(lX, ZymoReferenceSeq, sequence_getKmer);
-        Sequence *templateSeq = sequence_construct(lY, npRead->templateEvents, sequence_getEvent);
+        Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer,
+                                               sequence_sliceNucleotideSequence2);
+        Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
+                                                    sequence_sliceEventSequence2);
 
         getExpectationsUsingAnchors(sMt, cpHmm, refSeq, templateSeq, filteredRemappedAnchors,
                                     p, diagonalCalculation_signal_Expectations, 0, 0);
@@ -1384,7 +1391,7 @@ static void test_vanillaHmm_em(CuTest *testCase) {
     // close hmm
     vanillaHmm_destruct(vHmm);
 
-    for (int64_t iter = 0; iter < 50; iter++) {
+    for (int64_t iter = 0; iter < 10; iter++) {
         vHmm = vanillaHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, vanilla,
                                          vanillaHmm_addToKmerSkipBinExpectation,
                                          vanillaHmm_setKmerSkipBinExpectation,
@@ -1399,8 +1406,10 @@ static void test_vanillaHmm_em(CuTest *testCase) {
         stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
 
         // make Sequences for reference and template events
-        Sequence *refSeq = sequence_construct(lX, ZymoReferenceSeq, sequence_getKmer2);
-        Sequence *templateSeq = sequence_construct(lY, npRead->templateEvents, sequence_getEvent);
+        Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer2,
+                                               sequence_sliceNucleotideSequence2);
+        Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
+                                                    sequence_sliceEventSequence2);
 
         // implant match model
         vanillaHmm_implantMatchModelsintoHmm(sMt, vHmm);
@@ -1456,7 +1465,7 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_vanilla_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_echelon_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_scaleModel);
-    //SUITE_ADD_TEST(suite, test_vanilla_strandAlignmentNoBanding);
+    SUITE_ADD_TEST(suite, test_vanilla_strandAlignmentNoBanding);
     //SUITE_ADD_TEST(suite, test_echelon_strandAlignmentNoBanding);
     SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);

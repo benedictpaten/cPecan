@@ -106,12 +106,17 @@ stList *performSignalAlignmentP(StateMachine *sM, double *events, int64_t nbEven
 
     // make sequences
     int64_t lX = sequence_correctSeqLength(strlen(target), event);
-    Sequence *sX = sequence_construct(lX, target, targetGetFcn);
-    Sequence *sY = sequence_construct(nbEvents, events, sequence_getEvent);
+    //Sequence *sX = sequence_construct(lX, target, targetGetFcn);
+    //Sequence *sY = sequence_construct(nbEvents, events, sequence_getEvent);
+    Sequence *sX = sequence_construct2(lX, target, targetGetFcn, sequence_sliceNucleotideSequence2);
+    Sequence *sY = sequence_construct2(nbEvents, events, sequence_getEvent, sequence_sliceEventSequence2);
+
+    // todo need pad sequence here? no, only for echelon
 
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, sY, filteredRemappedAnchors, p,
                                                        diagonalCalculationPosteriorMatchProbs,
                                                        1, 1);
+
 
     return alignedPairs;
 }
@@ -178,8 +183,10 @@ Hmm *performBaumWelchTrainingP(const char *model, const char *inputHmm, StateMac
         hmmContinuous_destruct(hmm, type);
         hmm = hmmContinuous_getEmptyHmm(type);
         // make sequence objects
-        Sequence *target = sequence_construct(lX, trainingTarget, getFcn);
-        Sequence *eventS = sequence_construct(nbEvents, events, sequence_getEvent);
+        //Sequence *target = sequence_construct(lX, trainingTarget, getFcn);
+        //Sequence *eventS = sequence_construct(nbEvents, events, sequence_getEvent);
+        Sequence *target = sequence_construct2(lX, trainingTarget, getFcn, sequence_sliceNucleotideSequence2);
+        Sequence *eventS = sequence_construct2(nbEvents, events, sequence_getEvent, sequence_sliceEventSequence2);
 
         // implant if using vanilla
         if (type == vanilla) {
@@ -338,7 +345,7 @@ int main(int argc, char *argv[]) {
 
     // get anchors
     stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(targetSeq, npRead->twoDread, p);
-
+    st_uglyf("SENTINAL - starting with %lld anchors\n", stList_length(anchorPairs));
     // EM training routine //
     if ((templateTrainedHmmFile != NULL) || (complementTrainedHmmFile != NULL)) {
         if (templateTrainedHmmFile != NULL) {
@@ -364,10 +371,12 @@ int main(int argc, char *argv[]) {
         // Template alignment
         // load template stateMachine
         StateMachine *sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype);
+
         // get aligned pairs
         stList *templateAlignedPairs = performSignalAlignment(sMt, templateHmmFile, npRead->templateEvents,
                                                               npRead->nbTemplateEvents, npRead->templateEventMap,
                                                               targetSeq, p, anchorPairs);
+        st_uglyf("SENTINAL - got %lld template aligned pairs\n", stList_length(templateAlignedPairs));
         // sort
         stList_sort(templateAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
         // write to file
@@ -388,7 +397,7 @@ int main(int argc, char *argv[]) {
         stList *complementAlignedPairs = performSignalAlignment(sMc, complementHmmFile, npRead->complementEvents,
                                                                 npRead->nbComplementEvents, npRead->complementEventMap,
                                                                 rc_targetSeq, p, anchorPairs);
-
+        st_uglyf("SENTINAL - got %lld complement aligned pairs\n", stList_length(complementAlignedPairs));
         // sort
         stList_sort(complementAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
         // write to file

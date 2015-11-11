@@ -628,8 +628,8 @@ class SignalAlignment(object):
                                                                           template_model_path=temp_t_model,
                                                                           complement_model_path=temp_c_model)
 
-        print("temp template model", temp_t_model)
-        print("temp complement model", temp_c_model)
+        print("signalAlign - temp template model", temp_t_model, file=sys.stderr)
+        print("signalAlign - temp complement model", temp_c_model, file=sys.stderr)
 
         if success is False:
             return False

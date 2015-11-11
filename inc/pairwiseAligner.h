@@ -33,12 +33,14 @@ typedef enum {
     event=2
 } SequenceType;
 
-typedef struct sequence {
+typedef struct _sequence Sequence;
+
+struct _sequence {
     int64_t length;
     void *elements;
-    void* (*get)(void *elements, int64_t index);
-} Sequence;
-
+    void *(*get)(void *elements, int64_t index);
+    Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t);
+};
 
 /*
  * Sequence constructor function
@@ -48,11 +50,19 @@ typedef struct sequence {
 */
 Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(void *, int64_t));
 
+Sequence *sequence_construct2(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
+                              Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t));
+
 void sequence_padSequence(Sequence *sequence);
 
 //slice a sequence object
-Sequence *sequence_getSubSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength,
-                                  void *(*getFcn)(void *, int64_t));
+Sequence *sequence_sliceNucleotideSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength,
+                                           void *(*getFcn)(void *, int64_t));
+Sequence *sequence_sliceNucleotideSequence2(Sequence *inputSequence, int64_t start, int64_t sliceLength);
+
+Sequence *sequence_sliceEventSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength,
+                                      void *(*getFcn)(void *, int64_t));
+Sequence *sequence_sliceEventSequence2(Sequence *inputSequence, int64_t start, int64_t sliceLength);
 
 void sequence_sequenceDestroy(Sequence *seq);
 

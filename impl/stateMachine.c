@@ -112,7 +112,7 @@ int64_t emissions_discrete_getBaseIndex(void *base) {
         case 'T':
             return 3;
         default: // N or n. Hack to make sure that we get a zero model mean
-            return NUM_OF_KMERS;
+            return NUM_OF_KMERS + 1; // 11/10/15 change debugging segfaults on ecoli
     }
 }
 
@@ -1034,20 +1034,6 @@ static double stateMachine3_raggedEndStateProb(StateMachine *sM, int64_t state) 
     return 0.0;
 }
 
-static double stateMachine3Vanilla_endStateProb(StateMachine *sM, int64_t state) {
-    StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *) sM;
-    state_check(sM, state);
-    switch (state) {
-        case match:
-            return sM3v->DEFAULT_END_MATCH_PROB;
-        case shortGapX:
-            return sM3v->DEFAULT_END_FROM_X_PROB;
-        case shortGapY:
-            return sM3v->DEFAULT_END_FROM_Y_PROB;
-    }
-    return 0.0;
-}
-
 static double stateMachine3Vanilla_raggedEndStateProb(StateMachine *sM, int64_t state) {
     StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *) sM;
     state_check(sM, state);
@@ -1058,6 +1044,20 @@ static double stateMachine3Vanilla_raggedEndStateProb(StateMachine *sM, int64_t 
             return sM3v->DEFAULT_END_FROM_X_PROB;
         case shortGapY:
             return sM3v->DEFAULT_END_FROM_Y_PROB;
+    }
+    return 0.0;
+}
+
+static double stateMachine3Vanilla_endStateProb(StateMachine *sM, int64_t state) {
+    StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *) sM;
+    state_check(sM, state);
+    switch (state) {
+        case match:
+            return sM3v->DEFAULT_END_MATCH_PROB;
+        case shortGapX:
+            return sM3v->DEFAULT_END_FROM_X_PROB;
+        case shortGapY:
+            return sM3v->DEFAULT_END_FROM_X_PROB;
     }
     return 0.0;
 }
@@ -1156,6 +1156,8 @@ static void stateMachine3Vanilla_cellCalculate(StateMachine *sM,
     StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *) sM;
     // Establish transition probs (all adopted from Nanopolish by JTS)
     // from match
+    //st_uglyf("SENTINAL - vanilla cell calc start\n");
+    //st_uglyf("SENTINAL - cX: %c, cY: %f \n", *(char *)cX, *(double *)cY);
     double a_mx = sM3v->getKmerSkipProb((StateMachine *) sM3v, cX, 0); // get beta prob
     double a_my = (1 - a_mx) * sM3v->TRANSITION_M_TO_Y_NOT_X; // trans M to Y not X fudge factor
     double a_mm = 1.0f - a_my - a_mx;
@@ -1168,7 +1170,7 @@ static void stateMachine3Vanilla_cellCalculate(StateMachine *sM,
     //double a_xx = a_mx;
     double a_xx = sM3v->getKmerSkipProb((StateMachine *)sM3v, cX, 1); // get alpha prob
     double a_xm = 1.0f - a_xx;
-
+    //st_uglyf("SENTINAL - vanilla cell established probs\n");
     if (lower != NULL) {
         doTransition(lower, current, match, shortGapX, 0, log(a_mx), extraArgs);
         doTransition(lower, current, shortGapX, shortGapX, 0, log(a_xx), extraArgs);
@@ -1303,9 +1305,9 @@ StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t para
     // defaults from a template nanopore file
     sM3v->TRANSITION_M_TO_Y_NOT_X = 0.17; //default for template
     sM3v->TRANSITION_E_TO_E = 0.55f; //default for template
-    sM3v->DEFAULT_END_MATCH_PROB = 0.79015888282447311; // stride_prb
-    sM3v->DEFAULT_END_FROM_X_PROB = 0.19652425498269727; // skip_prob
-    sM3v->DEFAULT_END_FROM_Y_PROB = 0.013316862192910478; // stay_prob
+    sM3v->DEFAULT_END_MATCH_PROB = -0.23552123624314988; // log(step_prob) (0.79015888282447311)
+    sM3v->DEFAULT_END_FROM_X_PROB = -1.6269694202638481; // log(skip_prob) (0.19652425498269727)
+    sM3v->DEFAULT_END_FROM_Y_PROB = -4.3187242127300092; // log(1 - (skip_prob + step_prob)) (0.013316862192829682)
     // setup the parent class
     sM3v->model.type = type;
     sM3v->model.parameterSetSize = parameterSetSize;
@@ -1343,7 +1345,7 @@ StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t param
         st_errAbort("Tried to create a echelon state machine with the wrong type?");
     }
 
-    // setup end state probabilities
+    // setup end state probabilities // todo these aren't log and won't work
     sMe->DEFAULT_END_MATCH_PROB = 0.79015888282447311; // stride_prb
     sMe->DEFAULT_END_FROM_X_PROB = 0.19652425498269727; // skip_prob
     sMe->BACKGROUND_EVENT_PROB = -3.0;
