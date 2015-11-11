@@ -1057,7 +1057,7 @@ static double stateMachine3Vanilla_endStateProb(StateMachine *sM, int64_t state)
         case shortGapX:
             return sM3v->DEFAULT_END_FROM_X_PROB;
         case shortGapY:
-            return sM3v->DEFAULT_END_FROM_X_PROB;
+            return sM3v->DEFAULT_END_FROM_Y_PROB;
     }
     return 0.0;
 }
@@ -1114,6 +1114,20 @@ void stateMachine3_setTransitionsToNanoporeDefaults(StateMachine *sM) {
     sM3->TRANSITION_GAP_EXTEND_Y = -4.3187242127239411; // log(stay_prob) 0.013316862192910478
     sM3->TRANSITION_GAP_SWITCH_TO_X = LOG_ZERO;
     sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;
+}
+
+void stateMachine3Vanilla_setStrandTransitionsToDefaults(StateMachine *sM, Strand strand) {
+    StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *)sM;
+    switch (strand) {
+        case template:
+            sM3v->TRANSITION_M_TO_Y_NOT_X = 0.17f;
+            sM3v->TRANSITION_E_TO_E = 0.55f;
+            return;
+        case complement:
+            sM3v->TRANSITION_M_TO_Y_NOT_X = 0.14f;
+            sM3v->TRANSITION_E_TO_E = 0.49f;
+            return;
+    }
 }
 
 static void stateMachine3_cellCalculate(StateMachine *sM,
@@ -1469,7 +1483,6 @@ StateMachine *getSignalStateMachine3Vanilla(const char *modelFile) {
     // construct a stateMachine3Vanilla then load the model
     StateMachine *sM3v = stateMachine3Vanilla_construct(vanilla, NUM_OF_KMERS,
                                                         emissions_signal_initEmissionsToZero,
-            //emissions_signal_getKmerSkipProb,
                                                         emissions_signal_getBetaOrAlphaSkipProb,
                                                         emissions_signal_getEventMatchProbWithTwoDists,
                                                         emissions_signal_getEventMatchProbWithTwoDists,
@@ -1485,7 +1498,7 @@ StateMachine *getStateMachineEchelon(const char *modelFile) {
                                                       emissions_signal_getKmerSkipProb,
                                                       emissions_signal_multipleKmerMatchProb,
                                                       emissions_signal_getEventMatchProbWithTwoDists,
-                                                      NULL);
+                                                      NULL); // cell update expectation, to be implemented
     emissions_signal_loadPoreModel(sMe, modelFile, sMe->type);
     return sMe;
 }

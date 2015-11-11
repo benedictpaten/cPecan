@@ -6,10 +6,6 @@
 #include "nanopore.h"
 #include "continuousHmm.h"
 
-typedef enum _strand {
-    template = 0,
-    complement = 1
-} Strand;
 
 void usage() {
     fprintf(stderr, "./vanillaAlign target.txt read.npRead posteriorProbs.tsv\n");
@@ -74,11 +70,13 @@ stList *getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eventMap) {
     return filteredRemappedAnchors;
 }
 
-StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentParameters npp, StateMachineType type) {
+StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentParameters npp, StateMachineType type,
+                                Strand strand) {
     assert((type == threeState) || (type == vanilla));
     if (type == vanilla) {
         StateMachine *sM = getSignalStateMachine3Vanilla(modelFile);
         emissions_signal_scaleModel(sM, npp.scale, npp.shift, npp.var, npp.scale_sd, npp.var_sd);
+        stateMachine3Vanilla_setStrandTransitionsToDefaults(sM, strand);
         return sM;
     }
     if (type == threeState) {
@@ -154,9 +152,10 @@ stList *performSignalAlignment(StateMachine *sM, const char *hmmFile, double *ev
 Hmm *performBaumWelchTrainingP(const char *model, const char *inputHmm, StateMachineType type,
                               NanoporeReadAdjustmentParameters npp, double *events, int64_t nbEvents,
                               int64_t *eventMap, char *trainingTarget, PairwiseAlignmentParameters *p,
-                              stList *unmappedAnchors, int64_t iterations, void *(*getFcn)(void *, int64_t)) {
+                              stList *unmappedAnchors, int64_t iterations, void *(*getFcn)(void *, int64_t),
+                              Strand strand) {
     // load model into stateMachine
-    StateMachine *sM = buildStateMachine(model, npp, type);
+    StateMachine *sM = buildStateMachine(model, npp, type, strand);
 
     // load HMM if given
     if (inputHmm != NULL) {
@@ -221,15 +220,15 @@ Hmm *performBaumWelchTrainingP(const char *model, const char *inputHmm, StateMac
 Hmm *performBaumWelchTraining(const char *model, const char *inputHmm, StateMachineType type,
                               NanoporeReadAdjustmentParameters npp, double *events, int64_t nbEvents,
                               int64_t *eventMap, char *trainingTarget, PairwiseAlignmentParameters *p,
-                              stList *unmappedAnchors, int64_t iterations) {
+                              stList *unmappedAnchors, int64_t iterations, Strand strand) {
     if (type == vanilla) {
         Hmm *hmm = performBaumWelchTrainingP(model, inputHmm, type, npp, events, nbEvents, eventMap, trainingTarget,
-                                             p, unmappedAnchors, iterations, sequence_getKmer2);
+                                             p, unmappedAnchors, iterations, sequence_getKmer2, strand);
         return hmm;
     }
     if (type == threeState) {
         Hmm *hmm = performBaumWelchTrainingP(model, inputHmm, type, npp, events, nbEvents, eventMap, trainingTarget,
-                                             p, unmappedAnchors, iterations, sequence_getKmer);
+                                             p, unmappedAnchors, iterations, sequence_getKmer, strand);
         return hmm;
     }
     return 0;
@@ -353,7 +352,7 @@ int main(int argc, char *argv[]) {
             Hmm *templateTrainedHmm = performBaumWelchTraining(templateModelFile, templateHmmFile, sMtype,
                                                                npRead->templateParams, npRead->templateEvents,
                                                                npRead->nbTemplateEvents, npRead->templateEventMap,
-                                                               targetSeq, p, anchorPairs, iter);
+                                                               targetSeq, p, anchorPairs, iter, template);
             fprintf(stderr, "vanillaAlign - writing hmm to file: %s\n\n", templateTrainedHmmFile);
             hmmContinuous_writeToFile(templateTrainedHmmFile, templateTrainedHmm, sMtype);
         }
@@ -362,23 +361,25 @@ int main(int argc, char *argv[]) {
             Hmm *complementTrainedHmm = performBaumWelchTraining(complementModelFile, complementHmmFile, sMtype,
                                                                  npRead->complementParams, npRead->complementEvents,
                                                                  npRead->nbComplementEvents, npRead->complementEventMap,
-                                                                 rc_targetSeq, p, anchorPairs, iter);
+                                                                 rc_targetSeq, p, anchorPairs, iter, complement);
             fprintf(stderr, "vanillaAlign - writing hmm to file: %s\n\n", complementTrainedHmmFile);
             hmmContinuous_writeToFile(complementTrainedHmmFile, complementTrainedHmm, sMtype);
         }
     } else {
-        fprintf(stderr, "vanillaAlign - starting template alignment\n");
         // Template alignment
+        fprintf(stderr, "vanillaAlign - starting template alignment\n");
         // load template stateMachine
-        StateMachine *sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype);
+        StateMachine *sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype, template);
 
         // get aligned pairs
         stList *templateAlignedPairs = performSignalAlignment(sMt, templateHmmFile, npRead->templateEvents,
                                                               npRead->nbTemplateEvents, npRead->templateEventMap,
                                                               targetSeq, p, anchorPairs);
         st_uglyf("SENTINAL - got %lld template aligned pairs\n", stList_length(templateAlignedPairs));
+
         // sort
         stList_sort(templateAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
+
         // write to file
         if (posteriorProbsFile != NULL) {
             writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_PROBS, npRead->templateEvents,
@@ -390,16 +391,18 @@ int main(int argc, char *argv[]) {
         stList_destruct(templateAlignedPairs);
 
         // Complement alignment
-        // load complement stateMachine
         fprintf(stderr, "vanillaAlign - starting complement alignment\n");
-        StateMachine *sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype);
+        StateMachine *sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, complement);
+
         // get aligned pairs
         stList *complementAlignedPairs = performSignalAlignment(sMc, complementHmmFile, npRead->complementEvents,
                                                                 npRead->nbComplementEvents, npRead->complementEventMap,
                                                                 rc_targetSeq, p, anchorPairs);
         st_uglyf("SENTINAL - got %lld complement aligned pairs\n", stList_length(complementAlignedPairs));
+
         // sort
         stList_sort(complementAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
+
         // write to file
         if (posteriorProbsFile != NULL) {
             writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_PROBS, npRead->complementEvents,

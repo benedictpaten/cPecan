@@ -28,6 +28,11 @@ typedef enum {
     match = 0, shortGapX = 1, shortGapY = 2, longGapX = 3, longGapY = 4
 } State;
 
+typedef enum _strand {
+    template = 0,
+    complement = 1
+} Strand;
+
 typedef struct _stateMachine StateMachine;
 typedef struct _hmm Hmm;
 
@@ -236,6 +241,8 @@ int64_t emissions_discrete_getKmerIndexFromKmer(void *kmer);
 void stateMachine3_setTransitionsToNucleotideDefaults(StateMachine *sM);
 
 void stateMachine3_setTransitionsToNanoporeDefaults(StateMachine *sM);
+
+void stateMachine3Vanilla_setStrandTransitionsToDefaults(StateMachine *sM, Strand strand);
 
 // emissions defaults
 void emissions_discrete_initEmissionsToZero(StateMachine *sM);
