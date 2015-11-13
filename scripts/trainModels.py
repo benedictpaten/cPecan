@@ -76,13 +76,13 @@ def cull_training_files(directory, training_amount):
         total_amount += get_2d_length(directory+fast5s[i])
         if total_amount >= training_amount:
             break
-    print("Culled {nb_files} training files.".format(nb_files=len(training_files)),
+    print("trainModels - Culled {nb_files} training files.".format(nb_files=len(training_files)),
           end="\n", file=sys.stderr)
 
     return training_files
 
 
-def doEM(in_fast5, reference, destination, strawMan_flag, strand="Template", bwa_index=None, in_hmm=None, iterations=50):
+def doEM(in_fast5, reference, folder_handle, strawMan_flag, strand="Template", bwa_index=None, in_hmm=None, iterations=50):
     """
     :param in_fast5: path to the fast5 file
     :param reference: path to the reference sequence (fasta)
@@ -98,32 +98,38 @@ def doEM(in_fast5, reference, destination, strawMan_flag, strand="Template", bwa
     # it align to the reference as it is in the fastA or to the reverse complement
 
     # containers and defaults
-    temp_dir = destination + "tempFiles_{strand}/".format(strand=strand)
-    # make the temp directory, if needed
-    if not os.path.isdir(temp_dir):
-        os.system("mkdir {dir}".format(dir=temp_dir))
-    temp_np_read = temp_dir + "temp_nanoporeRead.npRead"
-    temp_2d_read = temp_dir + "temp_2d_read.fa"
-    get_npRead_2dseq_and_models(in_fast5, temp_np_read, temp_2d_read)
+    read_label = in_fast5.split("/")[-1]  # name of read
 
-    # if there is no bwa index given, make one
+    # object to handle files
+
+    work_dir = folder_handle.path
+    print("PYSENTINAL - working directory", work_dir)
+
+    # deconstructed files for alignment
+    temp_np_read = folder_handle.add_file_path("temp_nanoporeRead.npRead")
+    temp_2d_read = folder_handle.add_file_path("temp_2d_read.fa")
+    temp_t_model = folder_handle.add_file_path("template_model.model")
+    temp_c_model = folder_handle.add_file_path("complement_model.model")
+
+    # make the npRead and fasta todo make this assert
+    success, temp_t_model, temp_c_model = get_npRead_2dseq_and_models(fast5=in_fast5,
+                                                                      npRead_path=temp_np_read,
+                                                                      twod_read_path=temp_2d_read,
+                                                                      template_model_path=temp_t_model,
+                                                                      complement_model_path=temp_c_model)
+
+    if success is False:
+        return False
+
+    # if there is no bwa index given, make one #LOOK# maybe don't need this?
     if bwa_index is None:
         bwa = Bwa(reference)
-        bwa.build_index(temp_dir)
-        bwa_ref_index = temp_dir + "temp_bwaIndex"
+        bwa.build_index(work_dir)
+        bwa_ref_index = work_dir + "temp_bwaIndex"
     else:
         bwa_ref_index = bwa_index
 
-    # align with bwa
-    #bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"  # todo require bwa in path remove this
-    #command = "{bwaDir}bwa mem -x ont2d {index} {query}".format(bwaDir=bwa_dir, index=bwa_ref_index,
-    #                                                            query=temp_2d_read)
-    # this is a small SAM file that comes from bwa
-    #print("trainModels - mapping read from {inFile}".format(inFile=in_fast5), file=sys.stderr)
-    #aln = subprocess.check_output(command.split())
-    #aln = aln.split("\t") # split
-
-    # migrated function outside
+    # orient read with bwa
     orientation = orient_read_with_bwa(bwa_index=bwa_ref_index, query=temp_2d_read)
 
     # forward strand
@@ -136,17 +142,18 @@ def doEM(in_fast5, reference, destination, strawMan_flag, strand="Template", bwa
 
     # didn't map
     elif (orientation != 0) and (orientation != 16):
-        print("\n\ntrainModels - read didn't map", file=sys.stderr)
-        return  # todo double check if this works correctly
+        print("\ntrainModels - read didn't map", file=sys.stderr)
+        return  False
 
     # EM training routine: now we can run the training, we run training on either the template or
     # complement, so that we can run this program in parallel and really do both at once
 
     # containers and defaults
-    temp_ref_seq = temp_dir + "temp_ref_seq.txt"
+    temp_ref_seq = folder_handle.add_file_path("temp_ref_seq.txt")
     path_to_vanillaAlign = "./vanillaAlign"
     strand_flags = ["-y", "-t"]
-    training_hmm = destination + "{strand}_trained.hmm".format(strand=strand)
+    training_hmm = folder_handle.add_file_path("{strand}_trained.hmm".format(strand=strand))
+    print("PYSENTINAL - training hmm", training_hmm)
 
     # make the temp sequence file
     make_temp_sequence(reference, forward, temp_ref_seq)
@@ -201,16 +208,14 @@ def main(args):
     print(start_message, file=sys.stderr)
 
     # make directory to put temporary files
-    temp_dir = args.out + "tempFiles_{strand}/".format(strand=args.strand)
-    # make the temp directory, if needed
-    if not os.path.isdir(temp_dir):
-        os.system("mkdir {dir}".format(dir=temp_dir))
+    training_folder = FolderHandler()
+    training_folder_path = training_folder.open_folder(args.out + "tempFiles_{strand}/".format(strand=args.strand))
 
     # index the reference for bwa, if needed
     bwa_ref_index = ''
     if args.bwa_index is None:
         print("trainModels - indexing reference", file=sys.stderr)
-        bwa_ref_index = get_bwa_index(args.ref, temp_dir)
+        bwa_ref_index = get_bwa_index(args.ref, training_folder_path)
         print("trainModels - indexing reference, done\n", file=sys.stderr)
     else:
         bwa_ref_index = args.bwa_index
@@ -218,24 +223,24 @@ def main(args):
     # get a random list of files containing the number of bases we want to train
     training_file_list = cull_training_files(args.files_dir, args.amount)
 
-    training_hmm = args.out + "{strand}_trained.hmm".format(strand=args.strand)
+    training_hmm = training_folder.add_file_path("{strand}_trained.hmm".format(strand=args.strand))
 
     # get started. if there is no input training hmm, then we start from scratch, and train on one file
     if args.inHmm is None:
         get_started_file = training_file_list.pop()
         doEM(in_fast5=get_started_file, reference=args.ref, strand=args.strand, bwa_index=bwa_ref_index,
-             in_hmm=None, destination=args.out, iterations=args.iter, strawMan_flag=args.strawMan)
+             in_hmm=None, folder_handle=training_folder, iterations=args.iter, strawMan_flag=args.strawMan)
 
     # otherwise train with the input hmm on one file
     if args.inHmm is not None:
         get_started_file = training_file_list.pop()
         doEM(in_fast5=get_started_file, reference=args.ref, strand=args.strand, bwa_index=bwa_ref_index,
-             in_hmm=args.inHmm, destination=args.out, iterations=args.iter, strawMan_flag=args.strawMan)
+             in_hmm=args.inHmm, folder_handle=training_folder, iterations=args.iter, strawMan_flag=args.strawMan)
 
     # train on the rest of the files
     for training_file in training_file_list:
         doEM(in_fast5=training_file, reference=args.ref, strand=args.strand, bwa_index=bwa_ref_index,
-             in_hmm=training_hmm, destination=args.out, iterations=args.iter, strawMan_flag=args.strawMan)
+             in_hmm=training_hmm, folder_handle=training_folder, iterations=args.iter, strawMan_flag=args.strawMan)
 
     print("\nFinished Training routine, exiting.\n", file=sys.stderr)
 

@@ -77,7 +77,7 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path, template_mod
         if t_transformed is False or c_transformed is False:
             return False
 
-        # output
+        # Make the npRead
 
         # line 1
         print(len(npRead.twoD_read_sequence), end=' ', file=out_file) # 2D read length
@@ -107,8 +107,8 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path, template_mod
             print(mean, stdev, length, sep=' ', end=' ', file=out_file)
         print("", end="\n", file=out_file)
 
-        # line 5
-        for _ in npRead.complement_event_map:
+        # line 5 remember to flip the map around because this will be aligned to the reverse complement!
+        for _ in npRead.complement_event_map[::-1]:
             print(_, end=' ', file=out_file)
         print("", end="\n", file=out_file)
 
@@ -117,27 +117,30 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path, template_mod
             print(mean, stdev, length, sep=' ', end=' ', file=out_file)
         print("", end="\n", file=out_file)
 
-        # make temp read
+        # make the 2d read
         npRead.extract_2d_read(temp_fasta)
 
         # handle models
+        # template model
         if npRead.get_model_id("/Analyses/Basecall_2D_000/Summary/basecall_1d_template") == \
                 "template_median68pA.model":
-            print("found default template model")
+            print("signalAlign - found default template model", file=sys.stderr)
             template_model_path = None
         else:
             template_model_file = open(template_model_path, "w")
             got_template_model = npRead.export_template_model(template_model_file)
+            # TODO put fail check here
 
+        # complement model
         if npRead.get_model_id("/Analyses/Basecall_2D_000/Summary/basecall_1d_complement") == \
             "complement_median68pA_pop2.model":
-            print("found default complement model")
+            print("signalAlign - found default complement model", file=sys.stderr)
             complement_model_path = None
         else:
             complement_model_file = open(complement_model_path, "w")
             got_complement_model = npRead.export_complement_model(complement_model_file)
+            # todo put fail check
 
-        # todo need checks or something
         npRead.close()
         return True, template_model_path, complement_model_path
     else:
@@ -610,11 +613,14 @@ class SignalAlignment(object):
         # Preamble set up before doing the alignment
 
         # containers and defaults
-        read_label = self.in_fast5.split("/")[-1]  # used in the posteriors file
+        read_label = self.in_fast5.split("/")[-1]      # used in the posteriors file as identifier
         read_name = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
+
+        # object for handling temporary files
         temp_folder = FolderHandler()
         temp_dir_path = temp_folder.open_folder(self.destination + "tempFiles_{readLabel}".format(readLabel=read_label))
 
+        # read-specific files, could be removed later but are kept right now to make it easier to rerun commands
         temp_np_read = temp_folder.add_file_path("temp_{read}.npRead".format(read=read_label))
         temp_2d_read = temp_folder.add_file_path("temp_2Dseq_{read}.fa".format(read=read_label))
         temp_t_model = temp_folder.add_file_path("template_model.model")
@@ -628,8 +634,8 @@ class SignalAlignment(object):
                                                                           template_model_path=temp_t_model,
                                                                           complement_model_path=temp_c_model)
 
-        print("signalAlign - temp template model", temp_t_model, file=sys.stderr)
-        print("signalAlign - temp complement model", temp_c_model, file=sys.stderr)
+        print("signalAlign - temp template match model", temp_t_model, file=sys.stderr)
+        print("signalAlign - temp complement match model", temp_c_model, file=sys.stderr)
 
         if success is False:
             return False
@@ -660,7 +666,7 @@ class SignalAlignment(object):
 
         # didn't map
         elif (orientation != 0) and (orientation != 16):
-            print("\n\ntrainModels - read didn't map", file=sys.stderr)
+            print("\nsignalAlign - read didn't map", file=sys.stderr)
             return False
 
         # Alignment routine

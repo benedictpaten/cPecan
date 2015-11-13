@@ -327,15 +327,13 @@ void *sequence_getBase(void *elements, int64_t index) {
 }
 
 void *sequence_getKmer(void *elements, int64_t index) {
-    char *n = "";
+    char *n = "n";
     //int64_t i = index;
     return index >= 0 ? &(((char *) elements)[index]) : n;
 }
 
 void *sequence_getKmer2(void *elements, int64_t index) {
-    //char *n = "NNNNNN";
     if (index < 0){
-        //return n;
         return &(((char *) elements)[0]);
     }
     return index > 0 ? &(((char *) elements)[index - 1]) : &(((char *) elements)[index]);
@@ -468,7 +466,8 @@ void cell_signal_updateBetaAndAlphaProb(double *fromCells, double *toCells, int6
         hmmExpectations->baseContinuousHmm.baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, x, 0, p);
     }
     if (from == shortGapX && to == shortGapX) {
-        hmmExpectations->baseContinuousHmm.baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, x, 0, p);
+        hmmExpectations->baseContinuousHmm.baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations,
+                                                                                 (x + 30), 0, p);
     }
 }
 
@@ -477,8 +476,8 @@ static void cell_calculateExpectation(StateMachine *sM,
                                       double *current, double *lower, double *middle, double *upper,
                                       void* cX, void* cY,
                                       void *extraArgs) {
-    void *extraArgs2[4] = { ((void **)extraArgs)[0], // hmmExpectations
-                            ((void **)extraArgs)[1], // &totalProbabability
+    void *extraArgs2[4] = { ((void **)extraArgs)[0], // &totalProbabability
+                            ((void **)extraArgs)[1], // hmmExpectations
                             cX,
                             cY };
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, cell_updateExpectations, extraArgs2);
@@ -488,8 +487,8 @@ static void cell_signal_calculateUpdateExpectation(StateMachine *sM,
                                                    double *current, double *lower, double *middle, double *upper,
                                                    void *cX, void *cY,
                                                    void *extraArgs) {
-    void *extraArgs2[4] = { ((void **)extraArgs)[0], // hmmExpectations
-                            ((void **)extraArgs)[1], // &totalProbabability
+    void *extraArgs2[4] = { ((void **)extraArgs)[0], // &totalProbabability
+                            ((void **)extraArgs)[1], // hmmExpectations
                             cX,   // pointer to char in sequence
                             cY }; // pointer to event array, can remove..?
     sM->cellCalculate(sM, current, lower, middle, upper, cX, cY,
@@ -856,7 +855,7 @@ void diagonalCalculation_signal_Expectations(StateMachine *sM, int64_t xay,
     /*
      * Updates the expectations of the transitions/emissions for the given diagonal.
      */
-    Hmm *hmmExpectations = extraArgs; // maybe change around hmm here?
+    Hmm *hmmExpectations = extraArgs;
     void *extraArgs2[2] = { &totalProbability, hmmExpectations }; // this is where you pack in totalprob
 
     // update likelihood
@@ -1102,17 +1101,16 @@ stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatM
     if (lY > 1000) {
         tempFile2 = getTempFile();
         writeSequenceToFile(tempFile2, "b", sY);
-        // change the path here to local lastz folder
         command =
                 stString_print(
                         "./cPecanLastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s %s",
-                        //"./cPecanLastz --hspthresh=1800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s %s",
+                        //"./cPecanLastz --hspthresh=1800 --chain --strand=plus --gapped --format=cigar --gap=100,100 --ambiguous=iupac,100,100 %s %s",
                         tempFile1, tempFile2);
     } else {
         command =
                 stString_print(
                         "echo '>b\n%s\n' | ./cPecanLastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s",
-                        //"echo '>b\n%s\n' | ./cPecanLastz --hspthresh=1800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s",
+                        //"echo '>b\n%s\n' | ./cPecanLastz --hspthresh=1800 --chain --strand=plus --gapped --gap=100,100 --format=cigar --ambiguous=iupac,100,100 %s",
                         sY, tempFile1);
     }
     FILE *fileHandle = popen(command, "r");
@@ -1391,8 +1389,6 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         int64_t x2 = stIntTuple_get(subRegion, 2);
         int64_t y2 = stIntTuple_get(subRegion, 3);
 
-        //Sequence *sX3 = sequence_sliceNucleotideSequence(SsX, x1, x2 - x1, SsX->get);
-        //Sequence *sY3 = sequence_sliceEventSequence(SsY, y1, y2 - y1, SsY->get);
         Sequence *sX3 = SsX->sliceFcn(SsX, x1, x2 - x1);
         Sequence *sY3 = SsY->sliceFcn(SsY, y1, y2 - y1);
 

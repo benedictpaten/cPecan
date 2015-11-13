@@ -75,7 +75,6 @@ Hmm *continuousPairHmm_constructEmpty(
     int64_t nb_states = cpHmm->baseContinuousHmm.baseHmm.stateNumber;
     cpHmm->transitions = st_malloc(nb_states * nb_states * sizeof(double));
     for (int64_t i = 0; i < (nb_states * nb_states); i++) {
-
         cpHmm->transitions[i] = pseudocount;
     }
 

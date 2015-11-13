@@ -113,6 +113,7 @@ def main(args):
         p.join()
 
     done_queue.put('STOP')
+    print("signalAlign - finished alignments\n", file=sys.stderr)
 
 
 if __name__ == "__main__":

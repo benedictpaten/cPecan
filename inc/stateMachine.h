@@ -21,7 +21,8 @@ typedef enum {
     threeState=2,
     threeStateAsymmetric=3,
     vanilla=4,
-    echelon=5
+    echelon=5,
+    fourState=6
 } StateMachineType;
 
 typedef enum {
@@ -125,6 +126,48 @@ struct _StateMachine5 {
 
 };
 
+typedef struct _StateMachine4 StateMachine4;
+
+struct _StateMachine4 {
+    StateMachine model;
+    // to match
+    double TRANSITION_MATCH_CONTINUE; //0.9703833696510062f
+    double TRANSITION_MATCH_FROM_SHORT_GAP_X; //1.0 - gapExtend - gapSwitch = 0.280026392297485
+    double TRANSITION_MATCH_FROM_LONG_GAP_X; //1.0 - gapExtend = 0.00343657420938
+    double TRANSITION_MATCH_FROM_SHORT_GAP_Y; //1.0 - gapExtend - gapSwitch = 0.280026392297485
+
+    // to shortGap X
+    double TRANSITION_GAP_SHORT_OPEN_X; //0.0129868352330243
+    double TRANSITION_GAP_SHORT_EXTEND_X; //0.7126062401851738f;
+
+    // to shortGap Y
+    double TRANSITION_GAP_SHORT_OPEN_Y; //0.0129868352330243
+    double TRANSITION_GAP_SHORT_EXTEND_Y; //0.7126062401851738f;
+
+    // to long gap (random) X
+    double TRANSITION_GAP_LONG_OPEN_X; //(1.0 - match - 2*gapOpenShort)/2 = 0.001821479941473
+    double TRANSITION_GAP_LONG_EXTEND_X; //0.99656342579062f;
+    double TRANSITION_GAP_LONG_SWITCH_TO_X; //0.0073673675173412815f;
+
+    // unused
+    //double TRANSITION_GAP_SHORT_SWITCH_TO_X; //0.0073673675173412815f;
+
+    //double TRANSITION_MATCH_FROM_LONG_GAP_Y; //1.0 - gapExtend = 0.00343657420938
+    //double TRANSITION_GAP_SHORT_SWITCH_TO_Y; //0.0073673675173412815f;
+    //double TRANSITION_GAP_LONG_OPEN_Y; //(1.0 - match - 2*gapOpenShort)/2 = 0.001821479941473
+    //double TRANSITION_GAP_LONG_EXTEND_Y; //0.99656342579062f;
+    //double TRANSITION_GAP_LONG_SWITCH_TO_Y; //0.0073673675173412815f;
+
+    // prob of a kmer being skipped
+    double (*getXGapProbFcn)(const double *emissionXGapProbs, void *kmer);
+
+    // prob of an extra event
+    double (*getYGapProbFcn)(const double *scaledMatchModel, void *kmer, void *event);
+
+    // prob of an kmer/event match
+    double (*getMatchProbFcn)(const double *matchModel, void *kmer, void *event);
+};
+
 typedef struct _StateMachine3 StateMachine3;
 
 struct _StateMachine3 {
@@ -208,6 +251,14 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
                                                                    int64_t from, int64_t to,
                                                                    double eP, double tP, void *extraArgs));
 
+StateMachine *stateMachine4_construct(StateMachineType type, int64_t parameterSetSize,
+                                      void (*setEmissionsToDefaults)(StateMachine *, int64_t nbSkipParams),
+                                      double (*gapXProbFcn)(const double *, void *),
+                                      double (*gapYProbFcn)(const double *, void *, void *),
+                                      double (*matchProbFcn)(const double *, void *, void *),
+                                      void (*cellCalcUpdateFcn)(double *, double *, int64_t from, int64_t to,
+                                                                double eP, double tP, void *));
+
 StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t parameterSetSize,
                                              void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                              double (*xSkipProbFcn)(StateMachine *, void *, bool),
@@ -280,11 +331,11 @@ double emissions_signal_getEventMatchProbWithTwoDists(const double *eventModel, 
 void emissions_signal_scaleModel(StateMachine *sM, double scale, double shift, double var,
                                  double scale_sd, double var_sd);
 
-double emissions_signal_meanEventMatchProb(const double *eventModel, void *kmers, void *event);
-
 double emissions_signal_getDurationProb(void *event, int64_t n);
 
 StateMachine *getStrawManStateMachine3(const char *modelFile);
+
+StateMachine *getStateMachine4(const char *modelFile);
 
 StateMachine *getSignalStateMachine3Vanilla(const char *modelFile);
 

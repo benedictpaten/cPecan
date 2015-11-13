@@ -97,25 +97,17 @@ stList *performSignalAlignmentP(StateMachine *sM, double *events, int64_t nbEven
                                 PairwiseAlignmentParameters *p, stList *unmappedAnchors,
                                 void *(*targetGetFcn)(void *, int64_t)) {
     // remap anchor pairs
-    //stList *remapedAnchors = nanopore_remapAnchorPairs(unmappedAnchors, eventMap);
-    //stList *filteredRemappedAnchors = filterToRemoveOverlap(remapedAnchors);
     stList *filteredRemappedAnchors = getRemappedAnchorPairs(unmappedAnchors, eventMap);
 
 
     // make sequences
     int64_t lX = sequence_correctSeqLength(strlen(target), event);
-    //Sequence *sX = sequence_construct(lX, target, targetGetFcn);
-    //Sequence *sY = sequence_construct(nbEvents, events, sequence_getEvent);
     Sequence *sX = sequence_construct2(lX, target, targetGetFcn, sequence_sliceNucleotideSequence2);
     Sequence *sY = sequence_construct2(nbEvents, events, sequence_getEvent, sequence_sliceEventSequence2);
-
-    // todo need pad sequence here? no, only for echelon
 
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, sY, filteredRemappedAnchors, p,
                                                        diagonalCalculationPosteriorMatchProbs,
                                                        1, 1);
-
-
     return alignedPairs;
 }
 
@@ -125,9 +117,6 @@ stList *performSignalAlignment(StateMachine *sM, const char *hmmFile, double *ev
     if ((sM->type != threeState) && (sM->type != vanilla)) {
         st_errAbort("you're trying to do the wrong kind of alignment\n");
     }
-
-    // load model into stateMachine
-    //StateMachine *sM = buildStateMachine(model, npp, type);
 
     // load HMM if given
     if (hmmFile != NULL) {
@@ -182,8 +171,6 @@ Hmm *performBaumWelchTrainingP(const char *model, const char *inputHmm, StateMac
         hmmContinuous_destruct(hmm, type);
         hmm = hmmContinuous_getEmptyHmm(type);
         // make sequence objects
-        //Sequence *target = sequence_construct(lX, trainingTarget, getFcn);
-        //Sequence *eventS = sequence_construct(nbEvents, events, sequence_getEvent);
         Sequence *target = sequence_construct2(lX, trainingTarget, getFcn, sequence_sliceNucleotideSequence2);
         Sequence *eventS = sequence_construct2(nbEvents, events, sequence_getEvent, sequence_sliceEventSequence2);
 
@@ -281,6 +268,7 @@ int main(int argc, char *argv[]) {
                 return 0;
             case 's':
                 sMtype = threeState;
+                //sMtype = fourState;
                 break;
             case 'T':
                 templateModelFile = stString_copy(optarg);

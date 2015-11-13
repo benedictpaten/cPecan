@@ -280,7 +280,7 @@ static void emissions_signal_loadPoreModel(StateMachine *sM, const char *modelFi
     }
 
     // load in the kmer skip 'bins' for the vanilla and echelon models
-    if (type >= vanilla) {
+    if (type == vanilla || type == echelon) {
         // load X Gap emissions into stateMachine
         for (int64_t i = 0; i < 30; i++) {
             int64_t j = sscanf(stList_get(tokens, i), "%lf", &(sM->EMISSION_GAP_X_PROBS[i]));
@@ -749,7 +749,6 @@ static double stateMachine5_endStateProb(StateMachine *sM, int64_t state) {
 }
 
 static double stateMachine5_raggedEndStateProb(StateMachine *sM, int64_t state) {
-    //End state is like to going to a match
     StateMachine5 *sM5 = (StateMachine5 *) sM;
     state_check(sM, state);
     switch (state) {
@@ -766,6 +765,44 @@ static double stateMachine5_raggedEndStateProb(StateMachine *sM, int64_t state) 
     }
     return 0.0;
 }
+
+static double stateMachine4_raggedStartStateProb(StateMachine *sM, int64_t state) {
+    state_check(sM, state);
+    return (state == longGapX || state == shortGapY) ? 0 : LOG_ZERO;
+}
+
+static double stateMachine4_endStateProb(StateMachine *sM, int64_t state) {
+    StateMachine4 *sM4 = (StateMachine4 *)sM;
+    state_check(sM, state);
+    switch (state) {
+        case match:
+            return sM4->TRANSITION_MATCH_CONTINUE;
+        case shortGapX:
+            return sM4->TRANSITION_MATCH_FROM_SHORT_GAP_X;
+        case shortGapY:
+            return sM4->TRANSITION_MATCH_FROM_SHORT_GAP_Y;
+        case longGapX:
+            return sM4->TRANSITION_MATCH_FROM_LONG_GAP_X;
+    }
+    return 0.0;
+}
+
+static double stateMachine4_raggedEndStateProb(StateMachine *sM, int64_t state) {
+    StateMachine4 *sM4 = (StateMachine4 *)sM;
+    state_check(sM, state);
+    switch (state) {
+        case match:
+            return sM4->TRANSITION_GAP_LONG_OPEN_X;
+        case shortGapX:
+            return sM4->TRANSITION_GAP_LONG_OPEN_X;
+        case shortGapY:
+            return sM4->TRANSITION_GAP_LONG_OPEN_X;
+        case longGapX:
+            return sM4->TRANSITION_GAP_LONG_EXTEND_X;
+    }
+    return 0.0;
+}
+
 
 static void stateMachine5_cellCalculate(StateMachine *sM,
                                         double *current, double *lower, double *middle, double *upper,
@@ -802,6 +839,38 @@ static void stateMachine5_cellCalculate(StateMachine *sM,
         doTransition(upper, current, match, longGapY, eP, sM5->TRANSITION_GAP_LONG_OPEN_Y, extraArgs);
         doTransition(upper, current, longGapY, longGapY, eP, sM5->TRANSITION_GAP_LONG_EXTEND_Y, extraArgs);
         //doTransition(upper, current, longGapX, longGapY, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_Y, extraArgs);
+    }
+}
+
+static void stateMachine4_cellCalculate(StateMachine *sM,
+                                              double *current, double *lower, double *middle, double *upper,
+                                            void *cX, void *cY,
+                                            void (*doTransition)(double *, double *, // fromCells, toCells
+                                                                 int64_t, int64_t,   // from, to
+                                                                 double, double,     // emissionProb, transitionProb
+                                                                 void *),            // extraArgs
+                                            void *extraArgs) {
+    StateMachine4 *sM5 = (StateMachine4 *) sM;
+    if (lower != NULL) {
+        double eP = sM5->getXGapProbFcn(sM5->model.EMISSION_GAP_X_PROBS, cX);
+        doTransition(lower, current, match, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_OPEN_X, extraArgs);
+        doTransition(lower, current, shortGapX, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_X, extraArgs);
+        doTransition(lower, current, match, longGapX, eP, sM5->TRANSITION_GAP_LONG_OPEN_X, extraArgs);
+        doTransition(lower, current, longGapX, longGapX, eP, sM5->TRANSITION_GAP_LONG_EXTEND_X, extraArgs);
+        doTransition(lower, current, shortGapY, longGapX, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_X, extraArgs);
+
+    }
+    if (middle != NULL) {
+        double eP = sM5->getMatchProbFcn(sM5->model.EMISSION_MATCH_PROBS, cX, cY);
+        doTransition(middle, current, match, match, eP, sM5->TRANSITION_MATCH_CONTINUE, extraArgs);
+        doTransition(middle, current, shortGapX, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X, extraArgs);
+        doTransition(middle, current, shortGapY, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y, extraArgs);
+        doTransition(middle, current, longGapX, match, eP, sM5->TRANSITION_MATCH_FROM_LONG_GAP_X, extraArgs);
+    }
+    if (upper != NULL) {
+        double eP = sM5->getYGapProbFcn(sM5->model.EMISSION_GAP_Y_PROBS, cX, cY);
+        doTransition(upper, current, match, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_OPEN_Y, extraArgs);
+        doTransition(upper, current, shortGapY, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_Y, extraArgs);
     }
 }
 
@@ -864,6 +933,87 @@ StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSe
     setEmissionsDefaults((StateMachine *) sM5);
 
     return (StateMachine *) sM5;
+}
+
+StateMachine *stateMachine4_construct(StateMachineType type, int64_t parameterSetSize,
+                                      void (*setEmissionsToDefaults)(StateMachine *, int64_t nbSkipParams),
+                                      double (*gapXProbFcn)(const double *, void *),
+                                      double (*gapYProbFcn)(const double *, void *, void *),
+                                      double (*matchProbFcn)(const double *, void *, void *),
+                                      void (*cellCalcUpdateFcn)(double *, double *, int64_t from, int64_t to,
+                                                                double eP, double tP, void *)) {
+    StateMachine4 *sM4 = st_malloc(sizeof(StateMachine4));
+    if (type != fourState) {
+        st_errAbort("Tried to make four-state stateMachine, with wrong type\n");
+    }
+
+    // setup parent class
+    sM4->model.type = type,
+    sM4->model.parameterSetSize = parameterSetSize;
+    sM4->model.stateNumber = 4;
+    sM4->model.matchState = match;
+    // start
+    sM4->model.startStateProb = stateMachine5_startStateProb;
+    sM4->model.raggedStartStateProb = stateMachine4_raggedStartStateProb;
+    // end
+    sM4->model.endStateProb = stateMachine4_endStateProb;
+    sM4->model.raggedEndStateProb = stateMachine4_raggedEndStateProb;
+    sM4->model.cellCalculate = stateMachine4_cellCalculate;
+    // cell calculate
+    sM4->model.cellCalculateUpdateExpectations = cellCalcUpdateFcn;
+
+    // setup functions
+    sM4->getXGapProbFcn = gapXProbFcn;
+    sM4->getYGapProbFcn = gapYProbFcn;
+    sM4->getMatchProbFcn = matchProbFcn;
+
+
+    // set transitions to defaults (these are from a template read)
+    // from Match
+    sM4->TRANSITION_MATCH_CONTINUE = -0.23552123624314988; // log(p_step) (0.79015888282447311)
+    sM4->TRANSITION_GAP_SHORT_OPEN_X = -1.6269694202638481; // log(p_skip) 0.19652425498269727
+    sM4->TRANSITION_GAP_SHORT_OPEN_Y = -4.7241893208381773; // log(1 - p_step - p_skip - p_longGapXOpen)
+    sM4->TRANSITION_GAP_LONG_OPEN_X = -5.4173365013981227; // log((1 - p_step - p_skip)/3)
+
+    // from shortGapX
+    sM4->TRANSITION_GAP_SHORT_EXTEND_X = -1.6269694202638481; // log(p_skip)
+    sM4->TRANSITION_MATCH_FROM_SHORT_GAP_X = -0.21880828092192281; // log(1 - skip_prob) (1 - 0.19652425498269727)
+
+    // from longGapX
+    sM4->TRANSITION_GAP_LONG_EXTEND_X = -0.003442492794189331; // 0.99656342579062f;
+    sM4->TRANSITION_MATCH_FROM_LONG_GAP_X = -5.6732801731704612; // 1 - long gap extend
+
+    // from shortGapY
+    sM4->TRANSITION_MATCH_FROM_SHORT_GAP_Y = -0.013406326748077823; // log(1 - stay_prob) (0.98668313780708949)
+    sM4->TRANSITION_GAP_SHORT_EXTEND_Y = -4.724189320832104; // log(0.008877908128607004)
+    sM4->TRANSITION_GAP_LONG_SWITCH_TO_X = -5.4173365013920494; // log((1 - 0.98668313780708949)/3)
+
+    /*
+    // set transitions to defaults (these are from a complement read)
+    // from Match
+    sM4->TRANSITION_MATCH_CONTINUE = -0.38537441356664359; // log(p_step) (0.68019591394367218)
+    sM4->TRANSITION_GAP_SHORT_OPEN_X = -1.1462174196841781; // log(p_skip) 0.31783674145479074
+    sM4->TRANSITION_GAP_SHORT_OPEN_Y = -6.6365356716005186; // log(1 - p_step - p_skip - p_longGapXOpen)
+    sM4->TRANSITION_GAP_LONG_OPEN_X = -7.329682852160464; // log((1 - p_step - p_skip)/3)
+
+    // from shortGapX
+    sM4->TRANSITION_GAP_SHORT_EXTEND_X = -1.1462174196841781; // log(p_skip)
+    sM4->TRANSITION_MATCH_FROM_SHORT_GAP_X = -0.38248626775488298; // log(1 - skip_prob) (1 - 0.19652425498269727)
+
+    // from longGapX
+    sM4->TRANSITION_GAP_LONG_EXTEND_X = -0.003442492794189331; // 0.99656342579062f;
+    sM4->TRANSITION_MATCH_FROM_LONG_GAP_X = -5.6732801731704612; // 1 - long gap extend
+
+    // from shortGapY
+    sM4->TRANSITION_MATCH_FROM_SHORT_GAP_Y = -0.0019692823655876384; // log(1 - stay_prob) (0.98668313780708949)
+    sM4->TRANSITION_GAP_SHORT_EXTEND_Y = -6.6365356717310187; // log(0.008877908128607004)
+    sM4->TRANSITION_GAP_LONG_SWITCH_TO_X = -7.3296828522909641; // log((1 - (p_matchFromShortGapY)/3)
+    */
+
+    // initialize emissions
+    setEmissionsToDefaults((StateMachine *)sM4, parameterSetSize);
+
+    return (StateMachine *)sM4;
 }
 
 static void switchDoubles(double *a, double *b) {
@@ -1170,8 +1320,6 @@ static void stateMachine3Vanilla_cellCalculate(StateMachine *sM,
     StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *) sM;
     // Establish transition probs (all adopted from Nanopolish by JTS)
     // from match
-    //st_uglyf("SENTINAL - vanilla cell calc start\n");
-    //st_uglyf("SENTINAL - cX: %c, cY: %f \n", *(char *)cX, *(double *)cY);
     double a_mx = sM3v->getKmerSkipProb((StateMachine *) sM3v, cX, 0); // get beta prob
     double a_my = (1 - a_mx) * sM3v->TRANSITION_M_TO_Y_NOT_X; // trans M to Y not X fudge factor
     double a_mm = 1.0f - a_my - a_mx;
@@ -1181,10 +1329,9 @@ static void stateMachine3Vanilla_cellCalculate(StateMachine *sM,
     double a_ym = 1.0f - a_yy;
 
     // from X [Skipped event state]
-    //double a_xx = a_mx;
     double a_xx = sM3v->getKmerSkipProb((StateMachine *)sM3v, cX, 1); // get alpha prob
     double a_xm = 1.0f - a_xx;
-    //st_uglyf("SENTINAL - vanilla cell established probs\n");
+
     if (lower != NULL) {
         doTransition(lower, current, match, shortGapX, 0, log(a_mx), extraArgs);
         doTransition(lower, current, shortGapX, shortGapX, 0, log(a_xx), extraArgs);
@@ -1477,6 +1624,17 @@ StateMachine *getStrawManStateMachine3(const char *modelFile) {
                                                 cell_signal_updateTransAndKmerSkipExpectations);
     emissions_signal_loadPoreModel(sM3, modelFile, sM3->type);
     return sM3;
+}
+
+StateMachine *getStateMachine4(const char *modelFile) {
+    StateMachine *sM4 = stateMachine4_construct(fourState, NUM_OF_KMERS,
+                                                emissions_signal_initEmissionsToZero,
+                                                emissions_kmer_getGapProb,
+                                                emissions_signal_strawManGetKmerEventMatchProb,
+                                                emissions_signal_strawManGetKmerEventMatchProb,
+                                                cell_signal_updateTransAndKmerSkipExpectations);
+    emissions_signal_loadPoreModel(sM4, modelFile, sM4->type);
+    return sM4;
 }
 
 StateMachine *getSignalStateMachine3Vanilla(const char *modelFile) {
