@@ -599,17 +599,31 @@ class ComplementModel(NanoporeModel):
 
 class SignalAlignment(object):
     def __init__(self, in_fast5, reference, destination, strawman, bwa_index, in_templateHmm, in_complementHmm):
-        self.reference = reference
-        self.destination = destination
-        self.strawman = strawman
-        self.bwa_index = bwa_index
-        self.in_templateHmm = in_templateHmm
-        self.in_complementHmm = in_complementHmm
-        self.in_fast5 = in_fast5
-        self.in_templateModel = None
-        self.in_complementModel = None
+        self.in_fast5 = in_fast5  # fast5 file to align
+        self.reference = reference  # reference sequence
+        self.destination = destination  # place where the alignments go, should already exist
+        self.strawman = strawman  # flag to use pair-hmm
+        self.bwa_index = bwa_index  # index of reference sequence
+        self.in_templateModel = None  # initialize to none
+        self.in_complementModel = None  # initialize to none
+
+        # if we're using an input hmm, make sure it exists
+        if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
+            self.in_templateHmm = in_templateHmm
+        else:
+            self.in_templateHmm = None
+        if (in_complementHmm is not None) and os.path.isfile(in_complementHmm):
+            self.in_complementHmm = in_complementHmm
+        else:
+            self.in_complementHmm = None
 
     def do_alignment(self):
+        # file checks
+
+        if os.path.isfile(self.in_fast5) is False:
+            print("signalAlign - problem with file path {file}".format(file=self.in_fast5))
+            return False
+
         # Preamble set up before doing the alignment
 
         # containers and defaults

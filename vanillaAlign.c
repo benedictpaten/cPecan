@@ -14,7 +14,8 @@ void usage() {
 void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *matchModel, double *events, char *target,
                          stList *alignedPairs, Strand strand) {
     /*
-     * Writes the posterior match probabibilities to a tab separated file, each line being X coordinate, Y coordinate, Match probability
+     * Writes the posterior match probabibilities to a tab separated file, each line being X coordinate,
+     * Y coordinate, Match probability
      */
     char *strandLabel;
     if (strand == template) {

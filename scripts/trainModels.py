@@ -82,7 +82,8 @@ def cull_training_files(directory, training_amount):
     return training_files
 
 
-def doEM(in_fast5, reference, folder_handle, strawMan_flag, strand="Template", bwa_index=None, in_hmm=None, iterations=50):
+def doEM(in_fast5, reference, folder_handle, strawMan_flag, strand="Template", bwa_index=None, in_hmm=None,
+         iterations=50):
     """
     :param in_fast5: path to the fast5 file
     :param reference: path to the reference sequence (fasta)

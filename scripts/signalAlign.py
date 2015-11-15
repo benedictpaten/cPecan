@@ -17,7 +17,7 @@ def parse_args():
     # query files
     parser.add_argument('--file_directory', '-d', action='store',
                         dest='files_dir', required=False, type=str, default=None,
-                        help="directory with fast5 files to train on, should have trailing /")
+                        help="directory with fast5s for alignment")
     parser.add_argument('-nb_files', '-nb', action='store', dest='nb_files', required=False,
                         default=50, type=int, help="maximum number of reads to align")
 
@@ -64,8 +64,19 @@ def main(args):
 
     start_message = """
     Starting Signal Align
-    """
+    Aligning files from: {fileDir}
+    Aligning to reference: {reference}
+    Aligning {nbFiles}
+    Input template HMM: {inThmm}
+    Input complement HMM: {inChmm}
+    """.format(fileDir=args.files_dir, reference=args.ref, nbFiles=args.nb_files,
+               inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm)
+
     print(start_message, file=sys.stderr)
+
+    if not os.path.isfile(args.ref):
+        print("Did not find valid reference file", file=sys.stderr)
+        sys.exit(1)
 
     # make directory to put temporary files
     temp_folder = FolderHandler()
