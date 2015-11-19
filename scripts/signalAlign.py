@@ -42,8 +42,8 @@ def parse_args():
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
-    parser.add_argument('--strawMan', '-sm', action='store_true', dest='strawMan',
-                        required=False, default=False, help="use strawman pair-HMM")
+    parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
+                        required=False, default=None, help="decide which model to use, vanilla by default")
 
     args = parser.parse_args()
     return args
@@ -105,8 +105,8 @@ def main(args):
     for fast5 in fast5s:
         alignment_args = {
             "reference": args.ref,
-            "destination": temp_dir_path, #+ args.out,
-            "strawman": args.strawMan,
+            "destination": temp_dir_path,
+            "stateMachineType": args.stateMachineType,
             "bwa_index": bwa_ref_index,
             "in_templateHmm": args.in_T_Hmm,
             "in_complementHmm": args.in_C_Hmm,

@@ -1693,7 +1693,7 @@ static void test_vanillaHmm_em(CuTest *testCase) {
         for (int64_t bin = 0; bin < 30; bin++) {
             st_logInfo("bin %lld has prob %f\n", bin, vHmm->getTransitionsExpFcn(vHmm, bin, 0));
         }
-        st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", vHmm->likelihood, iter);
+        //st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", vHmm->likelihood, iter);
 
         // M step
         vanillaHmm_loadKmerSkipBinExpectations(sMt, vHmm);
@@ -1735,15 +1735,15 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_vanilla_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_echelon_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_scaleModel);
-    //SUITE_ADD_TEST(suite, test_vanilla_strandAlignmentNoBanding);
-    //SUITE_ADD_TEST(suite, test_echelon_strandAlignmentNoBanding);
-    //SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
-    //SUITE_ADD_TEST(suite, test_stateMachine4_getAlignedPairsWithBanding);
-    //SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);
-    //SUITE_ADD_TEST(suite, test_echelon_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_vanilla_strandAlignmentNoBanding);
+    SUITE_ADD_TEST(suite, test_echelon_strandAlignmentNoBanding);
+    SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_stateMachine4_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_echelon_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_vanillaHmm);
-    //SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
+    SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
     SUITE_ADD_TEST(suite, test_vanillaHmm_em);
     return suite;
 }

@@ -598,11 +598,11 @@ class ComplementModel(NanoporeModel):
 
 
 class SignalAlignment(object):
-    def __init__(self, in_fast5, reference, destination, strawman, bwa_index, in_templateHmm, in_complementHmm):
+    def __init__(self, in_fast5, reference, destination, stateMachineType, bwa_index, in_templateHmm, in_complementHmm):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.reference = reference  # reference sequence
         self.destination = destination  # place where the alignments go, should already exist
-        self.strawman = strawman  # flag to use pair-hmm
+        self.stateMachineType = stateMachineType  # mostly for flag for vanillaAlign
         self.bwa_index = bwa_index  # index of reference sequence
         self.in_templateModel = None  # initialize to none
         self.in_complementModel = None  # initialize to none
@@ -655,12 +655,18 @@ class SignalAlignment(object):
             return False
 
         # add an indicator for the model being used
-        if self.strawman is True:
+        if self.stateMachineType == "threeState":
             model_label = ".sm"
-            use_strawMan_flag = "--s "
+            stateMachineType_flag = "--s "
+        elif self.stateMachineType == "fourState":
+            model_label = ".4s"
+            stateMachineType_flag = "--f "
+        elif self.stateMachineType == "echelon":
+            model_label = "e"
+            stateMachineType_flag = "--e "
         else:
             model_label = ".vl"
-            use_strawMan_flag = ""
+            stateMachineType_flag = ""
 
         # this gives the format: /directory/for/files/file.model.orientation.tsv
         posteriors_file_path = ''
@@ -723,7 +729,7 @@ class SignalAlignment(object):
         # alignment commands
         alignment_command = \
             "{vA} {straw}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm} -u {posteriors} -L {readLabel}"\
-            .format(vA=path_to_vanillaAlign, straw=use_strawMan_flag, ref=temp_ref_seq, readLabel=read_label,
+            .format(vA=path_to_vanillaAlign, straw=stateMachineType_flag, ref=temp_ref_seq, readLabel=read_label,
                     npRead=temp_np_read, t_model=template_model_flag, c_model=complement_model_flag,
                     t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag, posteriors=posteriors_file_path)
 
