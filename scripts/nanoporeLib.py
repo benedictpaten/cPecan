@@ -31,8 +31,7 @@ def list_twoD_event_map(self):
 
 def orient_read_with_bwa(bwa_index, query):
     # align with bwa
-    #bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"  # todo require bwa in path remove this
-    #command = "{bwaDir}bwa mem -x ont2d {index} {query}".format(bwaDir=bwa_dir, index=bwa_index, query=query)
+
     command = "bwa mem -x ont2d {index} {query}".format(index=bwa_index, query=query)
     # this is a small SAM file that comes from bwa
     aln = subprocess.check_output(command.split())
@@ -598,11 +597,13 @@ class ComplementModel(NanoporeModel):
 
 
 class SignalAlignment(object):
-    def __init__(self, in_fast5, reference, destination, stateMachineType, bwa_index, in_templateHmm, in_complementHmm):
+    def __init__(self, in_fast5, reference, destination, stateMachineType, banded, bwa_index,
+                 in_templateHmm, in_complementHmm):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.reference = reference  # reference sequence
         self.destination = destination  # place where the alignments go, should already exist
-        self.stateMachineType = stateMachineType  # mostly for flag for vanillaAlign
+        self.stateMachineType = stateMachineType  # flag for vanillaAlign
+        self.banded = banded
         self.bwa_index = bwa_index  # index of reference sequence
         self.in_templateModel = None  # initialize to none
         self.in_complementModel = None  # initialize to none
@@ -662,7 +663,7 @@ class SignalAlignment(object):
             model_label = ".4s"
             stateMachineType_flag = "--f "
         elif self.stateMachineType == "echelon":
-            model_label = "e"
+            model_label = ".e"
             stateMachineType_flag = "--e "
         else:
             model_label = ".vl"
@@ -726,12 +727,19 @@ class SignalAlignment(object):
         else:
             complement_hmm_flag = ""
 
+        # banded alignment
+        if self.banded is True:
+            banded_flag = "--b "
+        else:
+            banded_flag = ""
+
         # alignment commands
         alignment_command = \
-            "{vA} {straw}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm} -u {posteriors} -L {readLabel}"\
-            .format(vA=path_to_vanillaAlign, straw=stateMachineType_flag, ref=temp_ref_seq, readLabel=read_label,
-                    npRead=temp_np_read, t_model=template_model_flag, c_model=complement_model_flag,
-                    t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag, posteriors=posteriors_file_path)
+            "{vA} {banded}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm} -u {posteriors} -L {readLabel}"\
+            .format(vA=path_to_vanillaAlign, model=stateMachineType_flag, banded=banded_flag, ref=temp_ref_seq,
+                    readLabel=read_label, npRead=temp_np_read, t_model=template_model_flag,
+                    c_model=complement_model_flag, t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag,
+                    posteriors=posteriors_file_path)
 
         # run
         print("signalAlign - running command", alignment_command, end="\n", file=sys.stderr)

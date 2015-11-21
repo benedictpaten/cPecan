@@ -771,9 +771,9 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
                 posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
             }
-            if (posteriorProbability <= p->threshold) {
-                //st_uglyf("NOT Adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f)\n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1));
-            }
+            //if (posteriorProbability <= p->threshold) { // todo remove this!?
+            //    //st_uglyf("NOT Adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f)\n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1));
+            //}
         }
         xmy += 2;
     }
@@ -814,10 +814,9 @@ void diagonalCalculationMultiPosteriorMatchProbs(StateMachine *sM, int64_t xay, 
                         stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, (x + n) - 1, y - 1));
                     }
                 }
-                if (posteriorProbability <= p->threshold) {
-                    //st_uglyf("NOT adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f), s:%lld \n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1), s);
-                }
-
+                //if (posteriorProbability <= p->threshold) { // todo remove this?!
+                //    //st_uglyf("NOT adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f), s:%lld \n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1), s);
+                //}
             }
         }
         xmy += 2;
@@ -1523,7 +1522,9 @@ stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int6
                                       bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
     // make sequence objects
     Sequence *ScX = sequence_construct(lX, cX, getXFcn);
-    sequence_padSequence(ScX);
+    if (sM->type == echelon) {
+        sequence_padSequence(ScX);
+    }
     Sequence *ScY = sequence_construct(lY, cY, getYFcn);
 
     // make matrices and bands
