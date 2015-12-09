@@ -117,6 +117,15 @@ def get_model(type, symbol_set_size):
         return ConditionalSignalHmm(model_type=type, symbol_set_size=symbol_set_size)
 
 
+def add_and_norm_expectations(path, files, model, hmm_file):
+    for f in files:
+        model.add_expectations_file(path + f)
+        os.remove(path + f)
+    model.normalize()
+    model.write(hmm_file)
+    model.running_likelihoods.append(model.likelihood)
+
+
 def main(args):
     # parse command line arguments
     args = parse_args()
@@ -170,7 +179,6 @@ def main(args):
             in_complement_hmm = complement_hmm
 
         # first cull a set of files to get expectations on
-        #training_files = cull_training_files(args.files_dir, args.amount)
         training_files = cull_training_files(args.files_dir, args.amount)
 
         # setup
@@ -207,25 +215,23 @@ def main(args):
         # load then normalize the expectations
         template_expectations_files = [x for x in os.listdir(working_directory_path)
                                        if x.endswith(".template.expectations")]
+
         complement_expectations_files = [x for x in os.listdir(working_directory_path)
                                          if x.endswith(".complement.expectations")]
-        for f in template_expectations_files:
-            template_model.add_expectations_file(working_directory_path + f)
-            os.remove(working_directory_path + f)
-        for f in complement_expectations_files:
-            complement_model.add_expectations_file(working_directory_path + f)
-            os.remove(working_directory_path + f)
 
-        template_model.normalize()
-        complement_model.normalize()
-
-        # write to disk for the next iteration
-        template_model.write(template_hmm)
-        template_model.running_likelihoods.append(template_model.likelihood)
-        complement_model.write(complement_hmm)
-        complement_model.running_likelihoods.append(complement_model.likelihood)
-        print("{t_likelihood}\t{c_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1],
-                                                      c_likelihood=complement_model.running_likelihoods[-1]))
+        if len(template_expectations_files) > 0:
+            add_and_norm_expectations(path=working_directory_path,
+                                      files=template_expectations_files,
+                                      model=template_model,
+                                      hmm_file=template_hmm)
+        if len(complement_expectations_files) > 0:
+            add_and_norm_expectations(path=working_directory_path,
+                                      files=complement_expectations_files,
+                                      model=complement_model,
+                                      hmm_file=complement_hmm)
+        if len(template_model.running_likelihoods) > 0 and len(complement_model.running_likelihoods) > 0:
+            print("{t_likelihood}\t{c_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1],
+                                                          c_likelihood=complement_model.running_likelihoods[-1]))
 
     print("signalAlign - finished training routine", file=sys.stdout)
     print("signalAlign - finished training routine", file=sys.stderr)

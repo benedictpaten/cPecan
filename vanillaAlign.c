@@ -457,8 +457,8 @@ int main(int argc, char *argv[]) {
         }
 
         // make empty HMM to collect expectations
-        Hmm *templateExpectations = hmmContinuous_getEmptyHmm(sMtype);
-        Hmm *complementExpectations = hmmContinuous_getEmptyHmm(sMtype);
+        Hmm *templateExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001);
+        Hmm *complementExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001);
 
         // get expectations for template
         fprintf(stderr, "vanillaAlign - getting expectations for template\n");

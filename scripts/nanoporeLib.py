@@ -246,8 +246,6 @@ def exonerated_bwa(bwa_index, query):
         print("unknown alignment flag, exiting", file=sys.stderr)
         return False, False
 
-    #completeCigarString = "cigar: %s %i %i %s %s %i %i + 1 %s" % (
-    #aln[8], reference_start, reference_end, strand, aln[6].split()[-1], query_start, query_end, cigar_string)
     completeCigarString = "cigar: %s %i %i + %s %i %i %s 1 %s" % (
     aln[6].split()[-1], query_start, query_end, aln[8], reference_start, reference_end, strand, cigar_string)
 
@@ -791,8 +789,10 @@ class SignalAlignment(object):
 
         # didn't map
         elif (strand != "+") and (strand != "-"):
-            print("\nsignalAlign - read didn't map", file=sys.stderr)
+            print("signalAlign - {} didn't map".format(read_label), file=sys.stderr)
             return False
+
+        print("-------->signalAlign - Continuing to alignment routine!", file=sys.stderr)
 
         # Alignment routine
 
@@ -861,7 +861,7 @@ class SignalAlignment(object):
         # run
         print("signalAlign - running command", alignment_command, end="\n", file=sys.stderr)
         os.system(alignment_command)
-        temp_folder.remove_folder()
+        #temp_folder.remove_folder()
         return True
 
 
@@ -907,7 +907,7 @@ class ContinuousPairHmm(SignalHmm):
             i = self.state_number * from_state
             j = sum(self.transitions[i:i+self.state_number])
             for to_state in xrange(self.state_number):
-                self.transitions[i + to_state] = self.transitions[i + to_state] / j
+                self.transitions[i + to_state] = self.transitions[i + to_state] / j ## todo check this!
 
         # normalize kmer skip probs
         total_skip_prob = sum(self.kmer_skip_probs)

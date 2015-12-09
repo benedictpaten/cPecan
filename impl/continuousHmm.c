@@ -6,6 +6,7 @@
 #include "discreteHmm.h"
 #include "emissionMatrix.h"
 #include "stateMachine.h"
+#include "pairwiseAligner.h"
 #include "continuousHmm.h"
 
 
@@ -174,10 +175,14 @@ void continuousPairHmm_loadTransitionsAndKmerGapProbs(StateMachine *sM, Hmm *hmm
     sM3->TRANSITION_GAP_EXTEND_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapY, shortGapY));
     sM3->TRANSITION_GAP_SWITCH_TO_X = log(hmm->getTransitionsExpFcn(hmm, shortGapY, shortGapX));
     sM3->TRANSITION_GAP_SWITCH_TO_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapX, shortGapY));
-    // load kmer gap probs
-    for (int64_t i = 0; i < hmm->symbolSetSize; i++) {
-        sM3->model.EMISSION_GAP_X_PROBS[i] = hmm->getEmissionExpFcn(hmm, 0, i, 0);
-    }
+    //sM3->TRANSITION_GAP_SWITCH_TO_X = LOG_ZERO;
+    //sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;
+
+    /// / load kmer gap probs
+    //for (int64_t i = 0; i < hmm->symbolSetSize; i++) {
+        //sM3->model.EMISSION_GAP_X_PROBS[i] = hmm->getEmissionExpFcn(hmm, 0, i, 0);
+    //    sM3->model.EMISSION_GAP_X_PROBS[i] = log(hmm->getEmissionExpFcn(hmm, 0, i, 0));
+    //}
 }
 
 void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
@@ -596,17 +601,17 @@ void hmmContinuous_destruct(Hmm *hmm, StateMachineType type) {
     }
 }
 
-Hmm *hmmContinuous_getEmptyHmm(StateMachineType type) {
+Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount) {
     assert((type == vanilla) || (type == threeState));
     if (type == vanilla) {
-        Hmm *hmm = vanillaHmm_constructEmpty(0.000000000001, 3, NUM_OF_KMERS, vanilla,
+        Hmm *hmm = vanillaHmm_constructEmpty(pseudocount, 3, NUM_OF_KMERS, vanilla,
                                              vanillaHmm_addToKmerSkipBinExpectation,
                                              vanillaHmm_setKmerSkipBinExpectation,
                                              vanillaHmm_getKmerSkipBinExpectation);
         return hmm;
     }
     if (type == threeState) {
-        Hmm *hmm = continuousPairHmm_constructEmpty(0.000000000001, 3, NUM_OF_KMERS, threeState,
+        Hmm *hmm = continuousPairHmm_constructEmpty(pseudocount, 3, NUM_OF_KMERS, threeState,
                                                     continuousPairHmm_addToTransitionsExpectation,
                                                     continuousPairHmm_setTransitionExpectation,
                                                     continuousPairHmm_getTransitionExpectation,

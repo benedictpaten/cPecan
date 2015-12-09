@@ -91,7 +91,7 @@ void hmmContinuous_loadExpectations(StateMachine *sM, Hmm *hmm, StateMachineType
 
 void hmmContinuous_destruct(Hmm *hmm, StateMachineType type);
 
-Hmm *hmmContinuous_getEmptyHmm(StateMachineType type);
+Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount);
 
 void hmmContinuous_normalize(Hmm *hmm, StateMachineType type);
 
