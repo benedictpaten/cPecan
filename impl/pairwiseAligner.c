@@ -133,11 +133,11 @@ Band *band_construct(stList *anchorPairs, int64_t lX, int64_t lY, int64_t expans
     assert(lX >= 0);
     assert(lY >= 0);
     assert(expansion % 2 == 0);
+    //st_uglyf("---> LANDMARK!!!>>>>>>1\n");
 
     Band *band = st_malloc(sizeof(Band));
     band->diagonals = st_malloc(sizeof(Diagonal) * (lX + lY + 1));
     band->lXalY = lX + lY;
-
 
     //Now initialise the diagonals
     int64_t anchorPairIndex = 0;
@@ -147,6 +147,7 @@ Band *band_construct(stList *anchorPairs, int64_t lX, int64_t lY, int64_t expans
     int64_t xL = 0, yL = 0, xU = 0, yU = 0;
 
     while (xay <= band->lXalY) {
+        //st_uglyf("---> LANDMARK!!!>>>>>>2 : xay: %lld\n", xay);
         band->diagonals[xay] = band_setCurrentDiagonal(xay, xL, yL, xU, yU);
         if (nxay == xay++) {
             //The previous diagonals become the next
@@ -465,6 +466,7 @@ void cell_signal_updateBetaAndAlphaProb(double *fromCells, double *toCells, int6
     if (from == match && to == shortGapX) {
         hmmExpectations->baseContinuousHmm.baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, x, 0, p);
     }
+    // update alpha
     if (from == shortGapX && to == shortGapX) {
         hmmExpectations->baseContinuousHmm.baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations,
                                                                                  (x + 30), 0, p);
@@ -898,6 +900,7 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
 
     //Primitives for the forward matrix recursion
     Band *band = band_construct(anchorPairs, sX->length, sY->length, p->diagonalExpansion);
+
     BandIterator *forwardBandIterator = bandIterator_construct(band);
     DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
     //Initialise forward matrix.
@@ -1102,14 +1105,14 @@ stList *getBlastPairs(const char *sX, const char *sY, int64_t trim, bool repeatM
         writeSequenceToFile(tempFile2, "b", sY);
         command =
                 stString_print(
-                        "./cPecanLastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s %s",
-                        //"./cPecanLastz --hspthresh=1800 --chain --strand=plus --gapped --format=cigar --gap=100,100 --ambiguous=iupac,100,100 %s %s",
+                        //"./cPecanLastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s %s",
+                        "./cPecanLastz --hspthresh=1800 --chain --strand=plus --gapped --format=cigar --gap=100,100 --ambiguous=iupac,100,100 %s %s",
                         tempFile1, tempFile2);
     } else {
         command =
                 stString_print(
-                        "echo '>b\n%s\n' | ./cPecanLastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s",
-                        //"echo '>b\n%s\n' | ./cPecanLastz --hspthresh=1800 --chain --strand=plus --gapped --gap=100,100 --format=cigar --ambiguous=iupac,100,100 %s",
+                        //"echo '>b\n%s\n' | ./cPecanLastz --hspthresh=800 --chain --strand=plus --gapped --format=cigar --ambiguous=iupac,100,100 %s",
+                        "echo '>b\n%s\n' | ./cPecanLastz --hspthresh=1800 --chain --strand=plus --gapped --gap=100,100 --format=cigar --ambiguous=iupac,100,100 %s",
                         sY, tempFile1);
     }
     FILE *fileHandle = popen(command, "r");
@@ -1286,7 +1289,6 @@ stList *getBlastPairsForPairwiseAlignmentParameters(void *sX, void *sY, Pairwise
     st_logDebug("Got %" PRIi64 " combined anchor pairs\n", stList_length(combinedAnchorPairs));
     return combinedAnchorPairs;
 }
-
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Split large gap functions

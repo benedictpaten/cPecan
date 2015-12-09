@@ -35,7 +35,7 @@ def parse_args():
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
-                        required=False, default=None, help="decide which model to use, vanilla by default")
+                        required=False, default="vanilla", help="decide which model to use, vanilla by default")
 
     args = parser.parse_args()
     return args
@@ -45,7 +45,7 @@ def aligner(work_queue, done_queue):
     try:
         for f in iter(work_queue.get, 'STOP'):
             alignment = SignalAlignment(**f)
-            alignment.do_alignment()
+            alignment.run()
     except Exception, e:
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 

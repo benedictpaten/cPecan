@@ -9,15 +9,14 @@
 
 void usage() {
     fprintf(stderr, "vanillaAlign binary, meant to be used through the signalAlign program.\n");
-    fprintf(stderr, "See docstring for signalAlign for help\n");
+    fprintf(stderr, "See doc for signalAlign for help\n");
 }
 
-void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *matchModel, double *events, char *target,
+void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *matchModel,
+                         double *events, char *target,
+                         int64_t eventSequenceOffset, int64_t referenceSequenceOffset,
                          stList *alignedPairs, Strand strand) {
-    /*
-     * Writes the posterior match probabibilities to a tab separated file, each line being X coordinate,
-     * Y coordinate, Match probability
-     */
+    // label for tsv output
     char *strandLabel;
     if (strand == template) {
         strandLabel = "t";
@@ -25,44 +24,47 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
     if (strand == complement) {
         strandLabel = "c";
     }
-    // x, k_x, name, strand, e_u, e_o, e_t, p, level_E_u, noise_E_u
-    // c   c    c     c       c    c    c    c    c         c  CHECK!
+
     FILE *fH = fopen(posteriorProbsFile, "a");
+
     for(int64_t i = 0; i < stList_length(alignedPairs); i++) {
         // grab the aligned pair
         stIntTuple *aPair = stList_get(alignedPairs, i);
 
         // unpack it to make this easier
-        int64_t x = stIntTuple_get(aPair, 1);         // target index
-        int64_t y = stIntTuple_get(aPair, 2);         // event index
+        int64_t x = stIntTuple_get(aPair, 1) + referenceSequenceOffset;         // target index
+        int64_t y = stIntTuple_get(aPair, 2) + eventSequenceOffset;             // event index
         double p = ((double)stIntTuple_get(aPair, 0)) / PAIR_ALIGNMENT_PROB_1;  // posterior prob
-
-        // make the kmer at the target index
-        char *k_i = st_malloc(KMER_LENGTH * sizeof(char));
-        for (int64_t k = 0; k < KMER_LENGTH; k++) {
-            k_i[k] = *(target + (x + k));
-        }
-        // get the kmer at the target index
-        int64_t targetKmerIndex = emissions_discrete_getKmerIndexFromKmer(k_i);
 
         // get the observations from the events
         double eventMean = events[(y * NB_EVENT_PARAMS)];
         double eventNoise = events[(y * NB_EVENT_PARAMS) + 1];
         double eventDuration = events[(y * NB_EVENT_PARAMS) + 2];
 
+        // make the kmer string at the target index,
+        char *k_i = st_malloc(KMER_LENGTH * sizeof(char));
+        for (int64_t k = 0; k < KMER_LENGTH; k++) {
+            k_i[k] = *(target + (x + k));
+        }
+        // get the kmer index
+        int64_t targetKmerIndex = emissions_discrete_getKmerIndexFromKmer(k_i);
+
         // get the expected event mean amplitude and noise
         double E_levelu = matchModel[1 + (targetKmerIndex * MODEL_PARAMS)];
         double E_noiseu = matchModel[1 + (targetKmerIndex * MODEL_PARAMS + 2)];
 
+        // write to disk
         fprintf(fH, "%lld\t%lld\t%s\t%s\t%s\t%f\t%f\t%f\t%f\t%f\t%f\n", x, y, k_i, readFile, strandLabel, eventMean,
                 eventNoise, eventDuration, p, E_levelu, E_noiseu);
+
+        // cleanup
         free(k_i);
     }
     fclose(fH);
 }
 
-stList *getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eventMap) {
-    stList *remapedAnchors = nanopore_remapAnchorPairs(unmappedAnchors, eventMap);
+stList *getRemappedAnchorPairs(stList *unmappedAnchors, int64_t *eventMap, int64_t mapOffset) {
+    stList *remapedAnchors = nanopore_remapAnchorPairsWithOffset(unmappedAnchors, eventMap, mapOffset);
 
     stList *filteredRemappedAnchors = filterToRemoveOverlap(remapedAnchors);
     return filteredRemappedAnchors;
@@ -105,7 +107,7 @@ void loadHmmRoutine(const char *hmmFile, StateMachine *sM, StateMachineType type
     hmmContinuous_destruct(hmm, type);
 }
 
-stList *performSignalAlignmentP(StateMachine *sM, double *events, int64_t nbEvents, int64_t *eventMap, char *target,
+stList *performSignalAlignmentP(StateMachine *sM, Sequence *sY, int64_t *eventMap, int64_t mapOffset, char *target,
                                 PairwiseAlignmentParameters *p, stList *unmappedAnchors,
                                 void *(*targetGetFcn)(void *, int64_t),
                                 void (*posteriorProbFcn)(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix,
@@ -114,15 +116,15 @@ stList *performSignalAlignmentP(StateMachine *sM, double *events, int64_t nbEven
                                                          void *extraArgs),
                                 bool banded) {
     int64_t lX = sequence_correctSeqLength(strlen(target), event);
+
     if (banded) {
         fprintf(stderr, "vanillaAlign - doing banded alignment\n");
 
         // remap anchor pairs
-        stList *filteredRemappedAnchors = getRemappedAnchorPairs(unmappedAnchors, eventMap);
+        stList *filteredRemappedAnchors = getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
 
         // make sequences
         Sequence *sX = sequence_construct2(lX, target, targetGetFcn, sequence_sliceNucleotideSequence2);
-        Sequence *sY = sequence_construct2(nbEvents, events, sequence_getEvent, sequence_sliceEventSequence2);
 
         // do alignment
         stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, sY, filteredRemappedAnchors, p,
@@ -131,15 +133,15 @@ stList *performSignalAlignmentP(StateMachine *sM, double *events, int64_t nbEven
     } else {
         fprintf(stderr, "vanillaAlign - doing non-banded alignment\n");
 
-        stList *alignedPairs = getAlignedPairsWithoutBanding(sM, target, events, lX, nbEvents, p, targetGetFcn,
+        stList *alignedPairs = getAlignedPairsWithoutBanding(sM, target, sY->elements, lX, sY->length, p, targetGetFcn,
                                                              sequence_getEvent, posteriorProbFcn, 1, 1);
         return alignedPairs;
     }
 }
 
-stList *performSignalAlignment(StateMachine *sM, const char *hmmFile, double *events, int64_t nbEvents,
-                               int64_t *eventMap, char *target, PairwiseAlignmentParameters *p,
-                               stList *unmappedAncors, bool banded) {
+stList *performSignalAlignment(StateMachine *sM, const char *hmmFile, Sequence *eventSequence, int64_t *eventMap,
+                               int64_t mapOffset,
+                               char *target, PairwiseAlignmentParameters *p, stList *unmappedAncors, bool banded) {
     if ((sM->type != threeState) && (sM->type != vanilla) && (sM->type != echelon) && (sM->type != fourState)) {
         st_errAbort("vanillaAlign - You're trying to do the wrong king of alignment");
     }
@@ -150,112 +152,138 @@ stList *performSignalAlignment(StateMachine *sM, const char *hmmFile, double *ev
         loadHmmRoutine(hmmFile, sM, sM->type);
     }
 
-    // do alignment
+    // decision tree for different stateMachine types
     if ((sM->type == vanilla) || (sM->type == echelon)) {
         if (sM->type == vanilla) {
-            stList *alignedPairs = performSignalAlignmentP(sM, events, nbEvents, eventMap, target, p, unmappedAncors,
-                                                           sequence_getKmer2, diagonalCalculationPosteriorMatchProbs,
-                                                           banded);
+            stList *alignedPairs = performSignalAlignmentP(sM, eventSequence, eventMap, mapOffset,
+                                                           target, p, unmappedAncors, sequence_getKmer2,
+                                                           diagonalCalculationPosteriorMatchProbs, banded);
             return alignedPairs;
         } else {
-            stList *alignedPairs = performSignalAlignmentP(sM, events, nbEvents, eventMap, target, p, unmappedAncors,
-                                                           sequence_getKmer2,
+            stList *alignedPairs = performSignalAlignmentP(sM, eventSequence, eventMap, mapOffset,
+                                                           target, p, unmappedAncors, sequence_getKmer2,
                                                            diagonalCalculationMultiPosteriorMatchProbs, banded);
             return alignedPairs;
         }
     }
     if ((sM->type == threeState) || (sM->type == fourState)) {
-        stList *alignedPairs = performSignalAlignmentP(sM, events, nbEvents, eventMap, target, p, unmappedAncors,
-                                                       sequence_getKmer, diagonalCalculationPosteriorMatchProbs,
-                                                       banded);
+        stList *alignedPairs = performSignalAlignmentP(sM, eventSequence, eventMap, mapOffset, target, p,
+                                                       unmappedAncors, sequence_getKmer,
+                                                       diagonalCalculationPosteriorMatchProbs, banded);
         return alignedPairs;
     }
     return 0;
 }
 
-Hmm *performBaumWelchTrainingP(const char *model, const char *inputHmm, StateMachineType type,
-                               NanoporeReadAdjustmentParameters npp, double *events, int64_t nbEvents,
-                               int64_t *eventMap, char *trainingTarget, PairwiseAlignmentParameters *p,
-                               stList *unmappedAnchors, int64_t iterations, void *(*getFcn)(void *, int64_t),
-                               Strand strand) {
-    // load model into stateMachine
+char *getSubSequence(char *seq, int64_t start, int64_t end, bool strand) {
+    if (strand) {
+        seq = stString_getSubString(seq, start, end - start);
+        return seq;
+    }
+    seq = stString_getSubString(seq, end, start - end);
+    return seq;
+}
+
+void rebasePairwiseAlignmentCoordinates(int64_t *start, int64_t *end, int64_t *strand,
+                                        int64_t coordinateShift, bool flipStrand) {
+    *start += coordinateShift;
+    *end += coordinateShift;
+    if (flipStrand) {
+        *strand = *strand ? 0 : 1;
+        int64_t i = *end;
+        *end = *start;
+        *start = i;
+    }
+}
+
+stList *guideAlignmentToRebasedAnchorPairs(struct PairwiseAlignment *pA, PairwiseAlignmentParameters *p) {
+    // check if we need to flip the reference
+    bool flipStrand1 = !pA->strand1;
+    int64_t refCoordShift = (pA->strand1 ? pA->start1 : pA->end1);
+
+    // rebase the reference alignment to (0), but not the nanopore read, this is corrected when remapping the
+    // anchorPairs
+    rebasePairwiseAlignmentCoordinates(&(pA->start1), &(pA->end1), &(pA->strand1), -refCoordShift, flipStrand1);
+    checkPairwiseAlignment(pA);
+
+    //Convert input alignment into anchor pairs
+    stList *unfilteredAnchorPairs = convertPairwiseForwardStrandAlignmentToAnchorPairs(
+            pA, p->constraintDiagonalTrim);
+
+    // sort
+    stList_sort(unfilteredAnchorPairs, (int (*)(const void *, const void *)) stIntTuple_cmpFn);
+
+    // filter
+    stList *anchorPairs = filterToRemoveOverlap(unfilteredAnchorPairs);
+
+    return anchorPairs;
+}
+
+Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t queryStart, int64_t queryEnd,
+                                                 int64_t *eventMap) {
+    // find the event mapped to the start and end of the 2D read alignment
+    int64_t startIdx = eventMap[queryStart];
+    int64_t endIdx = eventMap[queryEnd];
+
+    // move the event pointer to the first event
+    size_t elementSize = sizeof(double);
+    void *elements = (char *)events + ((startIdx * NB_EVENT_PARAMS) * elementSize);
+
+    // make the eventSequence
+    Sequence *eventS = sequence_construct2(endIdx - startIdx, elements, sequence_getEvent,
+                                           sequence_sliceEventSequence2);
+
+    return eventS;
+}
+
+void getSignalExpectations(const char *model, const char *inputHmm, Hmm *hmmExpectations, StateMachineType type,
+                           NanoporeReadAdjustmentParameters npp, Sequence *eventSequence,
+                           int64_t *eventMap, int64_t mapOffset, char *trainingTarget, PairwiseAlignmentParameters *p,
+                           stList *unmappedAnchors, Strand strand) {
+    // load match model, build stateMachine
     StateMachine *sM = buildStateMachine(model, npp, type, strand);
 
-    // load HMM if given
+    // load HMM transitions, if needed
     if (inputHmm != NULL) {
         fprintf(stderr, "vanillaAlign - loading HMM from file, %s\n", inputHmm);
         loadHmmRoutine(inputHmm, sM, type);
     }
 
-    // correct sequence length, once
+    // correct sequence length
     int64_t lX = sequence_correctSeqLength(strlen(trainingTarget), event);
 
     // remap the anchors
-    stList *filteredRemappedAnchors = getRemappedAnchorPairs(unmappedAnchors, eventMap);
+    stList *filteredRemappedAnchors = getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
 
-    // initial setup
-    double pLikelihood = -INFINITY;
-    Hmm *hmm = hmmContinuous_getEmptyHmm(type);
-    int64_t i = 0;
+    // make sequence objects, seperate the target sequences based on HMM type, also implant the match model if we're
+    // using a conditional model
+    //Sequence *eventS = sequence_construct2(nbEvents, events, sequence_getEvent, sequence_sliceEventSequence2);
 
-    // EM
-    fprintf(stderr, "vanillaAlign - about to start EM, set to %lld iterations\n", iterations);
-    fprintf(stderr, "vanillaAlign - likelihoods:\n");
-
-    while ((pLikelihood < hmm->likelihood) || i <= iterations) {
-        hmmContinuous_destruct(hmm, type);
-        hmm = hmmContinuous_getEmptyHmm(type);
-        // make sequence objects
-        Sequence *target = sequence_construct2(lX, trainingTarget, getFcn, sequence_sliceNucleotideSequence2);
-        Sequence *eventS = sequence_construct2(nbEvents, events, sequence_getEvent, sequence_sliceEventSequence2);
-
-        // implant if using vanilla
-        if (type == vanilla) {
-            vanillaHmm_implantMatchModelsintoHmm(sM, hmm);
-        }
-
-        // E Step
-        getExpectationsUsingAnchors(sM, hmm, target, eventS, filteredRemappedAnchors,
-                                    p, diagonalCalculation_signal_Expectations, 1, 1);
-
-        // normalize
-        hmmContinuous_normalize(hmm, type);
-
-        fprintf(stderr, "%f ", hmm->likelihood);
-
-        // M Step
-        hmmContinuous_loadExpectations(sM, hmm, type);
-
-        // check if we're done
-        if (pLikelihood == hmm->likelihood) {
-            break;
-        }
-        // update
-        pLikelihood = hmm->likelihood;
-        i++;
+    if (type == vanilla) {
+        Sequence *target = sequence_construct2(lX, trainingTarget, sequence_getKmer2,
+                                               sequence_sliceNucleotideSequence2);
+        vanillaHmm_implantMatchModelsintoHmm(sM, hmmExpectations);
+        // get expectations
+        getExpectationsUsingAnchors(sM, hmmExpectations, target, eventSequence, filteredRemappedAnchors, p,
+                                    diagonalCalculation_signal_Expectations, 1, 1);
+    } else {
+        Sequence *target = sequence_construct2(lX, trainingTarget, sequence_getKmer,
+                                               sequence_sliceNucleotideSequence2);
+        // get expectations
+        getExpectationsUsingAnchors(sM, hmmExpectations, target, eventSequence, filteredRemappedAnchors, p,
+                                    diagonalCalculation_signal_Expectations, 1, 1);
     }
-    fprintf(stderr, "\nvanillaAlign - finished iterations\n");
-    return hmm;
 }
 
-Hmm *performBaumWelchTraining(const char *model, const char *inputHmm, StateMachineType type,
-                              NanoporeReadAdjustmentParameters npp, double *events, int64_t nbEvents,
-                              int64_t *eventMap, char *trainingTarget, PairwiseAlignmentParameters *p,
-                              stList *unmappedAnchors, int64_t iterations, Strand strand) {
-    if ((type != threeState) && (type != vanilla)) {
-        st_errAbort("vanillaAlign - Baum-Welch training not allowed on this kind of stateMachine, yet");
-    }
-    if (type == vanilla) {
-        Hmm *hmm = performBaumWelchTrainingP(model, inputHmm, type, npp, events, nbEvents, eventMap, trainingTarget,
-                                             p, unmappedAnchors, iterations, sequence_getKmer2, strand);
-        return hmm;
-    }
-    if (type == threeState) {
-        Hmm *hmm = performBaumWelchTrainingP(model, inputHmm, type, npp, events, nbEvents, eventMap, trainingTarget,
-                                             p, unmappedAnchors, iterations, sequence_getKmer, strand);
-        return hmm;
-    }
-    return 0;
+void printPairwiseAlignmentSummary(struct PairwiseAlignment *pA) {
+    st_uglyf("contig 1: %s\n", pA->contig1);
+    st_uglyf("strand 1: %lld\n", pA->strand1);
+    st_uglyf("start  1: %lld\n", pA->start1);
+    st_uglyf("end    1: %lld\n", pA->end1);
+    st_uglyf("contig 2: %s\n", pA->contig2);
+    st_uglyf("strand 2: %lld\n", pA->strand2);
+    st_uglyf("start  2: %lld\n", pA->start2);
+    st_uglyf("end    2: %lld\n", pA->end2);
 }
 
 int main(int argc, char *argv[]) {
@@ -271,8 +299,8 @@ int main(int argc, char *argv[]) {
     char *posteriorProbsFile = NULL;
     char *templateHmmFile = NULL;
     char *complementHmmFile = NULL;
-    char *templateTrainedHmmFile = NULL;
-    char *complementTrainedHmmFile = NULL;
+    char *templateExpectationsFile = NULL;
+    char *complementExpectationsFile = NULL;
 
     int key;
     while (1) {
@@ -286,12 +314,12 @@ int main(int argc, char *argv[]) {
                 {"complementModel",         required_argument,  0,  'C'},
                 {"readLabel",               required_argument,  0,  'L'},
                 {"npRead",                  required_argument,  0,  'q'},
-                {"target",                  required_argument,  0,  'r'},
+                {"reference",               required_argument,  0,  'r'},
                 {"posteriors",              required_argument,  0,  'u'},
-                {"loadTemplateHmm",         required_argument,  0,  'y'},
-                {"loadComplementHmm",       required_argument,  0,  'z'},
-                {"templateTrainedHmm",      required_argument,  0,  't'},
-                {"complementTrainedHmm",    required_argument,  0,  'c'},
+                {"inTemplateHmm",           required_argument,  0,  'y'},
+                {"inComplementHmm",         required_argument,  0,  'z'},
+                {"templateExpectations",    required_argument,  0,  't'},
+                {"complementExpectations",  required_argument,  0,  'c'},
                 {"iterations",              required_argument,  0,  'i'},
                 {0, 0, 0, 0} };
 
@@ -338,10 +366,10 @@ int main(int argc, char *argv[]) {
                 posteriorProbsFile = stString_copy(optarg);
                 break;
             case 't':
-                templateTrainedHmmFile = stString_copy(optarg);
+                templateExpectationsFile = stString_copy(optarg);
                 break;
             case 'c':
-                complementTrainedHmmFile = stString_copy(optarg);
+                complementExpectationsFile = stString_copy(optarg);
                 break;
             case 'y':
                 templateHmmFile = stString_copy(optarg);
@@ -374,10 +402,9 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "vanillaAlign - using echelon model\n");
     }
 
-    // load target sequence (reference sequence)
-    FILE *target = fopen(targetFile, "r");
-    char *targetSeq = stFile_getLineFromFile(target);
-    char *rc_targetSeq = stString_reverseComplementString(targetSeq);
+    // load reference sequence (reference sequence)
+    FILE *reference = fopen(targetFile, "r");
+    char *referenceSequence = stFile_getLineFromFile(reference);
 
     // load nanopore read
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
@@ -385,40 +412,89 @@ int main(int argc, char *argv[]) {
     // make some params
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 
-    // get anchors // put if (banded) here?
-    stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(targetSeq, npRead->twoDread, p);
+    // get pairwise alignment from stdin, in exonerate CIGAR format
+    FILE *fileHandleIn = stdin;
 
-    // EM training routine // TODO needs to be redone! to just write expectations
-    if ((templateTrainedHmmFile != NULL) || (complementTrainedHmmFile != NULL)) {
-        if (templateTrainedHmmFile != NULL) {
-            fprintf(stderr, "vanillaAlign - starting training for template hmm\n");
-            Hmm *templateTrainedHmm = performBaumWelchTraining(templateModelFile, templateHmmFile, sMtype,
-                                                               npRead->templateParams, npRead->templateEvents,
-                                                               npRead->nbTemplateEvents, npRead->templateEventMap,
-                                                               targetSeq, p, anchorPairs, iter, template);
-            fprintf(stderr, "vanillaAlign - writing hmm to file: %s\n\n", templateTrainedHmmFile);
-            hmmContinuous_writeToFile(templateTrainedHmmFile, templateTrainedHmm, sMtype);
+    // parse input
+    struct PairwiseAlignment *pA;
+    pA = cigarRead(fileHandleIn);
+
+    // todo put in if debug:
+    //printPairwiseAlignmentSummary(pA);
+
+    // slice out the section of the reference we're aligning to
+    char *trimmedRefSeq = getSubSequence(referenceSequence, pA->start1, pA->end1, pA->strand1);
+
+    // reverse complement for complement event sequence
+    char *rc_trimmedRefSeq = stString_reverseComplementString(trimmedRefSeq);
+
+    // constrain the event sequence to the positions given by the guide alignment
+    Sequence *tEventSequence = makeEventSequenceFromPairwiseAlignment(npRead->templateEvents,
+                                                                      pA->start2, pA->end2,
+                                                                      npRead->templateEventMap);
+
+    Sequence *cEventSequence = makeEventSequenceFromPairwiseAlignment(npRead->complementEvents,
+                                                                      pA->start2, pA->end2,
+                                                                      npRead->complementEventMap);
+
+
+    // the alignments start at (0,0) so we need to correct them based on the guide alignment later.
+    // record this shift here
+    int64_t tCoordinateShift = npRead->templateEventMap[pA->start2];
+    int64_t cCoordinateShift = npRead->complementEventMap[pA->start2];
+    int64_t rCoordinateShift_t = (pA->strand1 ? pA->start1 : pA->end1);
+    int64_t rCoordinateShift_c = (int64_t)strlen(referenceSequence) - (pA->strand1 ? pA->end1 : pA->start1);
+
+    stList *anchorPairs = guideAlignmentToRebasedAnchorPairs(pA, p);
+
+    st_uglyf("SENTINAL - got %lld anchor pairs from INPUT alignment\n", stList_length(anchorPairs));
+
+    if ((templateExpectationsFile != NULL) && (complementExpectationsFile != NULL)) {
+        // Expectation Routine //
+
+        if ((sMtype != threeState) && (sMtype != vanilla)) {
+            st_errAbort("vanillaAlign - getting expectations not allowed for this HMM type, yet");
         }
-        if (complementTrainedHmmFile != NULL) {
-            fprintf(stderr, "vanillaAlign - starting training for complement hmm\n");
-            Hmm *complementTrainedHmm = performBaumWelchTraining(complementModelFile, complementHmmFile, sMtype,
-                                                                 npRead->complementParams, npRead->complementEvents,
-                                                                 npRead->nbComplementEvents, npRead->complementEventMap,
-                                                                 rc_targetSeq, p, anchorPairs, iter, complement);
-            fprintf(stderr, "vanillaAlign - writing hmm to file: %s\n\n", complementTrainedHmmFile);
-            hmmContinuous_writeToFile(complementTrainedHmmFile, complementTrainedHmm, sMtype);
-        }
-    } else { // Alignment Procedure //
+
+        // make empty HMM to collect expectations
+        Hmm *templateExpectations = hmmContinuous_getEmptyHmm(sMtype);
+        Hmm *complementExpectations = hmmContinuous_getEmptyHmm(sMtype);
+
+        // get expectations for template
+        fprintf(stderr, "vanillaAlign - getting expectations for template\n");
+        getSignalExpectations(templateModelFile, templateHmmFile, templateExpectations, sMtype, npRead->templateParams,
+                              tEventSequence, npRead->templateEventMap, pA->start2,
+                              trimmedRefSeq, p,
+                              anchorPairs, template);
+
+        // write to file
+        fprintf(stderr, "vanillaAlign - writing expectations to file: %s\n\n", templateExpectationsFile);
+        hmmContinuous_writeToFile(templateExpectationsFile, templateExpectations, sMtype);
+
+        // get expectations for the complement
+        fprintf(stderr, "vanillaAlign - getting expectations for complement\n");
+        getSignalExpectations(complementModelFile, complementHmmFile, complementExpectations, sMtype,
+                              npRead->complementParams, cEventSequence, npRead->complementEventMap, pA->start2,
+                              rc_trimmedRefSeq, p, anchorPairs, complement);
+
+        // write to file
+        fprintf(stderr, "vanillaAlign - writing expectations to file: %s\n\n", complementExpectationsFile);
+        hmmContinuous_writeToFile(complementExpectationsFile, complementExpectations, sMtype);
+        // todo make hmm destruct, test
+        return 0;
+    } else {
+        // Alignment Procedure //
+
         // Template alignment
         fprintf(stderr, "vanillaAlign - starting template alignment\n");
 
-        // load template stateMachine
+        // make template stateMachine
         StateMachine *sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype, template);
 
         // get aligned pairs
-        stList *templateAlignedPairs = performSignalAlignment(sMt, templateHmmFile, npRead->templateEvents,
-                                                              npRead->nbTemplateEvents, npRead->templateEventMap,
-                                                              targetSeq, p, anchorPairs, banded);
+        stList *templateAlignedPairs = performSignalAlignment(sMt, templateHmmFile, tEventSequence,
+                                                              npRead->templateEventMap, pA->start2, trimmedRefSeq,
+                                                              p, anchorPairs, banded);
         st_uglyf("SENTINAL - got %lld template aligned pairs\n", stList_length(templateAlignedPairs));
 
         // sort
@@ -426,12 +502,15 @@ int main(int argc, char *argv[]) {
 
         // write to file
         if (posteriorProbsFile != NULL) {
-            writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_PROBS, npRead->templateEvents,
-                                targetSeq, templateAlignedPairs, template);
+            writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_PROBS,
+                                npRead->templateEvents, referenceSequence, // use non-trimmed objects here
+                                tCoordinateShift, rCoordinateShift_t,        // correction is in function
+                                templateAlignedPairs, template);
         }
 
         // intermediate clean up
         stateMachine_destruct(sMt);
+        sequence_sequenceDestroy(tEventSequence);
         stList_destruct(templateAlignedPairs);
 
         // Complement alignment
@@ -439,9 +518,9 @@ int main(int argc, char *argv[]) {
         StateMachine *sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, complement);
 
         // get aligned pairs
-        stList *complementAlignedPairs = performSignalAlignment(sMc, complementHmmFile, npRead->complementEvents,
-                                                                npRead->nbComplementEvents, npRead->complementEventMap,
-                                                                rc_targetSeq, p, anchorPairs, banded);
+        stList *complementAlignedPairs = performSignalAlignment(sMc, complementHmmFile, cEventSequence,
+                                                                npRead->complementEventMap, pA->start2,
+                                                                rc_trimmedRefSeq, p, anchorPairs, banded);
         st_uglyf("SENTINAL - got %lld complement aligned pairs\n", stList_length(complementAlignedPairs));
 
         // sort
@@ -449,12 +528,15 @@ int main(int argc, char *argv[]) {
 
         // write to file
         if (posteriorProbsFile != NULL) {
-            writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_PROBS, npRead->complementEvents,
-                                rc_targetSeq, complementAlignedPairs, complement);
+            writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_PROBS,
+                                npRead->complementEvents, stString_reverseComplementString(referenceSequence),
+                                cCoordinateShift, rCoordinateShift_c,  // see above
+                                complementAlignedPairs, complement);
         }
 
         // final alignment clean up
         stateMachine_destruct(sMc);
+        sequence_sequenceDestroy(cEventSequence);
         stList_destruct(complementAlignedPairs);
         fprintf(stderr, "vanillaAlign - SUCCESS: finished alignment of query %s, exiting\n", readLabel);
     }

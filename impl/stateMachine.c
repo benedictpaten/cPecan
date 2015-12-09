@@ -354,9 +354,8 @@ static double emissions_signal_poissonPosteriorProb(int64_t n, double duration) 
     // Experimenting with changing the rate parameter, started with 2, but then the p(c|N=2) == p(c|N=1) which
     // doesn't make sense. When 0 < beta < 1 then the p(c|N=0) > p(c|N=1). At 1.25, it seems to have the correct
     // curve.
-    //double l_2 = 0.69314718055994529;
-    //double beta = 1.25;
-    double l_beta = 0.22314355131420976;
+    //double l_beta = 0.22314355131420976; // log(1.25)
+    double l_beta = 0.1397619423751586; // log(1.15)
     double lambda = duration / c;
     double l_factorials[6] = {0.0, 0.0, 0.69314718056, 1.79175946923, 3.17805383035, 4.78749174278};
 
@@ -850,27 +849,27 @@ static void stateMachine4_cellCalculate(StateMachine *sM,
                                                                  double, double,     // emissionProb, transitionProb
                                                                  void *),            // extraArgs
                                             void *extraArgs) {
-    StateMachine4 *sM5 = (StateMachine4 *) sM;
+    StateMachine4 *sM4 = (StateMachine4 *) sM;
     if (lower != NULL) {
-        double eP = sM5->getXGapProbFcn(sM5->model.EMISSION_GAP_X_PROBS, cX);
-        doTransition(lower, current, match, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_OPEN_X, extraArgs);
-        doTransition(lower, current, shortGapX, shortGapX, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_X, extraArgs);
-        doTransition(lower, current, match, longGapX, eP, sM5->TRANSITION_GAP_LONG_OPEN_X, extraArgs);
-        doTransition(lower, current, longGapX, longGapX, eP, sM5->TRANSITION_GAP_LONG_EXTEND_X, extraArgs);
-        doTransition(lower, current, shortGapY, longGapX, eP, sM5->TRANSITION_GAP_LONG_SWITCH_TO_X, extraArgs);
+        double eP = sM4->getXGapProbFcn(sM4->model.EMISSION_GAP_X_PROBS, cX);
+        doTransition(lower, current, match, shortGapX, eP, sM4->TRANSITION_GAP_SHORT_OPEN_X, extraArgs);
+        doTransition(lower, current, shortGapX, shortGapX, eP, sM4->TRANSITION_GAP_SHORT_EXTEND_X, extraArgs);
+        doTransition(lower, current, match, longGapX, eP, sM4->TRANSITION_GAP_LONG_OPEN_X, extraArgs);
+        doTransition(lower, current, longGapX, longGapX, eP, sM4->TRANSITION_GAP_LONG_EXTEND_X, extraArgs);
+        doTransition(lower, current, shortGapY, longGapX, eP, sM4->TRANSITION_GAP_LONG_SWITCH_TO_X, extraArgs);
 
     }
     if (middle != NULL) {
-        double eP = sM5->getMatchProbFcn(sM5->model.EMISSION_MATCH_PROBS, cX, cY);
-        doTransition(middle, current, match, match, eP, sM5->TRANSITION_MATCH_CONTINUE, extraArgs);
-        doTransition(middle, current, shortGapX, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_X, extraArgs);
-        doTransition(middle, current, shortGapY, match, eP, sM5->TRANSITION_MATCH_FROM_SHORT_GAP_Y, extraArgs);
-        doTransition(middle, current, longGapX, match, eP, sM5->TRANSITION_MATCH_FROM_LONG_GAP_X, extraArgs);
+        double eP = sM4->getMatchProbFcn(sM4->model.EMISSION_MATCH_PROBS, cX, cY);
+        doTransition(middle, current, match, match, eP, sM4->TRANSITION_MATCH_CONTINUE, extraArgs);
+        doTransition(middle, current, shortGapX, match, eP, sM4->TRANSITION_MATCH_FROM_SHORT_GAP_X, extraArgs);
+        doTransition(middle, current, shortGapY, match, eP, sM4->TRANSITION_MATCH_FROM_SHORT_GAP_Y, extraArgs);
+        doTransition(middle, current, longGapX, match, eP, sM4->TRANSITION_MATCH_FROM_LONG_GAP_X, extraArgs);
     }
     if (upper != NULL) {
-        double eP = sM5->getYGapProbFcn(sM5->model.EMISSION_GAP_Y_PROBS, cX, cY);
-        doTransition(upper, current, match, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_OPEN_Y, extraArgs);
-        doTransition(upper, current, shortGapY, shortGapY, eP, sM5->TRANSITION_GAP_SHORT_EXTEND_Y, extraArgs);
+        double eP = sM4->getYGapProbFcn(sM4->model.EMISSION_GAP_Y_PROBS, cX, cY);
+        doTransition(upper, current, match, shortGapY, eP, sM4->TRANSITION_GAP_SHORT_OPEN_Y, extraArgs);
+        doTransition(upper, current, shortGapY, shortGapY, eP, sM4->TRANSITION_GAP_SHORT_EXTEND_Y, extraArgs);
     }
 }
 

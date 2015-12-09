@@ -29,7 +29,9 @@ typedef struct _nanoporeRead {
 
 NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile);
 
-stList *nanopore_remapAnchorPairs(stList *blastPairs, int64_t *eventMap);
+stList *nanopore_remapAnchorPairs(stList *anchorPairs, int64_t *eventMap);
+
+stList *nanopore_remapAnchorPairsWithOffset(stList *unmappedPairs, int64_t *eventMap, int64_t mapOffset);
 
 void nanopore_nanoporeReadDestruct(NanoporeRead *npRead);
 

@@ -512,7 +512,9 @@ int main(int argc, char *argv[]) {
     if(hmmFile != NULL) {
         st_logInfo("Loading the hmm from file %s\n", hmmFile);
         Hmm *hmm = hmmDiscrete_loadFromFile(hmmFile);
-        StateMachineFunctions *sMfs = stateMachineFunctions_construct(emissions_symbol_getGapProb, emissions_symbol_getGapProb, emissions_symbol_getMatchProb);
+        StateMachineFunctions *sMfs = stateMachineFunctions_construct(emissions_symbol_getGapProb,
+                                                                      emissions_symbol_getGapProb,
+                                                                      emissions_symbol_getMatchProb);
         sM = getStateMachine5(hmm, sMfs);
         hmmDiscrete_normalize(hmm);
         hmmDiscrete_destruct(hmm);
@@ -565,8 +567,10 @@ int main(int argc, char *argv[]) {
         // Make sequence objects, slice 'em up
         char *subSeqX = getSubSequence(seqX, pA->start1, pA->end1, pA->strand1);
         char *subSeqY = getSubSequence(seqY, pA->start2, pA->end2, pA->strand2);
-        Sequence *SsubSeqX = sequence_construct((pA->end1 - pA->start1), subSeqX, sequence_getBase);
-        Sequence *SsubSeqY = sequence_construct((pA->end2 - pA->start2), subSeqY, sequence_getBase);
+        Sequence *SsubSeqX = sequence_construct2((pA->end1 - pA->start1), subSeqX, sequence_getBase,
+                                                 sequence_sliceNucleotideSequence2);
+        Sequence *SsubSeqY = sequence_construct2((pA->end2 - pA->start2), subSeqY, sequence_getBase,
+                                                 sequence_sliceNucleotideSequence2);
 
         rebasePairwiseAlignmentCoordinates(&(pA->start1), &(pA->end1), &(pA->strand1), -coordinateShift1, flipStrand1);
         rebasePairwiseAlignmentCoordinates(&(pA->start2), &(pA->end2), &(pA->strand2), -coordinateShift2, flipStrand2);

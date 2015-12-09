@@ -191,16 +191,27 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     return npRead;
 }
 
-stList *nanopore_remapAnchorPairs(stList *blastPairs, int64_t *eventMap) {
+stList *nanopore_remapAnchorPairs(stList *anchorPairs, int64_t *eventMap) {
     stList *mappedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
 
-    for (int64_t i = 0; i < stList_length(blastPairs); i++) {
-        stIntTuple *pair = stList_get(blastPairs, i);
-        //stList_set(blastPairs, i,
-        //           stIntTuple_construct2(stIntTuple_get(pair, 0), eventMap[stIntTuple_get(pair, 1)]));
+    for (int64_t i = 0; i < stList_length(anchorPairs); i++) {
+        stIntTuple *pair = stList_get(anchorPairs, i);
         stList_append(mappedPairs,
                       stIntTuple_construct2(stIntTuple_get(pair, 0), eventMap[stIntTuple_get(pair, 1)]));
-        //stIntTuple_destruct(pair);
+    }
+
+    return mappedPairs;
+}
+
+stList *nanopore_remapAnchorPairsWithOffset(stList *unmappedPairs, int64_t *eventMap, int64_t mapOffset) {
+    stList *mappedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
+
+    for (int64_t i = 0; i < stList_length(unmappedPairs); i++) {
+        stIntTuple *pair = stList_get(unmappedPairs, i);
+
+        stList_append(mappedPairs,
+                      stIntTuple_construct2(stIntTuple_get(pair, 0), eventMap[stIntTuple_get(pair, 1)] -
+                              eventMap[mapOffset]));
     }
 
     return mappedPairs;

@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 """Train HMMs for alignment of signal data from the MinION
 """
-from __future__ import print_function
-import h5py as h5
+from __future__ import print_function, division
 import subprocess
 import os
+import h5py as h5
+import numpy as np
 import sys
 sys.path.append("../")
-from serviceCourse.parsers import read_fasta
-from serviceCourse.sequenceTools import reverse_complement
+from multiprocessing import Process, Queue, current_process, Manager
 from nanoporeLib import *
 from argparse import ArgumentParser
 from random import shuffle
@@ -17,34 +17,47 @@ from random import shuffle
 def parse_args():
     parser = ArgumentParser (description=__doc__)
 
-    parser.add_argument('--file_directory', '-d', action='store',
+    #parser.add_argument('--file_directory', '-d', action='store',
+    #                    dest='files_dir', required=True, type=str,
+    #                    help="directory with fast5 files to train on")
+    parser.add_argument('--file_directory', '-d', action='append',
                         dest='files_dir', required=True, type=str,
-                        help="directory with fast5 files to train on, should have trailing /")
-
-    parser.add_argument('--train_amount', '-m', action='store', dest='amount',
-                        required=False, type=int, default='1000000')
+                        help="directories with fast5 files to train on")
 
     parser.add_argument('--ref', '-r', action='store',
-                        dest='ref', required=True, type=str)
+                        dest='ref', required=True, type=str,
+                        help="location of refrerence sequence in FASTA")
 
-    parser.add_argument('--index', '-i', action='store', dest='bwa_index',
-                        required=False, type=str, default=None)
-
-    parser.add_argument('--inputHmm', '-y', action='store', dest='inHmm',
-                        required=False, type=str, default=None)
+    #parser.add_argument('--inputHmm', '-y', action='store', dest='inHmm',
+    #                    required=False, type=str, default=None)
 
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
-                        help="directory to put the trained model, should have trailing slash")
-
-    parser.add_argument('--strand', '-s', action='store', dest='strand',
-                        required=True, type=str)
+                        help="directory to put the trained model, and use for working directory.")
 
     parser.add_argument('--iterations', '-t', action='store', dest='iter',
-                        required=False, type=str, default='50')
+                        required=False, type=int, default=40)
 
-    parser.add_argument('--strawMan', '-sm', action='store_true', dest='strawMan',
-                        required=False, default=False)
+    parser.add_argument('--train_amount', '-m', action='store', dest='amount',
+                        required=False, type=int, default=100000,
+                        help="limit the total length of sequence to use in training.")
+
+    parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
+                        required=False, type=str, default=None,
+                        help="input HMM for template events, if you don't want the default")
+
+    parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
+                        required=False, type=str, default=None,
+                        help="input HMM for complement events, if you don't want the default")
+
+    parser.add_argument('--banded', '-b', action='store_true', dest='banded',
+                        default=False, help='flag, use banded alignment heuristic')
+
+    parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
+                        default=4, type=int, help="number of jobs to run concurrently")
+
+    parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
+                        required=False, default="vanilla", help="decide which model to use, vanilla by default")
 
     args = parser.parse_args()
     return args
@@ -64,129 +77,44 @@ def get_2d_length(fast5):
         return read_length
 
 
-def cull_training_files(directory, training_amount):
-    print("trainModels - culling training files.  ", end="", file=sys.stderr)
-    fast5s = [x for x in os.listdir(directory) if x.endswith(".fast5")]
-    shuffle(fast5s)
-    training_files = []
-    total_amount = 0
+def cull_training_files(directories, training_amount):
+    print("trainModels - culling training files.\n", end="", file=sys.stderr)
 
-    for i in xrange(len(fast5s)):
-        training_files.append(directory+fast5s[i])
-        total_amount += get_2d_length(directory+fast5s[i])
-        if total_amount >= training_amount:
-            break
-    print("trainModels - Culled {nb_files} training files.".format(nb_files=len(training_files)),
-          end="\n", file=sys.stderr)
+    training_files = []
+
+    for directory in directories:
+        fast5s = [x for x in os.listdir(directory) if x.endswith(".fast5")]
+        shuffle(fast5s)
+
+        total_amount = 0
+        n = 0
+        for i in xrange(len(fast5s)):
+            training_files.append(directory + fast5s[i])
+            n += 1
+            total_amount += get_2d_length(directory + fast5s[i])
+            if total_amount >= training_amount:
+                break
+        print("Culled {nb_files} training files from {dir}.".format(nb_files=n,
+                                                                    dir=directory),
+              end="\n", file=sys.stderr)
 
     return training_files
 
 
-def doEM(in_fast5, reference, folder_handle, strawMan_flag, strand="Template", bwa_index=None, in_hmm=None,
-         iterations=50):
-    """
-    :param in_fast5: path to the fast5 file
-    :param reference: path to the reference sequence (fasta)
-    :param strand, string, "Template" or "Complement"
-    :param strawMan_flag, set to True to use straw man model
-    :param bwa_index: path to index files (no suffix)
-    :param in_hmm: input hmm to continue training
-    :param destination: place to put the trained hmm
-    :param iterations: number of iterations to do
-    :return: void, makes a trained hmm (or updates the existing one)
-    """
-    # Preamble: first we align the 2D read to the reference and get the orientation, ie does
-    # it align to the reference as it is in the fastA or to the reverse complement
+def get_expectations(work_queue, done_queue):
+    try:
+        for f in iter(work_queue.get, 'STOP'):
+            alignment = SignalAlignment(**f)
+            alignment.run(get_expectations=True)
+    except Exception, e:
+        done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
-    # containers and defaults
-    read_label = in_fast5.split("/")[-1]  # name of read
 
-    # object to handle files
-
-    work_dir = folder_handle.path
-    print("PYSENTINAL - working directory", work_dir)
-
-    # deconstructed files for alignment
-    temp_np_read = folder_handle.add_file_path("temp_nanoporeRead.npRead")
-    temp_2d_read = folder_handle.add_file_path("temp_2d_read.fa")
-    temp_t_model = folder_handle.add_file_path("template_model.model")
-    temp_c_model = folder_handle.add_file_path("complement_model.model")
-
-    # make the npRead and fasta todo make this assert
-    success, temp_t_model, temp_c_model = get_npRead_2dseq_and_models(fast5=in_fast5,
-                                                                      npRead_path=temp_np_read,
-                                                                      twod_read_path=temp_2d_read,
-                                                                      template_model_path=temp_t_model,
-                                                                      complement_model_path=temp_c_model)
-
-    if success is False:
-        return False
-
-    # if there is no bwa index given, make one #LOOK# maybe don't need this?
-    if bwa_index is None:
-        bwa = Bwa(reference)
-        bwa.build_index(work_dir)
-        bwa_ref_index = work_dir + "temp_bwaIndex"
-    else:
-        bwa_ref_index = bwa_index
-
-    # orient read with bwa
-    orientation = orient_read_with_bwa(bwa_index=bwa_ref_index, query=temp_2d_read)
-
-    # forward strand
-    if orientation == 0:
-        forward = True
-
-    # backward strand
-    if orientation == 16:
-        forward = False
-
-    # didn't map
-    elif (orientation != 0) and (orientation != 16):
-        print("\ntrainModels - read didn't map", file=sys.stderr)
-        return  False
-
-    # EM training routine: now we can run the training, we run training on either the template or
-    # complement, so that we can run this program in parallel and really do both at once
-
-    # containers and defaults
-    temp_ref_seq = folder_handle.add_file_path("temp_ref_seq.txt")
-    path_to_vanillaAlign = "./vanillaAlign"
-    strand_flags = ["-y", "-t"]
-    training_hmm = folder_handle.add_file_path("{strand}_trained.hmm".format(strand=strand))
-    print("PYSENTINAL - training hmm", training_hmm)
-
-    # make the temp sequence file
-    make_temp_sequence(reference, forward, temp_ref_seq)
-
-    # switch flags if we're doing the complement
-    if strand == "Complement":
-        strand_flags = ["-z", "-c"]
-
-    use_strawMan_model = ""
-    if strawMan_flag is True:
-        use_strawMan_model = "--s "
-
-    print("trainModels - starting B-W on file: {inFile}".format(inFile=in_fast5), end="\n", file=sys.stderr)
-    # training commands
-    em_command_start = "{vanillaAlign} {straw}-r {ref} -q {npRead} {outHmmFlag} {outHmm} -i {iter}".format(
-        vanillaAlign=path_to_vanillaAlign, straw=use_strawMan_model, ref=temp_ref_seq, npRead=temp_np_read,
-        outHmmFlag=strand_flags[1], outHmm=training_hmm, iter=iterations)
-    em_command_continue = \
-        "{vanillaAlign} {straw}-r {ref} -q {npRead} {inHmmFlag} {inHmm} {outHmmFlag} {outHmm} -i {iter}"\
-        .format(vanillaAlign=path_to_vanillaAlign, straw=use_strawMan_model, inHmmFlag=strand_flags[0], inHmm=in_hmm,
-                ref=temp_ref_seq, npRead=temp_np_read, outHmmFlag=strand_flags[1],
-                outHmm=training_hmm, iter=iterations)
-
-    # if we are given an input HMM
-    if in_hmm is None:
-        print("trainModels - running command", em_command_start, end="\n", file=sys.stderr)
-        os.system(em_command_start)
-
-    # if we're starting from scratch
-    else:
-        print("trainModels - running command", em_command_continue, end="\n", file=sys.stderr)
-        os.system(em_command_continue)
+def get_model(type, symbol_set_size):
+    if type == "threeState":
+        return ContinuousPairHmm(model_type=type, symbol_set_size=symbol_set_size)
+    if type == "vanilla":
+        return ConditionalSignalHmm(model_type=type, symbol_set_size=symbol_set_size)
 
 
 def main(args):
@@ -195,55 +123,112 @@ def main(args):
 
     start_message = """\n
     Starting Baum-Welch training.
-    Directory with training files: {files_dir}
+    Directories with training files: {files_dir}
     Training on {amount} bases.
     Using reference sequence: {ref}
-    Input hmm: {inHmm}
-    Writing trained hmm to: {outLoc}
-    Training on strand: {strand}
+    Input template/complement models: {inTHmm}/{inCHmm}
+    Writing trained models to: {outLoc}
     Performing {iterations} iterations.
-    Using strawMan model: {straw}
+    Using model: {model}
     \n
-    """.format(files_dir=args.files_dir, amount=args.amount, ref=args.ref, inHmm=args.inHmm,
-               outLoc=args.out, strand=args.strand, iterations=args.iter, straw=args.strawMan)
-    print(start_message, file=sys.stderr)
+    """.format(files_dir=args.files_dir, amount=args.amount, ref=args.ref,
+               inTHmm=args.in_T_Hmm, inCHmm=args.in_C_Hmm, outLoc=args.out,
+               iterations=args.iter, model=args.stateMachineType)
+    print(start_message, file=sys.stdout)
 
-    # make directory to put temporary files
-    training_folder = FolderHandler()
-    training_folder_path = training_folder.open_folder(args.out + "tempFiles_{strand}/".format(strand=args.strand))
+    if not os.path.isfile(args.ref):
+        print("Did not find valid reference file", file=sys.stderr)
+        sys.exit(1)
 
-    # index the reference for bwa, if needed
-    bwa_ref_index = ''
-    if args.bwa_index is None:
-        print("trainModels - indexing reference", file=sys.stderr)
-        bwa_ref_index = get_bwa_index(args.ref, training_folder_path)
-        print("trainModels - indexing reference, done\n", file=sys.stderr)
-    else:
-        bwa_ref_index = args.bwa_index
+    # make directory to put the files we're using files
+    working_folder = FolderHandler()
+    working_directory_path = working_folder.open_folder(args.out + "tempFiles_expectations")
 
-    # get a random list of files containing the number of bases we want to train
-    training_file_list = cull_training_files(args.files_dir, args.amount)
+    # index the reference for bwa
+    print("signalAlign - indexing reference", file=sys.stderr)
+    bwa_ref_index = get_bwa_index(args.ref, working_directory_path)
+    print("signalAlign - indexing reference, done", file=sys.stderr)
 
-    training_hmm = training_folder.add_file_path("{strand}_trained.hmm".format(strand=args.strand))
+    # make model objects, these handle normalizing, loading, and writing
+    template_model = get_model(type=args.stateMachineType, symbol_set_size=4096)
+    complement_model = get_model(type=args.stateMachineType, symbol_set_size=4096)
 
-    # get started. if there is no input training hmm, then we start from scratch, and train on one file
-    if args.inHmm is None:
-        get_started_file = training_file_list.pop()
-        doEM(in_fast5=get_started_file, reference=args.ref, strand=args.strand, bwa_index=bwa_ref_index,
-             in_hmm=None, folder_handle=training_folder, iterations=args.iter, strawMan_flag=args.strawMan)
+    # make some paths to files to hold the HMMs
+    template_hmm = working_folder.add_file_path("template_trained.hmm")
+    complement_hmm = working_folder.add_file_path("complement_trained.hmm")
 
-    # otherwise train with the input hmm on one file
-    if args.inHmm is not None:
-        get_started_file = training_file_list.pop()
-        doEM(in_fast5=get_started_file, reference=args.ref, strand=args.strand, bwa_index=bwa_ref_index,
-             in_hmm=args.inHmm, folder_handle=training_folder, iterations=args.iter, strawMan_flag=args.strawMan)
+    print("Starting {iterations} iterations.\nRunning likelihoods\nTempalte\tComplement".format(
+        iterations=args.iter), file=sys.stdout)
 
-    # train on the rest of the files
-    for training_file in training_file_list:
-        doEM(in_fast5=training_file, reference=args.ref, strand=args.strand, bwa_index=bwa_ref_index,
-             in_hmm=training_hmm, folder_handle=training_folder, iterations=args.iter, strawMan_flag=args.strawMan)
+    for i in xrange(args.iter):
+        # if we're starting there are no HMMs
+        if i == 0:
+            in_template_hmm = None
+            in_complement_hmm = None
+        else:
+            in_template_hmm = template_hmm
+            in_complement_hmm = complement_hmm
 
-    print("\nFinished Training routine, exiting.\n", file=sys.stderr)
+        # first cull a set of files to get expectations on
+        #training_files = cull_training_files(args.files_dir, args.amount)
+        training_files = cull_training_files(args.files_dir, args.amount)
+
+        # setup
+        workers = args.nb_jobs
+        work_queue = Manager().Queue()
+        done_queue = Manager().Queue()
+        jobs = []
+
+        # get expectations for all the files in the queue
+        for fast5 in training_files:
+            alignment_args = {
+                "reference": args.ref,
+                "destination": working_directory_path,
+                "stateMachineType": args.stateMachineType,
+                "bwa_index": bwa_ref_index,
+                "in_templateHmm": in_template_hmm,
+                "in_complementHmm": in_complement_hmm,
+                "banded": args.banded,
+                "in_fast5": fast5
+            }
+            work_queue.put(alignment_args)
+
+        for w in xrange(workers):
+            p = Process(target=get_expectations, args=(work_queue, done_queue))
+            p.start()
+            jobs.append(p)
+            work_queue.put('STOP')
+
+        for p in jobs:
+            p.join()
+
+        done_queue.put('STOP')
+
+        # load then normalize the expectations
+        template_expectations_files = [x for x in os.listdir(working_directory_path)
+                                       if x.endswith(".template.expectations")]
+        complement_expectations_files = [x for x in os.listdir(working_directory_path)
+                                         if x.endswith(".complement.expectations")]
+        for f in template_expectations_files:
+            template_model.add_expectations_file(working_directory_path + f)
+            os.remove(working_directory_path + f)
+        for f in complement_expectations_files:
+            complement_model.add_expectations_file(working_directory_path + f)
+            os.remove(working_directory_path + f)
+
+        template_model.normalize()
+        complement_model.normalize()
+
+        # write to disk for the next iteration
+        template_model.write(template_hmm)
+        template_model.running_likelihoods.append(template_model.likelihood)
+        complement_model.write(complement_hmm)
+        complement_model.running_likelihoods.append(complement_model.likelihood)
+        print("{t_likelihood}\t{c_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1],
+                                                      c_likelihood=complement_model.running_likelihoods[-1]))
+
+    print("signalAlign - finished training routine", file=sys.stdout)
+    print("signalAlign - finished training routine", file=sys.stderr)
 
 
 if __name__ == "__main__":

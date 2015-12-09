@@ -362,7 +362,7 @@ double vanillaHmm_getKmerSkipBinExpectation(Hmm *hmm, int64_t bin, int64_t ignor
 // normalize/randomize
 void vanillaHmm_normalizeKmerSkipBins(Hmm *hmm) {
     double total = 0.0;
-    for (int64_t i = 0; i < 60; i++) {
+    for (int64_t i = 0; i < 60; i++) { // this is wrong, want to normalize alpha and beta seperately
         total += hmm->getTransitionsExpFcn(hmm, i, 0);
     }
     for (int64_t i = 0; i < 60; i++) {
@@ -421,6 +421,7 @@ void vanillaHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
      * line 2: [correlation coeff] \t [match model .. \t]  \n
      * line 3: [correlation coeff] [extra event matchModel]
      * See emissions_signal_loadPoreModel for description of matchModel
+     * TODO might want to make poremodel and this more similar?
      */
     VanillaHmm *vHmm = (VanillaHmm *)hmm;
 
@@ -575,7 +576,7 @@ Hmm *hmmContinuous_loadSignalHmm(const char *fileName, StateMachineType type) {
     return 0;
 }
 
-void hmmContinuous_loadExpectations(StateMachine *sM, Hmm *hmm, StateMachineType type) {
+void hmmContinuous_loadExpectations(StateMachine *sM, Hmm *hmm, StateMachineType type) { // todo rename this function
     assert((type == vanilla) || (type == threeState));
     if (type == vanilla) {
         vanillaHmm_loadKmerSkipBinExpectations(sM, hmm);

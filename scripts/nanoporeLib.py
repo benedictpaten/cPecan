@@ -1,21 +1,21 @@
 #!/usr/bin/env python
 """Small library for working with MinION data
 """
-
-from __future__ import print_function
-from numpy import log2, power
-from itertools import islice, izip
-import subprocess
-from serviceCourse.sequenceTools import reverse_complement
-from serviceCourse.parsers import read_fasta
-from serviceCourse.file_handlers import FolderHandler
+from __future__ import print_function, division
 import os
 import h5py
 import sys
+import subprocess
+import re
+import numpy as np
+from itertools import islice, izip
+from serviceCourse.sequenceTools import reverse_complement
+from serviceCourse.parsers import read_fasta
+from serviceCourse.file_handlers import FolderHandler
 
 
 def kmer_iterator(dna, k):
-    for i in range(len(dna)):
+    for i in xrange(len(dna)):
         kmer = dna[i:(i+k)]
         if len(kmer) == k:
             yield kmer
@@ -31,13 +31,18 @@ def list_twoD_event_map(self):
 
 def orient_read_with_bwa(bwa_index, query):
     # align with bwa
-
     command = "bwa mem -x ont2d {index} {query}".format(index=bwa_index, query=query)
     # this is a small SAM file that comes from bwa
     aln = subprocess.check_output(command.split())
     aln = aln.split("\t") # split
 
     return int(aln[7])
+
+
+def write_fasta(id, sequence, destination):
+    print(">", id, sep="", end="\n", file=destination)
+    print(sequence, end="\n", file=destination)
+
 
 def get_bwa_index(reference, dest):
     bwa = Bwa(reference)
@@ -61,7 +66,7 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path, template_mod
         npRead.close()
         return False
 
-    if npRead.get_2d_event_map() and npRead.get_template_events() and npRead.get_complement_evnets():
+    if npRead.get_twoD_event_map() and npRead.get_template_events() and npRead.get_complement_evnets():
         # get model params
         t_model_bool = npRead.get_template_model_adjustments()
         c_model_bool = npRead.get_complement_model_adjustments()
@@ -79,22 +84,22 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path, template_mod
         # Make the npRead
 
         # line 1
-        print(len(npRead.twoD_read_sequence), end=' ', file=out_file) # 2D read length
-        print(len(npRead.template_events), end=' ', file=out_file)    # nb of template events
-        print(len(npRead.complement_events), end=' ', file=out_file)  # nb of complement events
-        print(npRead.template_scale, end=' ', file=out_file)          # template scale
-        print(npRead.template_shift, end=' ', file=out_file)          # template shift
-        print(npRead.template_var, end=' ', file=out_file)            # template var
-        print(npRead.template_scale_sd, end=' ', file=out_file)       # template scale_sd
-        print(npRead.template_var_sd, end=' ', file=out_file)         # template var_sd
-        print(npRead.complement_scale, end=' ', file=out_file)        # complement scale
-        print(npRead.complement_shift, end=' ', file=out_file)        # complement shift
-        print(npRead.complement_var, end=' ', file=out_file)          # complement var
-        print(npRead.complement_scale_sd, end=' ', file=out_file)     # complement scale_sd
-        print(npRead.complement_var_sd, end='\n', file=out_file)      # complement var_sd
+        print(len(npRead.alignment_table_sequence), end=' ', file=out_file)  # alignment read length
+        print(len(npRead.template_events), end=' ', file=out_file)           # nb of template events
+        print(len(npRead.complement_events), end=' ', file=out_file)         # nb of complement events
+        print(npRead.template_scale, end=' ', file=out_file)                 # template scale
+        print(npRead.template_shift, end=' ', file=out_file)                 # template shift
+        print(npRead.template_var, end=' ', file=out_file)                   # template var
+        print(npRead.template_scale_sd, end=' ', file=out_file)              # template scale_sd
+        print(npRead.template_var_sd, end=' ', file=out_file)                # template var_sd
+        print(npRead.complement_scale, end=' ', file=out_file)               # complement scale
+        print(npRead.complement_shift, end=' ', file=out_file)               # complement shift
+        print(npRead.complement_var, end=' ', file=out_file)                 # complement var
+        print(npRead.complement_scale_sd, end=' ', file=out_file)            # complement scale_sd
+        print(npRead.complement_var_sd, end='\n', file=out_file)             # complement var_sd
 
         # line 2
-        print(npRead.twoD_read_sequence, end='\n', file=out_file)
+        print(npRead.alignment_table_sequence, end='\n', file=out_file)
 
         # line 3
         for _ in npRead.template_event_map:
@@ -117,7 +122,8 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path, template_mod
         print("", end="\n", file=out_file)
 
         # make the 2d read
-        npRead.extract_2d_read(temp_fasta)
+        #npRead.extract_2d_read(temp_fasta)
+        write_fasta(id=fast5, sequence=npRead.alignment_table_sequence, destination=temp_fasta)
 
         # handle models
         # template model
@@ -182,6 +188,72 @@ class Bwa(object):
         os.system("bwa mem -x ont2d {0} {1}".format(self.db_handle, query))
 
 
+def parse_cigar(cigar_string, ref_start):
+    # use a regular expression to parse the string into operations and lengths
+    cigar_tuples = re.findall(r'([0-9]+)([MIDNSHPX=])', cigar_string)
+
+    clipping = {"S", "H"}
+    alignment_operations = {"M", "I", "D"}
+
+    # make some containers
+    query_start = 0
+    past_start = False
+    query_end = 0
+    reference_start = ref_start - 1  # fence posts adjustment
+    reference_end = 0
+
+    exonerated_cigar = " ".join(["%s %i" % (operation, int(length)) for length, operation in
+                                 cigar_tuples if operation in alignment_operations])
+
+    # this is how you calculate the reference map region
+    for length, op in cigar_tuples:
+        if op in clipping and past_start is False:
+            query_start += int(length)
+        if op == "M" or op == "D":
+            reference_end += int(length)
+            if past_start is False:
+                past_start = True
+        if op == "M" or op == "I":
+            query_end += int(length)
+            if past_start is False:
+                past_start = True
+
+    query_end = query_end + query_start
+    reference_end = reference_end + reference_start
+
+    return query_start, query_end, reference_start, reference_end, exonerated_cigar
+
+
+def exonerated_bwa(bwa_index, query):
+    # align with bwa
+    command = "bwa mem -x ont2d {index} {query}".format(index=bwa_index, query=query)
+
+    # this is a small SAM file that comes from bwa
+    aln = subprocess.check_output(command.split())
+    aln = aln.split("\t") # split
+
+    query_start, query_end, reference_start, reference_end, cigar_string = parse_cigar(aln[11], int(aln[9]))
+
+    strand = ""
+    if int(aln[7]) == 16:
+        strand = "-"
+        temp = reference_start
+        reference_start = reference_end
+        reference_end = temp
+    if int(aln[7]) == 0:
+        strand = "+"
+    elif int(aln[7]) != 0 and int(aln[7]) != 16:
+        print("unknown alignment flag, exiting", file=sys.stderr)
+        return False, False
+
+    #completeCigarString = "cigar: %s %i %i %s %s %i %i + 1 %s" % (
+    #aln[8], reference_start, reference_end, strand, aln[6].split()[-1], query_start, query_end, cigar_string)
+    completeCigarString = "cigar: %s %i %i + %s %i %i %s 1 %s" % (
+    aln[6].split()[-1], query_start, query_end, aln[8], reference_start, reference_end, strand, cigar_string)
+
+    return completeCigarString, strand
+
+
 def get_proceding_kmers(kmer, alphabet="ACGT"):
     proceding_kmers = []
     suffix = kmer[1:]
@@ -211,17 +283,10 @@ class NanoporeRead(object):
             print("Error opening file {filename}".format(filename=self.filename), file=sys.stderr)
             return False
 
-    def initialize_2d(self):
+    def initialize_twoD(self, get_sequence=False):
         # init
         self.has2D = False
         self.has2D_alignment_table = False
-
-        twoD_read_sequence_address = "/Analyses/Basecall_2D_000/BaseCalled_2D/Fastq"
-
-        if twoD_read_sequence_address in self.fastFive:
-            self.has2D = True
-            self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
-            self.twoD_id = self.fastFive[twoD_read_sequence_address][()].split()[0:2][0][1:]
 
         twoD_alignment_table_address = "/Analyses/Basecall_2D_000/BaseCalled_2D/Alignment"
         if twoD_alignment_table_address in self.fastFive:
@@ -229,6 +294,48 @@ class NanoporeRead(object):
             if len(self.twoD_alignment_table) > 0:
                 self.has2D_alignment_table = True
             self.kmer_length = len(self.twoD_alignment_table[0][2])
+
+        if get_sequence is True:
+            twoD_read_sequence_address = "/Analyses/Basecall_2D_000/BaseCalled_2D/Fastq"
+            if twoD_read_sequence_address in self.fastFive:
+                self.has2D = True
+                self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
+                self.twoD_id = self.fastFive[twoD_read_sequence_address][()].split()[0:2][0][1:]
+
+    def get_alignment_sequence(self):
+        """The 2D read sequence contains kmers that may not map to a tempalte or complement event, which can make
+        mapping difficult downstream. This function makes a sequence from the 2D alignment table, which is usually
+        pretty similar to the 2D read, except it is guaranteed to have an event map to every position.
+
+        :return: sequence made from alignment table
+        """
+        def find_kmer_overlap(k_i, k_j):
+            """ finds the overlap between two non-identical kmers.
+            :param k_i: one kmer
+            :param k_j: another kmer
+            :return: The number of positions not matching
+            """
+            for i in xrange(1, len(k_i)):
+                sk_i = k_i[i:]
+                sk_j = k_j[:-i]
+                if sk_i == sk_j:
+                    return i
+            return len(k_i)
+
+        # init
+        self.alignment_table_sequence = ''
+        p_kmer = ''
+        self.alignment_table_sequence = self.twoD_alignment_table[0][2]
+        p_kmer = self.twoD_alignment_table[0][2]
+
+        for t, c, kmer in self.twoD_alignment_table:
+            if kmer != p_kmer:
+                i = find_kmer_overlap(p_kmer, kmer)
+                self.alignment_table_sequence += kmer[-i:]
+                p_kmer = kmer
+            else:
+                continue
+        return
 
     def get_strand_event_map(self):
         """Maps the events from the template and complement strands to their base called kmers the map
@@ -259,8 +366,8 @@ class NanoporeRead(object):
         self.complement_strand_event_map = make_map(self.complement_event_table)
         return
 
-    def get_2d_event_map(self):
-        """Maps the kmers in the 2D basecalled read to events in the template and complement strand reads
+    def get_twoD_event_map(self):
+        """Maps the kmers in the alignment table sequence read to events in the template and complement strand reads
         """
         # initialize
         alignment_row = 0
@@ -269,13 +376,15 @@ class NanoporeRead(object):
         previous_complement_event = None
         previous_template_event = None
 
-        self.initialize_2d()
+        self.initialize_twoD()
 
-        if not (self.has2D and self.has2D_alignment_table):
+        if not self.has2D_alignment_table:
             return False
 
+        self.get_alignment_sequence()
+
         # go thought the kmers in the read sequence and match up the events
-        for i, seq_kmer in enumerate(kmer_iterator(self.twoD_read_sequence, self.kmer_length)):
+        for i, seq_kmer in enumerate(kmer_iterator(self.alignment_table_sequence, self.kmer_length)):
             # assign the current row's kmer
             current_alignment_kmer = self.twoD_alignment_table[alignment_row][2]
 
@@ -294,21 +403,18 @@ class NanoporeRead(object):
                 # handle template event
                 # if there is a gap, count it and don't add anything to the map
                 if template_event == -1:
-
                     nb_template_gaps += 1
+
                 # if there is an aligned event
                 if template_event != -1:
-                    # if it is an aligned event and there are no gaps, add it
-                    # to the map
+                    # if it is an aligned event and there are no gaps, add it to the map
                     if nb_template_gaps == 0:
-
                         self.template_event_map.append(template_event)
                         # update
                         previous_template_event = template_event
                     # if there were gaps in the alignment we have to add 'best guess'
                     # event alignments to the map which is the current aligned event
                     if nb_template_gaps > 0:
-
                         self.template_event_map += [template_event] * (nb_template_gaps + 1)
                         # reset template gaps
                         nb_template_gaps = 0
@@ -319,6 +425,7 @@ class NanoporeRead(object):
                 # if there is a gap, add the last aligned complement event to the map
                 if complement_event == -1:
                     self.complement_event_map.append(previous_complement_event)
+
                 # if there is an aligned complement event add it to the map
                 if complement_event != -1:
                     self.complement_event_map.append(complement_event)
@@ -346,8 +453,8 @@ class NanoporeRead(object):
             nb_template_gaps = 0
 
         # check that we have mapped all of the bases in the 2D read
-        assert(len(self.template_event_map) == len(self.twoD_read_sequence))
-        assert(len(self.complement_event_map) == len(self.twoD_read_sequence))
+        assert(len(self.template_event_map) == len(self.alignment_table_sequence))
+        assert(len(self.complement_event_map) == len(self.alignment_table_sequence))
         return True
 
     def transform_events(self, events, drift):
@@ -423,7 +530,7 @@ class NanoporeRead(object):
 
     @staticmethod
     def calculate_lambda(noise_mean, noise_stdev):
-        return (power(noise_mean, 3)) / (power(noise_stdev, 2))
+        return (np.power(noise_mean, 3)) / (np.power(noise_stdev, 2))
 
 
     def export_model(self, skip_bins, model_address, destination):
@@ -495,10 +602,6 @@ class NanoporeRead(object):
         else:
             return None
 
-    def extract_2d_read(self, destination):
-        print(">", self.twoD_id, sep="", end="\n", file=destination)
-        print(self.twoD_read_sequence, end="\n", file=destination)
-
     def close(self):
         self.fastFive.close()
 
@@ -520,7 +623,7 @@ class NanoporeModel(object):
                     [noise_mean] [noise_sd] [noise_lambda ] (.../kmer) \n
         """
         def calculate_lambda(noise_mean, noise_stdev):
-            return (power(noise_mean, 3)) / (power(noise_stdev, 2))
+            return (np.power(noise_mean, 3)) / (np.power(noise_stdev, 2))
 
         if self.model is None:
             print("This method is meant to be used as part of the child class TemplateModel or ComplementModel",
@@ -566,7 +669,8 @@ class TemplateModel(NanoporeModel):
     def __init__(self, fast5File):
         super(TemplateModel, self).__init__(fast5File=fast5File)
         self.model = self.fastFive['/Analyses/Basecall_2D_000/BaseCalled_template/Model']
-        self.stay_prob = log2(self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_template/Model"].attrs["stay_prob"])
+        self.stay_prob = np.log2(
+            self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_template/Model"].attrs["stay_prob"])
         self.skip_prob_bins = [0.487, 0.412, 0.311, 0.229, 0.174, 0.134, 0.115, 0.103, 0.096, 0.092,
                                0.088, 0.087, 0.084, 0.085, 0.083, 0.082, 0.085, 0.083, 0.084, 0.082,
                                0.080, 0.085, 0.088, 0.086, 0.087, 0.089, 0.085, 0.090, 0.087, 0.096]
@@ -583,7 +687,8 @@ class ComplementModel(NanoporeModel):
     def __init__(self, fast5File):
         super(ComplementModel, self).__init__(fast5File=fast5File)
         self.model = self.fastFive['/Analyses/Basecall_2D_000/BaseCalled_complement/Model']
-        self.stay_prob = log2(self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Model"].attrs["stay_prob"])
+        self.stay_prob = np.log2(
+            self.fastFive["/Analyses/Basecall_2D_000/BaseCalled_complement/Model"].attrs["stay_prob"])
         self.skip_prob_bins = [0.531, 0.478, 0.405, 0.327, 0.257, 0.207, 0.172, 0.154, 0.138, 0.132,
                                0.127, 0.123, 0.117, 0.115, 0.113, 0.113, 0.115, 0.109, 0.109, 0.107,
                                0.104, 0.105, 0.108, 0.106, 0.111, 0.114, 0.118, 0.119, 0.110, 0.119]
@@ -618,9 +723,8 @@ class SignalAlignment(object):
         else:
             self.in_complementHmm = None
 
-    def do_alignment(self):
+    def run(self, get_expectations=False):
         # file checks
-
         if os.path.isfile(self.in_fast5) is False:
             print("signalAlign - problem with file path {file}".format(file=self.in_fast5))
             return False
@@ -669,24 +773,24 @@ class SignalAlignment(object):
             model_label = ".vl"
             stateMachineType_flag = ""
 
+        # get orientation and cigar from BWA this serves as the guide alignment
+        cigar_string, strand = exonerated_bwa(bwa_index=self.bwa_index, query=temp_2d_read)
+
         # this gives the format: /directory/for/files/file.model.orientation.tsv
         posteriors_file_path = ''
 
-        # get orientation from BWA
-        orientation = orient_read_with_bwa(bwa_index=self.bwa_index, query=temp_2d_read)
-
         # forward strand
-        if orientation == 0:
+        if strand == "+":
             forward = True
             posteriors_file_path = self.destination + read_name + model_label + ".forward.tsv"
 
         # backward strand
-        if orientation == 16:
+        if strand == "-":
             forward = False
             posteriors_file_path = self.destination + read_name + model_label + ".backward.tsv"
 
         # didn't map
-        elif (orientation != 0) and (orientation != 16):
+        elif (strand != "+") and (strand != "-"):
             print("\nsignalAlign - read didn't map", file=sys.stderr)
             return False
 
@@ -694,7 +798,6 @@ class SignalAlignment(object):
 
         # containers and defaults
         temp_ref_seq = temp_folder.add_file_path("temp_ref_seq.txt")
-
         path_to_vanillaAlign = "./vanillaAlign"  # todo could require this in path
 
         # make sequence for vanillaAlign, we orient the sequence so that the template events align to the
@@ -733,16 +836,170 @@ class SignalAlignment(object):
         else:
             banded_flag = ""
 
-        # alignment commands
-        alignment_command = \
-            "{vA} {banded}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm} -u {posteriors} -L {readLabel}"\
-            .format(vA=path_to_vanillaAlign, model=stateMachineType_flag, banded=banded_flag, ref=temp_ref_seq,
-                    readLabel=read_label, npRead=temp_np_read, t_model=template_model_flag,
-                    c_model=complement_model_flag, t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag,
-                    posteriors=posteriors_file_path)
+        # commands
+        if get_expectations:
+            template_expectations_file_path = self.destination + read_name + ".template.expectations"
+            complement_expectations_file_path = self.destination + read_name + ".complement.expectations"
+
+            alignment_command = \
+                "echo {cigar} | {vA} {banded}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm} -L " \
+                "{readLabel} -t {templateExpectations} -c {complementExpectations}"\
+                .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag, banded=banded_flag,
+                        ref=temp_ref_seq, readLabel=read_label, npRead=temp_np_read, t_model=template_model_flag,
+                        c_model=complement_model_flag, t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag,
+                        templateExpectations=template_expectations_file_path,
+                        complementExpectations=complement_expectations_file_path)
+        else:
+            alignment_command = \
+                "echo {cigar} | {vA} {banded}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm} " \
+                "-u {posteriors} -L {readLabel}"\
+                .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag, banded=banded_flag, ref=temp_ref_seq,
+                        readLabel=read_label, npRead=temp_np_read, t_model=template_model_flag,
+                        c_model=complement_model_flag, t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag,
+                        posteriors=posteriors_file_path)
 
         # run
         print("signalAlign - running command", alignment_command, end="\n", file=sys.stderr)
         os.system(alignment_command)
-        #temp_folder.remove_folder()
+        temp_folder.remove_folder()
         return True
+
+
+class SignalHmm(object):
+    def __init__(self, model_type, symbol_set_size):
+        self.match_model_params = 5
+        self.model_type = model_type  # ID of model type
+        self.state_number = {"threeState": 3, "vanilla": 3}[model_type]
+        self.symbol_set_size = symbol_set_size  # eg. number of kmers, 4096 for 6mers
+        self.likelihood = 0.0
+        self.running_likelihoods = []
+
+
+class ContinuousPairHmm(SignalHmm):
+    def __init__(self, model_type, symbol_set_size):
+        super(ContinuousPairHmm, self).__init__(model_type=model_type, symbol_set_size=symbol_set_size)
+        self.transitions = np.zeros(self.state_number**2)
+        self.kmer_skip_probs = np.zeros(self.symbol_set_size)
+
+    def add_expectations_file(self, expectations_file):
+        fH = open(expectations_file, 'r')
+
+        # line 0: smType stateNumber, symbolSetSize
+        line = map(float, fH.readline().split())
+        assert line[0] == 2
+        assert line[1] == self.state_number
+        assert line[2] == self.symbol_set_size
+
+        # line 1: transitions, likelihood
+        line = map(float, fH.readline().split())
+        self.likelihood += line[-1]
+        self.transitions = map(lambda x: sum(x), zip(self.transitions, line[0:-1]))
+
+        # line 2: kmer skip probs
+        line = map(float, fH.readline().split())
+        self.kmer_skip_probs = map(lambda x: sum(x), zip(self.kmer_skip_probs, line))
+
+        fH.close()
+
+    def normalize(self):
+        # normalize transitions
+        for from_state in xrange(self.state_number):
+            i = self.state_number * from_state
+            j = sum(self.transitions[i:i+self.state_number])
+            for to_state in xrange(self.state_number):
+                self.transitions[i + to_state] = self.transitions[i + to_state] / j
+
+        # normalize kmer skip probs
+        total_skip_prob = sum(self.kmer_skip_probs)
+        for i in xrange(self.symbol_set_size):
+            self.kmer_skip_probs[i] = self.kmer_skip_probs[i] / total_skip_prob
+
+    def write(self, out_file):
+        # Format
+        # type \t stateNumber \t symbolSetSize \n
+        # [transitions, ... \t seperated] likelihood \n
+        # [kmer skip probs... \t sep] \n
+        f = open(out_file, 'w')
+
+        # line 0
+        f.write("2\t{stateNumber}\t{symbolSetSize}\n".format(stateNumber=self.state_number,
+                                                             symbolSetSize=self.symbol_set_size))
+
+        # line 1
+        # transitions
+        for i in xrange(self.state_number * self.state_number):
+            f.write("{transition}\t".format(transition=str(self.transitions[i])))
+        # likelihood
+        f.write("{}\n".format(str(self.likelihood)))
+
+        # line 2
+        # kmer skip probs
+        for kmer in xrange(self.symbol_set_size):
+            f.write("{}\t".format(str(self.kmer_skip_probs[kmer])))
+        # final newline
+        f.write("\n")
+        f.close()
+
+
+class ConditionalSignalHmm(SignalHmm):
+    def __init__(self, model_type, symbol_set_size):
+        super(ConditionalSignalHmm, self).__init__(model_type=model_type, symbol_set_size=symbol_set_size)
+        self.kmer_skip_bins = np.zeros(60)
+        self.match_model = np.zeros(1 + (symbol_set_size * self.match_model_params))
+        self.scaled_match_model = np.zeros(1 + (symbol_set_size * self.match_model_params))
+
+    def add_expectations_file(self, expectations_file):
+        fH = open(expectations_file, 'r')
+
+        # line 0: smType \t stateNumber \t symbol_set_size
+        line = map(float, fH.readline().split())
+        assert line[0] == 4
+        assert line[1] == self.state_number
+        assert line[2] == self.symbol_set_size
+
+        # line 1: kmer skip bins (alpha and beta) \t likelihood
+        line = map(float, fH.readline().split())
+        self.likelihood = line[-1]
+        self.kmer_skip_bins = map(lambda x: sum(x), zip(self.kmer_skip_bins, line[0:-1]))
+
+        # ignore match models for now
+
+    def normalize(self):
+        # get totals for alpha and beta probs
+        beta_total = sum(self.kmer_skip_bins[:30])
+        alpha_total = sum(self.kmer_skip_bins[30:])
+
+        # normalize
+        for i in xrange(30):
+            self.kmer_skip_bins[i] = self.kmer_skip_bins[i] / beta_total
+            self.kmer_skip_bins[i + 30] = self.kmer_skip_bins[i + 30] / alpha_total
+
+    def write(self, out_file):
+        # Format:
+        # line 0: type \t stateNumber \t symbolSetSize \n
+        # line 1: skip bins (alpha and beta) \t likelihood \n
+        # line 2: [correlation coeff] \t [match model .. \t]  \n
+        # line 3: [correlation coeff] [extra event matchModel]
+        f = open(out_file, 'w')
+
+        # line 0
+        f.write("4\t{stateNumber}\t{symbolSetSize}\n".format(stateNumber=self.state_number,
+                                                            symbolSetSize=self.symbol_set_size))
+        # line 1
+        # kmer skip bins
+        for i in xrange(60):
+            f.write("{kmerSkipBinProb}\t".format(kmerSkipBinProb=str(self.kmer_skip_bins[i])))
+        # likelihood
+        f.write("{}\n".format(str(self.likelihood)))
+
+        # line 2 and 3, we're not using the match models now so just write down some placeholders
+        for i in xrange(1 + (self.symbol_set_size * self.match_model_params)):
+            f.write("{}\t".format(str(self.match_model[i])))
+        f.write("\n")
+        for i in xrange(1 + (self.symbol_set_size * self.match_model_params)):
+            f.write("{}\t".format(str(self.scaled_match_model[i])))
+        f.write("\n")
+
+        f.close()
+
+
