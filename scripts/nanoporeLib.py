@@ -907,7 +907,8 @@ class ContinuousPairHmm(SignalHmm):
             i = self.state_number * from_state
             j = sum(self.transitions[i:i+self.state_number])
             for to_state in xrange(self.state_number):
-                self.transitions[i + to_state] = self.transitions[i + to_state] / j ## todo check this!
+                self.transitions[i + to_state] = self.transitions[i + to_state] / j
+            print(self.transitions[i:i+self.state_number], sum(self.transitions[i:i+self.state_number]))
 
         # normalize kmer skip probs
         total_skip_prob = sum(self.kmer_skip_probs)
