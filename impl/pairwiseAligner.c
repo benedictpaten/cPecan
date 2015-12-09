@@ -443,6 +443,7 @@ void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *t
 
     // Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
+
     // update transitions expectation
     hmmExpectations->addToTransitionExpectationFcn(hmmExpectations, from, to, p);
     //

@@ -1596,7 +1596,7 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
             st_logInfo("Emission x %" PRIi64 " has expectation %f\n", x, cpHmm->getEmissionExpFcn(cpHmm, 0, x, 0));
 
         }
-        st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", cpHmm->likelihood, iter);
+        st_logInfo("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", cpHmm->likelihood, iter);
 
         // M step
         continuousPairHmm_loadTransitionsAndKmerGapProbs(sMt, cpHmm); //todo| make sure this is working by looking for

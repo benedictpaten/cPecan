@@ -118,9 +118,10 @@ def get_model(type, symbol_set_size):
 
 
 def add_and_norm_expectations(path, files, model, hmm_file):
+    model.likelihood = 0
     for f in files:
         model.add_expectations_file(path + f)
-        os.remove(path + f)
+        #os.remove(path + f)
     model.normalize()
     model.write(hmm_file)
     model.running_likelihoods.append(model.likelihood)
