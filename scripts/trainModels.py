@@ -115,13 +115,13 @@ def add_and_norm_expectations(path, files, model, hmm_file):
     model.likelihood = 0
     for f in files:
         model.add_expectations_file(path + f)
-        #os.remove(path + f)
+        #os.remove(path + f)  # try reactivating this
     model.normalize()
     model.write(hmm_file)
     model.running_likelihoods.append(model.likelihood)
 
 
-def main(args):
+def main(argv):
     # parse command line arguments
     args = parse_args()
 
@@ -140,7 +140,7 @@ def main(args):
                iterations=args.iter, model=args.stateMachineType)
     print(start_message, file=sys.stdout)
 
-    if not os.path.isfile(args.ref):
+    if not os.path.isfile(args.ref):  # TODO make this is_fasta(args.ref)
         print("Did not find valid reference file", file=sys.stderr)
         sys.exit(1)
 

@@ -892,6 +892,9 @@ class ContinuousPairHmm(SignalHmm):
 
         # line 1: transitions, likelihood
         line = map(float, fH.readline().split())
+        # check if valid file
+        if len(line) != (len(self.transitions) + 1):
+            return
         self.likelihood += line[-1]
         print("incorperating", line[0:-1], (np.nan in line[0:-1]))
         self.transitions = map(lambda x: sum(x), zip(self.transitions, line[0:-1]))

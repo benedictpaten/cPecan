@@ -52,7 +52,8 @@ static HmmContinuous *hmmContinuous_constructEmpty(
 
 static bool continuousPairHmm_checkTransitions(double *transitions, int64_t nbTransitions) {
     for (int64_t i = 0; i < nbTransitions; i++) {
-        if (transitions[i] != transitions[i]) {
+        //if (transitions[i] != transitions[i]) {
+        if (isnan(transitions[i])) {
             return FALSE;
         } else {
             continue;
@@ -218,25 +219,21 @@ void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
                               * cpHmm->baseContinuousHmm.baseHmm.stateNumber);
     fprintf(stdout, "exps:");
     bool check = continuousPairHmm_checkTransitions(cpHmm->transitions, nb_transitions);
+    if (check) {
+        for (int64_t i = 0; i < nb_transitions; i++) {
+            fprintf(stdout, "%f ", cpHmm->transitions[i]);
+            fprintf(fileHandle, "%f\t", cpHmm->transitions[i]); // transitions 1:(0-9)
+        }
 
-    for (int64_t i = 0; i < nb_transitions; i++) {
-        fprintf(stdout, "%f ", cpHmm->transitions[i]);
-        fprintf(fileHandle, "%f\t", cpHmm->transitions[i]); // transitions 1:(0-9)
-    }
-    if (check == TRUE) {
-        fprintf(stdout, "OK\n");
-    } else {
-        fprintf(stdout, "BAD\n");
-    }
+        // write the likelihood
+        fprintf(fileHandle, "%f\n", cpHmm->baseContinuousHmm.baseHmm.likelihood); // likelihood 1:10, newLine
 
-    // write the likelihood
-    fprintf(fileHandle, "%f\n", cpHmm->baseContinuousHmm.baseHmm.likelihood); // likelihood 1:10, newLine
-
-    // write the individual kmer skip probs to disk
-    for (int64_t i = 0; i < cpHmm->baseContinuousHmm.baseHmm.symbolSetSize; i++) {
-        fprintf(fileHandle, "%f\t", cpHmm->individualKmerGapProbs[i]); // indiv kmer skip probs 2:(0-4096)
+        // write the individual kmer skip probs to disk
+        for (int64_t i = 0; i < cpHmm->baseContinuousHmm.baseHmm.symbolSetSize; i++) {
+            fprintf(fileHandle, "%f\t", cpHmm->individualKmerGapProbs[i]); // indiv kmer skip probs 2:(0-4096)
+        }
+        fprintf(fileHandle, "\n"); // newLine
     }
-    fprintf(fileHandle, "\n"); // newLine
 }
 
 Hmm *continuousPairHmm_loadFromFile(const char *fileName) {
