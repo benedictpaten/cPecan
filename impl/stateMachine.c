@@ -219,10 +219,6 @@ static inline void emissions_signal_initKmerSkipTableToZero(double *skipModel, i
     memset(skipModel, 0, parameterSetSize * sizeof(double));
 }
 
-static inline void emissions_signal_initKmerSkipTableToSomething(double *skipModel, int64_t parameterSetSize) {
-    memset(skipModel, -2.3025851, parameterSetSize * sizeof(double));
-}
-
 static inline double emissions_signal_getModelLevelMean(const double *eventModel, int64_t kmerIndex) {
     // 1 + i*MODEL PARAMS because the first element is the correlation parameter
     return kmerIndex > NUM_OF_KMERS ? 0.0 : eventModel[1 + (kmerIndex * MODEL_PARAMS)];
@@ -1451,10 +1447,10 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
     // set emissions to defaults or zeros
     setEmissionsDefaults((StateMachine *) sM3, parameterSetSize);
 
-    for (int64_t i = 0; i < parameterSetSize; i++) {
+    //for (int64_t i = 0; i < parameterSetSize; i++) {
         //sM3->model.EMISSION_GAP_X_PROBS[i] = -2.3025850929940455; // log(0.1)
-        sM3->model.EMISSION_GAP_X_PROBS[i] = -14.3025850929940455; // log(0.1)
-    }
+    //    sM3->model.EMISSION_GAP_X_PROBS[i] = -14.3025850929940455; // log(0.1)
+    //}
 
     return (StateMachine *) sM3;
 }
