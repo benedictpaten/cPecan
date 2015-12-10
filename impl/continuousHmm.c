@@ -180,17 +180,25 @@ void continuousPairHmm_randomize(Hmm *hmm) {
 void continuousPairHmm_loadTransitionsAndKmerGapProbs(StateMachine *sM, Hmm *hmm) {
     StateMachine3 *sM3 = (StateMachine3 *)sM;
     // load transitions
+    // from match
     sM3->TRANSITION_MATCH_CONTINUE = log(hmm->getTransitionsExpFcn(hmm, match, match));
-    sM3->TRANSITION_MATCH_FROM_GAP_X = log(hmm->getTransitionsExpFcn(hmm, shortGapX, match));
-    sM3->TRANSITION_MATCH_FROM_GAP_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapY, match));
     sM3->TRANSITION_GAP_OPEN_X = log(hmm->getTransitionsExpFcn(hmm, match, shortGapX));
     sM3->TRANSITION_GAP_OPEN_Y = log(hmm->getTransitionsExpFcn(hmm, match, shortGapY));
-    sM3->TRANSITION_GAP_EXTEND_X = log(hmm->getTransitionsExpFcn(hmm, shortGapX, shortGapX));
+
+    // from shortGapX (kmer skip)
+    sM3->TRANSITION_MATCH_FROM_GAP_X = log(hmm->getTransitionsExpFcn(hmm, shortGapX, match));
+    //sM3->TRANSITION_GAP_EXTEND_X = log(hmm->getTransitionsExpFcn(hmm, shortGapX, shortGapX));
+    sM3->TRANSITION_GAP_EXTEND_X = log(1 - hmm->getTransitionsExpFcn(hmm, shortGapX, match));
+    sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;
+
+    // from shortGapY (extra event)
+    sM3->TRANSITION_MATCH_FROM_GAP_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapY, match));
     sM3->TRANSITION_GAP_EXTEND_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapY, shortGapY));
     sM3->TRANSITION_GAP_SWITCH_TO_X = log(hmm->getTransitionsExpFcn(hmm, shortGapY, shortGapX));
-    sM3->TRANSITION_GAP_SWITCH_TO_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapX, shortGapY));
+
+    //sM3->TRANSITION_GAP_SWITCH_TO_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapX, shortGapY));
     //sM3->TRANSITION_GAP_SWITCH_TO_X = LOG_ZERO;
-    //sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;
+
 
     /// / load kmer gap probs
     for (int64_t i = 0; i < hmm->symbolSetSize; i++) {

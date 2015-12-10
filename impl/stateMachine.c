@@ -1306,6 +1306,7 @@ static void stateMachine3_cellCalculate(StateMachine *sM,
         double eP = sM3->getYGapProbFcn(sM3->model.EMISSION_GAP_Y_PROBS, cX, cY);
         doTransition(upper, current, match, shortGapY, eP, sM3->TRANSITION_GAP_OPEN_Y, extraArgs);
         doTransition(upper, current, shortGapY, shortGapY, eP, sM3->TRANSITION_GAP_EXTEND_Y, extraArgs);
+        // shortGapX -> shortGapY not allowed, this would be going from a kmer skip to extra event?
         //doTransition(upper, current, shortGapX, shortGapY, eP, sM3->TRANSITION_GAP_SWITCH_TO_Y, extraArgs);
     }
 }

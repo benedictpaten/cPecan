@@ -64,7 +64,7 @@ def main(args):
     """.format(fileDir=args.files_dir, reference=args.ref, nbFiles=args.nb_files,
                inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm)
 
-    print(start_message, file=sys.stderr)
+    print(start_message, file=sys.stdout)
 
     if not os.path.isfile(args.ref):
         print("Did not find valid reference file", file=sys.stderr)
@@ -115,6 +115,7 @@ def main(args):
 
     done_queue.put('STOP')
     print("signalAlign - finished alignments\n", file=sys.stderr)
+    print("signalAlign - finished alignments\n", file=sys.stdout)
 
 
 if __name__ == "__main__":

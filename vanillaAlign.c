@@ -447,8 +447,6 @@ int main(int argc, char *argv[]) {
 
     stList *anchorPairs = guideAlignmentToRebasedAnchorPairs(pA, p);
 
-    st_uglyf("SENTINAL - got %lld anchor pairs from INPUT alignment\n", stList_length(anchorPairs));
-
     if ((templateExpectationsFile != NULL) && (complementExpectationsFile != NULL)) {
         // Expectation Routine //
 
@@ -495,7 +493,8 @@ int main(int argc, char *argv[]) {
         stList *templateAlignedPairs = performSignalAlignment(sMt, templateHmmFile, tEventSequence,
                                                               npRead->templateEventMap, pA->start2, trimmedRefSeq,
                                                               p, anchorPairs, banded);
-        st_uglyf("SENTINAL - got %lld template aligned pairs\n", stList_length(templateAlignedPairs));
+        fprintf(stdout, "%s got %lld anchors %lld template and ", readLabel, stList_length(anchorPairs),
+                stList_length(templateAlignedPairs));
 
         // sort
         stList_sort(templateAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
@@ -521,7 +520,7 @@ int main(int argc, char *argv[]) {
         stList *complementAlignedPairs = performSignalAlignment(sMc, complementHmmFile, cEventSequence,
                                                                 npRead->complementEventMap, pA->start2,
                                                                 rc_trimmedRefSeq, p, anchorPairs, banded);
-        st_uglyf("SENTINAL - got %lld complement aligned pairs\n", stList_length(complementAlignedPairs));
+        fprintf(stdout, "%lld complement alignedPairs\n", stList_length(complementAlignedPairs));
 
         // sort
         stList_sort(complementAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
