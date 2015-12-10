@@ -1154,6 +1154,7 @@ static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
 
 
     // for ch1_file1 template there should be this many aligned pairs with banding
+    st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
     CuAssertTrue(testCase, stList_length(alignedPairs) == 1001);
 
     // check against alignment without banding

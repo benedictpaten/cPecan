@@ -227,8 +227,9 @@ def main(argv):
                                       hmm_file=complement_hmm)
 
         if len(template_model.running_likelihoods) > 0 and len(complement_model.running_likelihoods) > 0:
-            print("{t_likelihood}\t{c_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1],
-                                                          c_likelihood=complement_model.running_likelihoods[-1]))
+            print("{i}|{t_likelihood}\t{c_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1],
+                                                              c_likelihood=complement_model.running_likelihoods[-1],
+                                                              i=i))
 
     print("signalAlign - finished training routine", file=sys.stdout)
     print("signalAlign - finished training routine", file=sys.stderr)

@@ -892,9 +892,12 @@ class ContinuousPairHmm(SignalHmm):
 
         # line 1: transitions, likelihood
         line = map(float, fH.readline().split())
+
         # check if valid file
         if len(line) != (len(self.transitions) + 1):
+            print("PYSENTINAL - problem with file {}".format(expectations_file), file=sys.stdout)
             return
+
         self.likelihood += line[-1]
         print("incorperating", line[0:-1], (np.nan in line[0:-1]))
         self.transitions = map(lambda x: sum(x), zip(self.transitions, line[0:-1]))
@@ -910,10 +913,8 @@ class ContinuousPairHmm(SignalHmm):
         for from_state in xrange(self.state_number):
             i = self.state_number * from_state
             j = sum(self.transitions[i:i+self.state_number])
-            #print(self.transitions[i:i+self.state_number], sum(self.transitions[i:i+self.state_number]))
             for to_state in xrange(self.state_number):
                 self.transitions[i + to_state] = self.transitions[i + to_state] / j
-            #print(self.transitions[i:i+self.state_number], sum(self.transitions[i:i+self.state_number]))
 
         # normalize kmer skip probs
         total_skip_prob = sum(self.kmer_skip_probs)
