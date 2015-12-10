@@ -161,7 +161,7 @@ def main(argv):
     template_hmm = working_folder.add_file_path("template_trained.hmm")
     complement_hmm = working_folder.add_file_path("complement_trained.hmm")
 
-    print("Starting {iterations} iterations.\nRunning likelihoods\nTempalte\tComplement".format(
+    print("Starting {iterations} iterations.\n\n\t    Running likelihoods\ni\tTempalte\tComplement".format(
         iterations=args.iter), file=sys.stdout)
 
     for i in xrange(args.iter):
@@ -227,7 +227,7 @@ def main(argv):
                                       hmm_file=complement_hmm)
 
         if len(template_model.running_likelihoods) > 0 and len(complement_model.running_likelihoods) > 0:
-            print("{i}|{t_likelihood}\t{c_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1],
+            print("{i}| {t_likelihood}\t{c_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1],
                                                               c_likelihood=complement_model.running_likelihoods[-1],
                                                               i=i))
 

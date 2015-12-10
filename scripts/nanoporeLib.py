@@ -899,7 +899,7 @@ class ContinuousPairHmm(SignalHmm):
             return
 
         self.likelihood += line[-1]
-        print("incorperating", line[0:-1], (np.nan in line[0:-1]))
+        #print("incorperating", line[0:-1], (np.nan in line[0:-1]))
         self.transitions = map(lambda x: sum(x), zip(self.transitions, line[0:-1]))
 
         # line 2: kmer skip probs
@@ -966,6 +966,13 @@ class ConditionalSignalHmm(SignalHmm):
 
         # line 1: kmer skip bins (alpha and beta) \t likelihood
         line = map(float, fH.readline().split())
+
+        # check if valid file
+        if len(line) != (len(self.kmer_skip_bins) + 1):
+            print("PYSENTINAL - problem with file {}".format(expectations_file), file=sys.stdout)
+            return
+
+        #print("incorperating", line[0:-1], (np.nan in line[0:-1]))
         self.likelihood = line[-1]
         self.kmer_skip_bins = map(lambda x: sum(x), zip(self.kmer_skip_bins, line[0:-1]))
 

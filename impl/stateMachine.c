@@ -182,8 +182,7 @@ double emissions_kmer_getGapProb(const double *emissionGapProbs, void *kmer) {
     int64_t i = emissions_discrete_getKmerIndex(kmer_i);
     //index_check(i);
     free(kmer_i);
-    double p = i > NUM_OF_KMERS ? 0.0 : emissionGapProbs[i];
-
+    double p = i > NUM_OF_KMERS ? LOG_ZERO : emissionGapProbs[i];
     return p;
 }
 
@@ -1447,10 +1446,10 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
     // set emissions to defaults or zeros
     setEmissionsDefaults((StateMachine *) sM3, parameterSetSize);
 
-    //for (int64_t i = 0; i < parameterSetSize; i++) {
-        //sM3->model.EMISSION_GAP_X_PROBS[i] = -2.3025850929940455; // log(0.1)
-    //    sM3->model.EMISSION_GAP_X_PROBS[i] = -14.3025850929940455; // log(0.1)
-    //}
+    // set gap probs
+    for (int64_t i = 0; i < parameterSetSize; i++) {
+        sM3->model.EMISSION_GAP_X_PROBS[i] = -2.3025850929940455; // log(0.1)
+    }
 
     return (StateMachine *) sM3;
 }

@@ -48,12 +48,12 @@ static HmmContinuous *hmmContinuous_constructEmpty(
 
     return hmmC;
 }
-///////////////////////////////////////////// Continuous Pair HMM /////////////////////////////////////////////////////
 
-static bool continuousPairHmm_checkTransitions(double *transitions, int64_t nbTransitions) {
+static bool hmmContinuous_checkTransitions(double *transitions, int64_t nbTransitions) {
     for (int64_t i = 0; i < nbTransitions; i++) {
         //if (transitions[i] != transitions[i]) {
         if (isnan(transitions[i])) {
+            fprintf(stdout, "GOT NaN TRANS\n");
             return FALSE;
         } else {
             continue;
@@ -61,6 +61,7 @@ static bool continuousPairHmm_checkTransitions(double *transitions, int64_t nbTr
     }
     return TRUE;
 }
+///////////////////////////////////////////// Continuous Pair HMM /////////////////////////////////////////////////////
 
 Hmm *continuousPairHmm_constructEmpty(
         double pseudocount, int64_t stateNumber,
@@ -192,10 +193,10 @@ void continuousPairHmm_loadTransitionsAndKmerGapProbs(StateMachine *sM, Hmm *hmm
     //sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;
 
     /// / load kmer gap probs
-    //for (int64_t i = 0; i < hmm->symbolSetSize; i++) {
+    for (int64_t i = 0; i < hmm->symbolSetSize; i++) {
         //sM3->model.EMISSION_GAP_X_PROBS[i] = hmm->getEmissionExpFcn(hmm, 0, i, 0);
-    //    sM3->model.EMISSION_GAP_X_PROBS[i] = log(hmm->getEmissionExpFcn(hmm, 0, i, 0));
-    //}
+        sM3->model.EMISSION_GAP_X_PROBS[i] = log(hmm->getEmissionExpFcn(hmm, 0, i, 0));
+    }
 }
 
 void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
@@ -218,7 +219,7 @@ void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
     int64_t nb_transitions = (cpHmm->baseContinuousHmm.baseHmm.stateNumber
                               * cpHmm->baseContinuousHmm.baseHmm.stateNumber);
 
-    bool check = continuousPairHmm_checkTransitions(cpHmm->transitions, nb_transitions);
+    bool check = hmmContinuous_checkTransitions(cpHmm->transitions, nb_transitions);
     if (check) {
         // write out transitions
         for (int64_t i = 0; i < nb_transitions; i++) {
@@ -454,26 +455,29 @@ void vanillaHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
     fprintf(fileHandle, "%lld\t", vHmm->baseContinuousHmm.baseHmm.symbolSetSize); // symbolSetSize 0:2
     fprintf(fileHandle, "\n"); // newLine
 
+    // check
+    bool check = hmmContinuous_checkTransitions(vHmm->kmerSkipBins, 60);
+    if (check) {
+        // Line 1 - write kmer skip bins to disk
+        for (int64_t i = 0; i < 60; i++) {
+            fprintf(fileHandle, "%f\t", vHmm->kmerSkipBins[i]); // kmer skip bins
+        }
+        fprintf(fileHandle, "%f\n", vHmm->baseContinuousHmm.baseHmm.likelihood); // likelihood, newline
 
-    // Line 1 - write kmer skip bins to disk
-    for (int64_t i = 0; i < 60; i++) {
-        fprintf(fileHandle, "%f\t", vHmm->kmerSkipBins[i]); // kmer skip bins
+
+        // Line 2 - write matchModel to disk
+        int64_t nb_matchModelBuckets = 1 + (vHmm->baseContinuousHmm.baseHmm.symbolSetSize * MODEL_PARAMS);
+        for (int64_t i = 0; i < nb_matchModelBuckets; i++) {
+            fprintf(fileHandle, "%f\t", vHmm->matchModel[i]); // correlation coeff, matchModel
+        }
+        fprintf(fileHandle, "\n"); // newLine
+
+        // Line 3 - write extra event model to disk
+        for (int64_t i = 0; i < nb_matchModelBuckets; i++) {
+            fprintf(fileHandle, "%f\t", vHmm->scaledMatchModel[i]); // correlation coeff, extra event matchModel
+        }
+        fprintf(fileHandle, "\n"); // newLine
     }
-    fprintf(fileHandle, "%f\n", vHmm->baseContinuousHmm.baseHmm.likelihood); // likelihood, newline
-
-
-    // Line 2 - write matchModel to disk
-    int64_t nb_matchModelBuckets = 1 + (vHmm->baseContinuousHmm.baseHmm.symbolSetSize * MODEL_PARAMS);
-    for (int64_t i = 0; i < nb_matchModelBuckets; i++) {
-        fprintf(fileHandle, "%f\t", vHmm->matchModel[i]); // correlation coeff, matchModel
-    }
-    fprintf(fileHandle, "\n"); // newLine
-
-    // Line 3 - write extra event model to disk
-    for (int64_t i = 0; i < nb_matchModelBuckets; i++) {
-        fprintf(fileHandle, "%f\t", vHmm->scaledMatchModel[i]); // correlation coeff, extra event matchModel
-    }
-    fprintf(fileHandle, "\n"); // newLine
 }
 
 Hmm *vanillaHmm_loadFromFile(const char *fileName) {
