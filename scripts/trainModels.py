@@ -219,11 +219,13 @@ def main(args):
                                       files=template_expectations_files,
                                       model=template_model,
                                       hmm_file=template_hmm)
+
         if len(complement_expectations_files) > 0:
             add_and_norm_expectations(path=working_directory_path,
                                       files=complement_expectations_files,
                                       model=complement_model,
                                       hmm_file=complement_hmm)
+
         if len(template_model.running_likelihoods) > 0 and len(complement_model.running_likelihoods) > 0:
             print("{t_likelihood}\t{c_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1],
                                                           c_likelihood=complement_model.running_likelihoods[-1]))

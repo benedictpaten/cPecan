@@ -49,6 +49,18 @@ static HmmContinuous *hmmContinuous_constructEmpty(
     return hmmC;
 }
 ///////////////////////////////////////////// Continuous Pair HMM /////////////////////////////////////////////////////
+
+static bool continuousPairHmm_checkTransitions(double *transitions, int64_t nbTransitions) {
+    for (int64_t i = 0; i < nbTransitions; i++) {
+        if (transitions[i] != transitions[i]) {
+            return FALSE;
+        } else {
+            continue;
+        }
+    }
+    return TRUE;
+}
+
 Hmm *continuousPairHmm_constructEmpty(
         double pseudocount, int64_t stateNumber,
         int64_t symbolSetSize, StateMachineType type,
@@ -205,11 +217,17 @@ void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
     int64_t nb_transitions = (cpHmm->baseContinuousHmm.baseHmm.stateNumber
                               * cpHmm->baseContinuousHmm.baseHmm.stateNumber);
     fprintf(stdout, "exps:");
+    bool check = continuousPairHmm_checkTransitions(cpHmm->transitions, nb_transitions);
+
     for (int64_t i = 0; i < nb_transitions; i++) {
         fprintf(stdout, "%f ", cpHmm->transitions[i]);
         fprintf(fileHandle, "%f\t", cpHmm->transitions[i]); // transitions 1:(0-9)
     }
-    fprintf(stdout, "\n");
+    if (check == TRUE) {
+        fprintf(stdout, "OK\n");
+    } else {
+        fprintf(stdout, "BAD\n");
+    }
 
     // write the likelihood
     fprintf(fileHandle, "%f\n", cpHmm->baseContinuousHmm.baseHmm.likelihood); // likelihood 1:10, newLine
