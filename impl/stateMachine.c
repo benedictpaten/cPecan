@@ -1397,7 +1397,8 @@ static void stateMachineEchelon_cellCalculate(StateMachine *sM,
         for (int64_t n = 1; n < 6; n++) {
             doTransition(upper, current, n, match0,
                          sMe->getScaledMatchProbFcn(sMe->model.EMISSION_GAP_Y_PROBS, cX, cY),
-                         sMe->getDurationProb(cY, 0), extraArgs);
+                         //sMe->getDurationProb(cY, 0), extraArgs);
+                         (la_mh + sMe->getDurationProb(cY, 0)), extraArgs);
         }
     }
 }
