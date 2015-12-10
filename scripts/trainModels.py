@@ -17,9 +17,6 @@ from random import shuffle
 def parse_args():
     parser = ArgumentParser (description=__doc__)
 
-    #parser.add_argument('--file_directory', '-d', action='store',
-    #                    dest='files_dir', required=True, type=str,
-    #                    help="directory with fast5 files to train on")
     parser.add_argument('--file_directory', '-d', action='append',
                         dest='files_dir', required=True, type=str,
                         help="directories with fast5 files to train on")
@@ -28,18 +25,15 @@ def parse_args():
                         dest='ref', required=True, type=str,
                         help="location of refrerence sequence in FASTA")
 
-    #parser.add_argument('--inputHmm', '-y', action='store', dest='inHmm',
-    #                    required=False, type=str, default=None)
-
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the trained model, and use for working directory.")
 
     parser.add_argument('--iterations', '-t', action='store', dest='iter',
-                        required=False, type=int, default=40)
+                        required=True, type=int)
 
     parser.add_argument('--train_amount', '-m', action='store', dest='amount',
-                        required=False, type=int, default=100000,
+                        required=True, type=int,
                         help="limit the total length of sequence to use in training.")
 
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
@@ -53,11 +47,11 @@ def parse_args():
     parser.add_argument('--banded', '-b', action='store_true', dest='banded',
                         default=False, help='flag, use banded alignment heuristic')
 
-    parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
-                        default=4, type=int, help="number of jobs to run concurrently")
+    parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=True,
+                        type=int, help="number of jobs to run concurrently")
 
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
-                        required=False, default="vanilla", help="decide which model to use, vanilla by default")
+                        required=True, help="decide which model to use, vanilla by default")
 
     args = parser.parse_args()
     return args

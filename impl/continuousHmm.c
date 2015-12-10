@@ -204,9 +204,12 @@ void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
     // write the transitions to disk
     int64_t nb_transitions = (cpHmm->baseContinuousHmm.baseHmm.stateNumber
                               * cpHmm->baseContinuousHmm.baseHmm.stateNumber);
+    fprintf(stdout, "exps:");
     for (int64_t i = 0; i < nb_transitions; i++) {
+        fprintf(stdout, "%f ", cpHmm->transitions[i]);
         fprintf(fileHandle, "%f\t", cpHmm->transitions[i]); // transitions 1:(0-9)
     }
+    fprintf(stdout, "\n");
 
     // write the likelihood
     fprintf(fileHandle, "%f\n", cpHmm->baseContinuousHmm.baseHmm.likelihood); // likelihood 1:10, newLine

@@ -893,7 +893,7 @@ class ContinuousPairHmm(SignalHmm):
         # line 1: transitions, likelihood
         line = map(float, fH.readline().split())
         self.likelihood += line[-1]
-        print("incorperating", line[0:-1], (float('nan') in line[0:-1]))
+        print("incorperating", line[0:-1], (np.nan in line[0:-1]))
         self.transitions = map(lambda x: sum(x), zip(self.transitions, line[0:-1]))
 
         # line 2: kmer skip probs
