@@ -221,6 +221,21 @@ typedef struct _StateMachineEchelon {
 
 } StateMachineEchelon;
 
+typedef struct _StateMachineEchelonB {
+    // 8-state general hmm
+    StateMachine model;
+
+    double TRANSITION_MATCH_TO_SKIP; // skip_prob = 1 - stride prob
+    double TRANSITION_MATCH_TO_HUB;  // stride_prob
+    double TRANSITION_SKIP_CONTINUE; // keep skipping prob
+    double TRANSITION_SKIP_TO_HUB;   // stop skipping = 1 - keep skipping prob
+
+    double (*getDurationProb)(void *event, int64_t n); // P(dj|n)
+    double (*getMatchProbFcn)(const double *eventModel, void *kmers, void *event, int64_t n); // P(ej|xi..xn)
+    double (*getScaledMatchProbFcn)(const double *scaledEventModel, void *kmer, void *event);
+
+} StateMachineEchelonB;
+
 typedef struct _stateMachineFunctions { // TODO rename these to be more general or might remove them all together
     double (*gapXProbFcn)(const double *, void *);
     double (*gapYProbFcn)(const double *, void *);
@@ -330,6 +345,9 @@ double emissions_signal_getEventMatchProbWithTwoDists(const double *eventModel, 
 
 void emissions_signal_scaleModel(StateMachine *sM, double scale, double shift, double var,
                                  double scale_sd, double var_sd);
+
+void emissions_signal_scaleModelNoiseOnly(StateMachine *sM, double scale, double shift, double var, double scale_sd,
+                                          double var_sd);
 
 double emissions_signal_getDurationProb(void *event, int64_t n);
 

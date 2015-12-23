@@ -462,9 +462,13 @@ class NanoporeRead(object):
             return False
 
         # transform events by time
+        # events have format [[mean], [start_time], [std_dev], [length]]
+        # get the start time of the first event
         start_time = events[0][1]
         for event in events:
+            # time since first event
             delta_time = event[1] - start_time
+            # drift adjust
             event[0] -= (delta_time * drift)
         return True
 
@@ -701,7 +705,8 @@ class ComplementModel(NanoporeModel):
 
 class SignalAlignment(object):
     def __init__(self, in_fast5, reference, destination, stateMachineType, banded, bwa_index,
-                 in_templateHmm, in_complementHmm):
+                 in_templateHmm, in_complementHmm, threshold, diagonal_expansion,
+                 constraint_trim):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.reference = reference  # reference sequence
         self.destination = destination  # place where the alignments go, should already exist
@@ -710,6 +715,9 @@ class SignalAlignment(object):
         self.bwa_index = bwa_index  # index of reference sequence
         self.in_templateModel = None  # initialize to none
         self.in_complementModel = None  # initialize to none
+        self.threshold = threshold
+        self.diagonal_expansion = diagonal_expansion
+        self.constraint_trim = constraint_trim
 
         # if we're using an input hmm, make sure it exists
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
@@ -720,6 +728,7 @@ class SignalAlignment(object):
             self.in_complementHmm = in_complementHmm
         else:
             self.in_complementHmm = None
+
 
     def run(self, get_expectations=False):
         # file checks
@@ -830,6 +839,25 @@ class SignalAlignment(object):
         else:
             complement_hmm_flag = ""
 
+        # threshold
+        if self.threshold is not None:
+            threshold_flag = "-d {threshold} ".format(threshold=self.threshold)
+        else:
+            threshold_flag = ""
+
+        # diagonal expansion
+        if self.diagonal_expansion is not None:
+            diag_expansion_flag = "-x {expansion} ".format(expansion=self.diagonal_expansion)
+        else:
+            diag_expansion_flag = ""
+
+        # constraint trim
+        if self.constraint_trim is not None:
+            trim_flag = "-m {trim} ".format(trim=self.constraint_trim)
+        else:
+            trim_flag = ""
+
+
         # banded alignment
         if self.banded is True:
             banded_flag = "--b "
@@ -841,26 +869,28 @@ class SignalAlignment(object):
             template_expectations_file_path = self.destination + read_name + ".template.expectations"
             complement_expectations_file_path = self.destination + read_name + ".complement.expectations"
 
-            alignment_command = \
-                "echo {cigar} | {vA} {banded}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm} -L " \
-                "{readLabel} -t {templateExpectations} -c {complementExpectations}"\
+            command = \
+                "echo {cigar} | {vA} {banded}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
+                "{expansion}{trim} -L {readLabel} -t {templateExpectations} -c {complementExpectations}"\
                 .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag, banded=banded_flag,
                         ref=temp_ref_seq, readLabel=read_label, npRead=temp_np_read, t_model=template_model_flag,
                         c_model=complement_model_flag, t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag,
                         templateExpectations=template_expectations_file_path,
-                        complementExpectations=complement_expectations_file_path)
+                        complementExpectations=complement_expectations_file_path,
+                        thresh=threshold_flag, expansion=diag_expansion_flag, trim=trim_flag)
         else:
-            alignment_command = \
-                "echo {cigar} | {vA} {banded}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm} " \
-                "-u {posteriors} -L {readLabel}"\
-                .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag, banded=banded_flag, ref=temp_ref_seq,
-                        readLabel=read_label, npRead=temp_np_read, t_model=template_model_flag,
+            command = \
+                "echo {cigar} | {vA} {banded}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
+                "{expansion}{trim} -u {posteriors} -L {readLabel}"\
+                .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag, banded=banded_flag,
+                        ref=temp_ref_seq, readLabel=read_label, npRead=temp_np_read, t_model=template_model_flag,
                         c_model=complement_model_flag, t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag,
-                        posteriors=posteriors_file_path)
+                        posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
+                        trim=trim_flag)
 
         # run
-        print("signalAlign - running command", alignment_command, end="\n", file=sys.stderr)
-        os.system(alignment_command)
+        print("signalAlign - running command", command, end="\n", file=sys.stderr)
+        os.system(command)
         #temp_folder.remove_folder()
         return True
 

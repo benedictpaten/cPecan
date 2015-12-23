@@ -641,7 +641,29 @@ void emissions_signal_scaleModel(StateMachine *sM,
         sM->EMISSION_MATCH_PROBS[i+1] = sM->EMISSION_MATCH_PROBS[i+1] * var;
 
         // Fluctuation (noise) adjustments
-        // noise_mean *= * scale_sd
+        // noise_mean *= scale_sd
+        sM->EMISSION_MATCH_PROBS[i+2] = sM->EMISSION_MATCH_PROBS[i+2] * scale_sd;
+        // noise_lambda *= var_sd
+        sM->EMISSION_MATCH_PROBS[i+4] = sM->EMISSION_MATCH_PROBS[i+4] * var_sd;
+        // noise_sd = sqrt(adjusted_noise_mean**3 / adjusted_noise_lambda);
+        sM->EMISSION_MATCH_PROBS[i+3] = sqrt(pow(sM->EMISSION_MATCH_PROBS[i+2], 3.0) / sM->EMISSION_MATCH_PROBS[i+4]);
+    }
+}
+
+void emissions_signal_scaleModelNoiseOnly(StateMachine *sM,
+                                          double scale, double shift, double var,
+                                          double scale_sd, double var_sd) {
+    // model is arranged: level_mean, level_stdev, sd_mean, sd_stdev, sd_lambda per kmer
+    // already been adjusted for correlation coeff.
+    for (int64_t i = 1; i < (sM->parameterSetSize * MODEL_PARAMS) + 1; i += MODEL_PARAMS) {
+        // Level adjustments
+        // level_mean = mean * scale + shift
+        //sM->EMISSION_MATCH_PROBS[i] = sM->EMISSION_MATCH_PROBS[i] * scale + shift;
+        // level_stdev = stdev * var
+        //sM->EMISSION_MATCH_PROBS[i+1] = sM->EMISSION_MATCH_PROBS[i+1] * var;
+
+        // Fluctuation (noise) adjustments
+        // noise_mean *= scale_sd
         sM->EMISSION_MATCH_PROBS[i+2] = sM->EMISSION_MATCH_PROBS[i+2] * scale_sd;
         // noise_lambda *= var_sd
         sM->EMISSION_MATCH_PROBS[i+4] = sM->EMISSION_MATCH_PROBS[i+4] * var_sd;
@@ -1384,6 +1406,57 @@ static void stateMachineEchelon_cellCalculate(StateMachine *sM,
             for (int64_t from = 0; from < 6; from++) {
                 doTransition(middle, current, from, n,
                              sMe->getMatchProbFcn(sMe->model.EMISSION_MATCH_PROBS, cX, cY, n),
+                             (la_mh + sMe->getDurationProb(cY, n)), extraArgs);
+            }
+        }
+        // now do from gapX to the match states
+        for (int64_t n = 1; n < 6; n++) {
+            doTransition(middle, current, gapX, n, sMe->getMatchProbFcn(sMe->model.EMISSION_MATCH_PROBS, cX, cY, n),
+                         (la_xh + sMe->getDurationProb(cY, n)), extraArgs);
+        }
+    }
+    if (upper != NULL) {
+        // only allowed to go from match states to match0 (extra event state)
+        for (int64_t n = 1; n < 6; n++) {
+            doTransition(upper, current, n, match0,
+                         sMe->getScaledMatchProbFcn(sMe->model.EMISSION_GAP_Y_PROBS, cX, cY),
+                         //sMe->getDurationProb(cY, 0), extraArgs);
+                         (la_mh + sMe->getDurationProb(cY, 0)), extraArgs);
+        }
+    }
+}
+
+static void stateMachineEchelonB_cellCalculate(StateMachine *sM,
+                                              double *current, double *lower, double *middle, double *upper,
+                                              void *cX, void *cY,
+                                              void (*doTransition)(double *, double *, int64_t, int64_t,
+                                                                   double, double, void *),
+                                              void *extraArgs) {
+    StateMachineEchelonB *sMe = (StateMachineEchelonB *) sM;
+    // transitions
+    // from M
+    double la_mx = sMe->TRANSITION_MATCH_TO_SKIP;
+    double la_mh = sMe->TRANSITION_MATCH_TO_HUB;
+
+    // from X (kmer skip)
+    double la_xx = sMe->TRANSITION_SKIP_CONTINUE;
+    double la_xh = sMe->TRANSITION_SKIP_TO_HUB;
+
+    if (lower != NULL) {
+        // go from all of the match states to gapX
+        // TODO put kmer skip prob in here?
+        for (int64_t n = 1; n < 6; n++) {
+            doTransition(lower, current, n, gapX, 0, la_mx, extraArgs);
+        }
+        // gapX --> gapX
+        doTransition(lower, current, gapX, gapX, 0, la_xx, extraArgs);
+    }
+    if (middle != NULL) {
+        // first we handle going from all of the match states to match1 through match5
+        for (int64_t n = 1; n < 6; n++) {
+            for (int64_t from = 0; from < 6; from++) {
+                doTransition(middle, current, from, n,
+                             sMe->getMatchProbFcn(sMe->model.EMISSION_MATCH_PROBS, cX, cY, n), // eP
                              (la_mh + sMe->getDurationProb(cY, n)), extraArgs);
             }
         }

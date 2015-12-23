@@ -25,8 +25,16 @@ def parse_args():
     parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for complement events, if you don't want the default")
-    parser.add_argument('--banded', '-b', action='store_true', dest='banded',
-                        default=False, help='flag, use banded alignment heuristic')
+    parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
+                        required=True, default="vanilla", help="decide which model to use, vanilla by default")
+    parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
+                        default=None, help="posterior match probability threshold")
+    parser.add_argument('--diagonalExpansion', '-e', action='store', dest='diag_expansion', type=int,
+                        required=False, default=None, help="number of diagonals to expand around each anchor")
+    parser.add_argument('--constraintTrim', '-m', action='store', dest='constraint_trim', type=int,
+                        required=False, default=None, help='amount to remove from an anchor constraint')
+    parser.add_argument('---un-banded', '-ub', action='store_false', dest='banded',
+                        default=True, help='flag, turn off banding')
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
                         default=4, type=int, help="number of jobs to run concurrently")
     parser.add_argument('-nb_files', '-n', action='store', dest='nb_files', required=False,
@@ -34,8 +42,7 @@ def parse_args():
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
-    parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
-                        required=False, default="vanilla", help="decide which model to use, vanilla by default")
+
 
     args = parser.parse_args()
     return args
@@ -55,14 +62,15 @@ def main(args):
     args = parse_args()
 
     start_message = """
-    Starting Signal Align
-    Aligning files from: {fileDir}
-    Aligning to reference: {reference}
-    Aligning {nbFiles}
-    Input template HMM: {inThmm}
-    Input complement HMM: {inChmm}
+#   Starting Signal Align
+#   Aligning files from: {fileDir}
+#   Aligning to reference: {reference}
+#   Aligning {nbFiles}
+#   Using model: {model}
+#   Input template HMM: {inThmm}
+#   Input complement HMM: {inChmm}
     """.format(fileDir=args.files_dir, reference=args.ref, nbFiles=args.nb_files,
-               inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm)
+               inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm, model=args.stateMachineType)
 
     print(start_message, file=sys.stdout)
 
@@ -100,7 +108,10 @@ def main(args):
             "in_templateHmm": args.in_T_Hmm,
             "in_complementHmm": args.in_C_Hmm,
             "banded": args.banded,
-            "in_fast5": args.files_dir + fast5
+            "in_fast5": args.files_dir + fast5,
+            "threshold": args.threshold,
+            "diagonal_expansion": args.diag_expansion,
+            "constraint_trim": args.constraint_trim
         }
         work_queue.put(alignment_args)
 

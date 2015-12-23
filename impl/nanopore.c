@@ -217,6 +217,13 @@ stList *nanopore_remapAnchorPairsWithOffset(stList *unmappedPairs, int64_t *even
     return mappedPairs;
 }
 
+void nanopore_normalizeEvents(int64_t nb_events, double *events, double scale, double shift, double scale_sd) {
+    for (int64_t i = 0; i < nb_events; i += NB_EVENT_PARAMS) {
+        // normalize event mean: norm_obs = obs / scale - shift
+        events[i] = events[i] / scale - shift;
+    }
+}
+
 void nanopore_nanoporeReadDestruct(NanoporeRead *npRead) {
     free(npRead->twoDread);
     free(npRead->templateEventMap);

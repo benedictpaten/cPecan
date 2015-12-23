@@ -27,6 +27,8 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
 
     FILE *fH = fopen(posteriorProbsFile, "a");
 
+    st_uglyf("refoffset ---> %lld\n", referenceSequenceOffset);
+
     for(int64_t i = 0; i < stList_length(alignedPairs); i++) {
         // grab the aligned pair
         stIntTuple *aPair = stList_get(alignedPairs, i);
@@ -85,7 +87,6 @@ StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentPar
     if (type == threeState) {
         StateMachine *sM = getStrawManStateMachine3(modelFile);
         emissions_signal_scaleModel(sM, npp.scale, npp.shift, npp.var, npp.scale_sd, npp.var_sd);
-        // TODO put strand specific changes in here for conditional models
         return sM;
     }
     if (type == fourState) {
@@ -107,6 +108,22 @@ void loadHmmRoutine(const char *hmmFile, StateMachine *sM, StateMachineType type
     hmmContinuous_destruct(hmm, type);
 }
 
+static double totalScore(stList *alignedPairs) {
+    double score = 0.0;
+    for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
+        stIntTuple *aPair = stList_get(alignedPairs, i);
+        score += stIntTuple_get(aPair, 0);
+    }
+    return score;
+}
+
+double scoreByPosteriorProbabilityIgnoringGaps(stList *alignedPairs) {
+    /*
+     * Gives the average posterior match probability per base of the two sequences, ignoring indels.
+     */
+    return 100.0 * totalScore(alignedPairs) / ((double) stList_length(alignedPairs) * PAIR_ALIGNMENT_PROB_1);
+}
+
 stList *performSignalAlignmentP(StateMachine *sM, Sequence *sY, int64_t *eventMap, int64_t mapOffset, char *target,
                                 PairwiseAlignmentParameters *p, stList *unmappedAnchors,
                                 void *(*targetGetFcn)(void *, int64_t),
@@ -125,6 +142,10 @@ stList *performSignalAlignmentP(StateMachine *sM, Sequence *sY, int64_t *eventMa
 
         // make sequences
         Sequence *sX = sequence_construct2(lX, target, targetGetFcn, sequence_sliceNucleotideSequence2);
+
+        if (sM->type == echelon) {
+            sequence_padSequence(sX);
+        }
 
         // do alignment
         stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, sY, filteredRemappedAnchors, p,
@@ -290,7 +311,9 @@ int main(int argc, char *argv[]) {
     StateMachineType sMtype = vanilla;
     bool banded = FALSE;
     int64_t j;
-    int64_t iter = 0;
+    int64_t diagExpansion = 20;
+    double threshold = 0.01;
+    int64_t constraintTrim = 14;
     char *templateModelFile = stString_print("../../cPecan/models/template_median68pA.model");
     char *complementModelFile = stString_print("../../cPecan/models/complement_median68pA_pop2.model");
     char *readLabel = NULL;
@@ -320,12 +343,15 @@ int main(int argc, char *argv[]) {
                 {"inComplementHmm",         required_argument,  0,  'z'},
                 {"templateExpectations",    required_argument,  0,  't'},
                 {"complementExpectations",  required_argument,  0,  'c'},
-                {"iterations",              required_argument,  0,  'i'},
+                {"diagonalExpansion",       required_argument,  0,  'x'},
+                {"threshold",               required_argument,  0,  'd'},
+                {"constraintTrim",          required_argument,  0,  'm'},
+
                 {0, 0, 0, 0} };
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:s:f:e:b:T:C:L:q:r:u:y:z:t:c:i:", long_options, &option_index);
+        key = getopt_long(argc, argv, "h:s:f:e:b:T:C:L:q:r:u:y:z:t:c:i:x:d:m:", long_options, &option_index);
 
         if (key == -1) {
             //usage();
@@ -377,11 +403,22 @@ int main(int argc, char *argv[]) {
             case 'z':
                 complementHmmFile = stString_copy(optarg);
                 break;
-            case 'i':
-                j = sscanf(optarg, "%" PRIi64 "", &iter);
-                assert(j == 1);
-                assert(iter >= 0);
-                iter = (int64_t)iter;
+            case 'x':
+                j = sscanf(optarg, "%" PRIi64 "", &diagExpansion);
+                assert (j == 1);
+                assert (diagExpansion >= 0);
+                diagExpansion = (int64_t)diagExpansion;
+                break;
+            case 'd':
+                j = sscanf(optarg, "%lf", &threshold);
+                assert (j == 1);
+                assert (threshold >= 0);
+                break;
+            case 'm':
+                j = sscanf(optarg, "%" PRIi64 "", &constraintTrim);
+                assert (j == 1);
+                assert (constraintTrim >= 0);
+                constraintTrim = (int64_t)constraintTrim;
                 break;
             default:
                 usage();
@@ -411,6 +448,9 @@ int main(int argc, char *argv[]) {
 
     // make some params
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+    p->threshold = threshold;
+    p->constraintDiagonalTrim = constraintTrim;
+    p->diagonalExpansion = diagExpansion;
 
     // get pairwise alignment from stdin, in exonerate CIGAR format
     FILE *fileHandleIn = stdin;
@@ -442,8 +482,19 @@ int main(int argc, char *argv[]) {
     // record this shift here
     int64_t tCoordinateShift = npRead->templateEventMap[pA->start2];
     int64_t cCoordinateShift = npRead->complementEventMap[pA->start2];
+
+    // orig
     int64_t rCoordinateShift_t = (pA->strand1 ? pA->start1 : pA->end1);
     int64_t rCoordinateShift_c = (int64_t)strlen(referenceSequence) - (pA->strand1 ? pA->end1 : pA->start1);
+
+    // next try works for ecoli not for zymo
+    //int64_t rCoordinateShift_t = (pA->strand1 ? pA->start1 : (int64_t)strlen(referenceSequence) - pA->start1);
+    //int64_t rCoordinateShift_c = (pA->strand1 ? (int64_t)strlen(referenceSequence) - pA->end1 : pA->end1);
+
+    //int64_t rCoordinateShift_t = (pA->strand1 ? pA->start1 : (int64_t)strlen(referenceSequence) - pA->end1);
+    //int64_t rCoordinateShift_c = (pA->strand1 ? (int64_t)strlen(referenceSequence) - pA->end1 : pA->start1);
+
+    st_uglyf("tOffset: %lld, cOffset %lld \n", rCoordinateShift_t, rCoordinateShift_c);
 
     stList *anchorPairs = guideAlignmentToRebasedAnchorPairs(pA, p);
 
@@ -493,8 +544,11 @@ int main(int argc, char *argv[]) {
         stList *templateAlignedPairs = performSignalAlignment(sMt, templateHmmFile, tEventSequence,
                                                               npRead->templateEventMap, pA->start2, trimmedRefSeq,
                                                               p, anchorPairs, banded);
-        fprintf(stdout, "%s got %lld anchors %lld template and ", readLabel, stList_length(anchorPairs),
-                stList_length(templateAlignedPairs));
+
+        double templatePosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(templateAlignedPairs);
+
+        fprintf(stdout, "%s %lld\t%lld(%f)\t", readLabel, stList_length(anchorPairs),
+                stList_length(templateAlignedPairs), templatePosteriorScore);
 
         // sort
         stList_sort(templateAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing
@@ -520,7 +574,10 @@ int main(int argc, char *argv[]) {
         stList *complementAlignedPairs = performSignalAlignment(sMc, complementHmmFile, cEventSequence,
                                                                 npRead->complementEventMap, pA->start2,
                                                                 rc_trimmedRefSeq, p, anchorPairs, banded);
-        fprintf(stdout, "%lld complement alignedPairs\n", stList_length(complementAlignedPairs));
+
+        double complementPosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(complementAlignedPairs);
+
+        fprintf(stdout, "%lld(%f)\n", stList_length(complementAlignedPairs), complementPosteriorScore);
 
         // sort
         stList_sort(complementAlignedPairs, sortByXPlusYCoordinate2); //Ensure the coordinates are increasing

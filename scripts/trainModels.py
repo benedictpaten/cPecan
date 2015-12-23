@@ -2,11 +2,8 @@
 """Train HMMs for alignment of signal data from the MinION
 """
 from __future__ import print_function, division
-import subprocess
-import os
-import h5py as h5
-import numpy as np
 import sys
+import h5py as h5
 sys.path.append("../")
 from multiprocessing import Process, Queue, current_process, Manager
 from nanoporeLib import *

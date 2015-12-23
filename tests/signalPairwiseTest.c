@@ -1154,8 +1154,9 @@ static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
 
 
     // for ch1_file1 template there should be this many aligned pairs with banding
-    st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
-    CuAssertTrue(testCase, stList_length(alignedPairs) == 1001);
+    //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
+    // used to be 1001 before I added prior skip prob
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 987);
 
     // check against alignment without banding
     stList *alignedPairs2 = getAlignedPairsWithoutBanding(sMt, ZymoReferenceSeq, npRead->templateEvents, lX,
@@ -1165,7 +1166,7 @@ static void test_strawMan_getAlignedPairsWithBanding(CuTest *testCase) {
                                                           0, 0);
 
     checkAlignedPairs(testCase, alignedPairs2, lX, lY);
-    CuAssertTrue(testCase, stList_length(alignedPairs2) == 980);
+    CuAssertTrue(testCase, stList_length(alignedPairs2) == 986);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
@@ -1352,8 +1353,9 @@ static void test_echelon_getAlignedPairsWithBanding(CuTest *testCase) {
                                                        0, 0);
     checkAlignedPairsForEchelon(testCase, alignedPairs, lX, lY);
     // for ch1_file1 template there should be this many aligned pairs with banding
-    st_uglyf("there are %lld aligned pairs using anchors\n", stList_length(alignedPairs));
-    CuAssertIntEquals(testCase, stList_length(alignedPairs), 855);
+    //st_uglyf("there are %lld aligned pairs using anchors\n", stList_length(alignedPairs));
+    // used to be 855 before I added the M->H prob to the extra event calc
+    CuAssertIntEquals(testCase, stList_length(alignedPairs), 857);
 
 
     // do alignment without banding
@@ -1363,8 +1365,10 @@ static void test_echelon_getAlignedPairsWithBanding(CuTest *testCase) {
                                                           diagonalCalculationMultiPosteriorMatchProbs,
                                                           0, 0);
     // for ch1_file1 template there should be this many aligned pairs with banding
-    CuAssertIntEquals(testCase, stList_length(alignedPairs2), 1011);
     //st_uglyf("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
+    // used to be 1011, before change mentioned above
+    CuAssertIntEquals(testCase, stList_length(alignedPairs2), 1000);
+
     checkAlignedPairsForEchelon(testCase, alignedPairs2, lX, lY);
 
     // clean
