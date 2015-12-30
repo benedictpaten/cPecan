@@ -460,7 +460,7 @@ int main(int argc, char *argv[]) {
     pA = cigarRead(fileHandleIn);
 
     // todo put in if debug:
-    //printPairwiseAlignmentSummary(pA);
+    printPairwiseAlignmentSummary(pA);
 
     // slice out the section of the reference we're aligning to
     char *trimmedRefSeq = getSubSequence(referenceSequence, pA->start1, pA->end1, pA->strand1);

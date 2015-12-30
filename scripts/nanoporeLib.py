@@ -729,7 +729,6 @@ class SignalAlignment(object):
         else:
             self.in_complementHmm = None
 
-
     def run(self, get_expectations=False):
         # file checks
         if os.path.isfile(self.in_fast5) is False:
@@ -751,7 +750,6 @@ class SignalAlignment(object):
         temp_2d_read = temp_folder.add_file_path("temp_2Dseq_{read}.fa".format(read=read_label))
         temp_t_model = temp_folder.add_file_path("template_model.model")
         temp_c_model = temp_folder.add_file_path("complement_model.model")
-
 
         # make the npRead and fasta todo make this assert
         success, temp_t_model, temp_c_model = get_npRead_2dseq_and_models(fast5=self.in_fast5,
@@ -806,12 +804,12 @@ class SignalAlignment(object):
         # Alignment routine
 
         # containers and defaults
-        temp_ref_seq = temp_folder.add_file_path("temp_ref_seq.txt")
+        #temp_ref_seq = temp_folder.add_file_path("temp_ref_seq.txt")
         path_to_vanillaAlign = "./vanillaAlign"  # todo could require this in path
 
         # make sequence for vanillaAlign, we orient the sequence so that the template events align to the
         # reference and the complement events align to the reverse complement of the reference
-        make_temp_sequence(self.reference, forward, temp_ref_seq)
+        #make_temp_sequence(self.reference, forward, temp_ref_seq)
 
         # alignment flags
 
@@ -873,7 +871,7 @@ class SignalAlignment(object):
                 "echo {cigar} | {vA} {banded}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
                 "{expansion}{trim} -L {readLabel} -t {templateExpectations} -c {complementExpectations}"\
                 .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag, banded=banded_flag,
-                        ref=temp_ref_seq, readLabel=read_label, npRead=temp_np_read, t_model=template_model_flag,
+                        ref=self.reference, readLabel=read_label, npRead=temp_np_read, t_model=template_model_flag,
                         c_model=complement_model_flag, t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag,
                         templateExpectations=template_expectations_file_path,
                         complementExpectations=complement_expectations_file_path,
@@ -883,7 +881,7 @@ class SignalAlignment(object):
                 "echo {cigar} | {vA} {banded}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
                 "{expansion}{trim} -u {posteriors} -L {readLabel}"\
                 .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag, banded=banded_flag,
-                        ref=temp_ref_seq, readLabel=read_label, npRead=temp_np_read, t_model=template_model_flag,
+                        ref=self.reference, readLabel=read_label, npRead=temp_np_read, t_model=template_model_flag,
                         c_model=complement_model_flag, t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag,
                         posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
                         trim=trim_flag)
@@ -891,7 +889,7 @@ class SignalAlignment(object):
         # run
         print("signalAlign - running command", command, end="\n", file=sys.stderr)
         os.system(command)
-        #temp_folder.remove_folder()
+        temp_folder.remove_folder()
         return True
 
 

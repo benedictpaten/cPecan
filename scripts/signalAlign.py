@@ -81,6 +81,9 @@ def main(args):
     # make directory to put temporary files
     temp_folder = FolderHandler()
     temp_dir_path = temp_folder.open_folder(args.out + "tempFiles_alignment")
+    reference_seq = temp_folder.add_file_path("reference_seq.txt")
+    make_temp_sequence(args.ref, True, reference_seq)
+
 
     # index the reference for bwa
     print("signalAlign - indexing reference", file=sys.stderr)
@@ -101,7 +104,7 @@ def main(args):
 
     for fast5 in fast5s:
         alignment_args = {
-            "reference": args.ref,
+            "reference": reference_seq,
             "destination": temp_dir_path,
             "stateMachineType": args.stateMachineType,
             "bwa_index": bwa_ref_index,
@@ -113,7 +116,9 @@ def main(args):
             "diagonal_expansion": args.diag_expansion,
             "constraint_trim": args.constraint_trim
         }
-        work_queue.put(alignment_args)
+        alignment = SignalAlignment(**alignment_args)
+        alignment.run()
+        #work_queue.put(alignment_args)
 
     for w in xrange(workers):
         p = Process(target=aligner, args=(work_queue, done_queue))
