@@ -24,17 +24,24 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
     if (strand == complement) {
         strandLabel = "c";
     }
-
+    // open the file for output
     FILE *fH = fopen(posteriorProbsFile, "a");
 
     st_uglyf("refoffset ---> %lld\n", referenceSequenceOffset);
-
+    st_uglyf("length of target: %lld\n", strlen(target));
     for(int64_t i = 0; i < stList_length(alignedPairs); i++) {
         // grab the aligned pair
         stIntTuple *aPair = stList_get(alignedPairs, i);
 
         // unpack it to make this easier
         int64_t x = stIntTuple_get(aPair, 1) + referenceSequenceOffset;         // target index
+        int64_t x_i = stIntTuple_get(aPair, 1);
+        if (strand == complement) {
+            int64_t refLength = (int64_t)strlen(target);
+            int64_t refLengthInEvents = (int64_t)strlen(target) - KMER_LENGTH;
+            x = refLengthInEvents - (x_i + (refLength - referenceSequenceOffset));
+            st_uglyf("x: %lld, x_i: %lld \n", x, x_i);
+        }
         int64_t y = stIntTuple_get(aPair, 2) + eventSequenceOffset;             // event index
         double p = ((double)stIntTuple_get(aPair, 0)) / PAIR_ALIGNMENT_PROB_1;  // posterior prob
 
@@ -196,6 +203,7 @@ stList *performSignalAlignment(StateMachine *sM, const char *hmmFile, Sequence *
     return 0;
 }
 
+// todo could be static?
 char *getSubSequence(char *seq, int64_t start, int64_t end, bool strand) {
     if (strand) {
         seq = stString_getSubString(seq, start, end - start);
@@ -459,7 +467,7 @@ int main(int argc, char *argv[]) {
     struct PairwiseAlignment *pA;
     pA = cigarRead(fileHandleIn);
 
-    // todo put in if debug:
+    // todo put in to help with debuging:
     printPairwiseAlignmentSummary(pA);
 
     // slice out the section of the reference we're aligning to
@@ -485,7 +493,8 @@ int main(int argc, char *argv[]) {
 
     // orig
     int64_t rCoordinateShift_t = (pA->strand1 ? pA->start1 : pA->end1);
-    int64_t rCoordinateShift_c = (int64_t)strlen(referenceSequence) - (pA->strand1 ? pA->end1 : pA->start1);
+    //int64_t rCoordinateShift_c = (int64_t)strlen(referenceSequence) - (pA->strand1 ? pA->end1 : pA->start1);
+    int64_t rCoordinateShift_c = (pA->strand1 ? pA->end1 : pA->start1);
 
     // next try works for ecoli not for zymo
     //int64_t rCoordinateShift_t = (pA->strand1 ? pA->start1 : (int64_t)strlen(referenceSequence) - pA->start1);
@@ -556,7 +565,7 @@ int main(int argc, char *argv[]) {
         // write to file
         if (posteriorProbsFile != NULL) {
             writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_PROBS,
-                                npRead->templateEvents, referenceSequence, // use non-trimmed objects here
+                                npRead->templateEvents, referenceSequence,   // use non-trimmed objects here
                                 tCoordinateShift, rCoordinateShift_t,        // correction is in function
                                 templateAlignedPairs, template);
         }
