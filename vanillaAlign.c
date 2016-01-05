@@ -12,8 +12,19 @@ void usage() {
     fprintf(stderr, "See doc for signalAlign for help\n");
 }
 
+void printPairwiseAlignmentSummary(struct PairwiseAlignment *pA) {
+    st_uglyf("contig 1: %s\n", pA->contig1);
+    st_uglyf("strand 1: %lld\n", pA->strand1);
+    st_uglyf("start  1: %lld\n", pA->start1);
+    st_uglyf("end    1: %lld\n", pA->end1);
+    st_uglyf("contig 2: %s\n", pA->contig2);
+    st_uglyf("strand 2: %lld\n", pA->strand2);
+    st_uglyf("start  2: %lld\n", pA->start2);
+    st_uglyf("end    2: %lld\n", pA->end2);
+}
+
 void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *matchModel,
-                         double *events, char *target,
+                         double *events, char *target, bool forward, char *contig,
                          int64_t eventSequenceOffset, int64_t referenceSequenceOffset,
                          stList *alignedPairs, Strand strand) {
     // label for tsv output
@@ -24,23 +35,21 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
     if (strand == complement) {
         strandLabel = "c";
     }
+
     // open the file for output
     FILE *fH = fopen(posteriorProbsFile, "a");
-
-    st_uglyf("refoffset ---> %lld\n", referenceSequenceOffset);
-    st_uglyf("length of target: %lld\n", strlen(target));
     for(int64_t i = 0; i < stList_length(alignedPairs); i++) {
         // grab the aligned pair
         stIntTuple *aPair = stList_get(alignedPairs, i);
-
-        // unpack it to make this easier
-        int64_t x = stIntTuple_get(aPair, 1) + referenceSequenceOffset;         // target index
         int64_t x_i = stIntTuple_get(aPair, 1);
-        if (strand == complement) {
+        int64_t x_adj;  // x is the reference coordinate that we record in the aligned pairs w
+        if ((strand == template && forward) || (strand == complement && (!forward))) {
+            x_adj = stIntTuple_get(aPair, 1) + referenceSequenceOffset;
+        }
+        if ((strand == complement && forward) || (strand == template && (!forward))) {
             int64_t refLength = (int64_t)strlen(target);
-            int64_t refLengthInEvents = (int64_t)strlen(target) - KMER_LENGTH;
-            x = refLengthInEvents - (x_i + (refLength - referenceSequenceOffset));
-            st_uglyf("x: %lld, x_i: %lld \n", x, x_i);
+            int64_t refLengthInEvents = refLength - KMER_LENGTH;
+            x_adj = refLengthInEvents - (x_i + (refLength - referenceSequenceOffset));
         }
         int64_t y = stIntTuple_get(aPair, 2) + eventSequenceOffset;             // event index
         double p = ((double)stIntTuple_get(aPair, 0)) / PAIR_ALIGNMENT_PROB_1;  // posterior prob
@@ -53,7 +62,7 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
         // make the kmer string at the target index,
         char *k_i = st_malloc(KMER_LENGTH * sizeof(char));
         for (int64_t k = 0; k < KMER_LENGTH; k++) {
-            k_i[k] = *(target + (x + k));
+            k_i[k] = *(target + (x_i + k));
         }
         // get the kmer index
         int64_t targetKmerIndex = emissions_discrete_getKmerIndexFromKmer(k_i);
@@ -62,9 +71,21 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
         double E_levelu = matchModel[1 + (targetKmerIndex * MODEL_PARAMS)];
         double E_noiseu = matchModel[1 + (targetKmerIndex * MODEL_PARAMS + 2)];
 
+        // make reference kmer
+        char *refKmer;
+        if ((strand == template && forward) || (strand == complement && (!forward))) {
+            refKmer = k_i;
+        }
+        if ((strand == complement && forward) || (strand == template && (!forward))) {
+            refKmer = stString_reverseComplementString(k_i);
+        }
         // write to disk
-        fprintf(fH, "%lld\t%lld\t%s\t%s\t%s\t%f\t%f\t%f\t%f\t%f\t%f\n", x, y, k_i, readFile, strandLabel, eventMean,
-                eventNoise, eventDuration, p, E_levelu, E_noiseu);
+        // contig	position	reference_kmer	read_index	strand	event_index	event_level_mean	event_stdv	event_length	model_kmer	model_mean	model_stdv	event_length
+        fprintf(fH, "%s\t%lld\t%s\t%s\t%s\t%lld\t%f\t%f\t%f\t%s\t%f\t%f\t%f\n",
+                contig, x_adj, refKmer, readFile, strandLabel, y, eventMean, eventNoise, eventDuration, k_i, E_levelu,
+                E_noiseu, p);
+        //fprintf(fH, "%s\t%lld\t%lld\t%s\t%s\t%s\t%f\t%f\t%f\t%f\t%f\t%f\n", contig, x_adj, y, k_i, readFile, strandLabel, eventMean,
+        //        eventNoise, eventDuration, p, E_levelu, E_noiseu);
 
         // cleanup
         free(k_i);
@@ -304,17 +325,6 @@ void getSignalExpectations(const char *model, const char *inputHmm, Hmm *hmmExpe
     }
 }
 
-void printPairwiseAlignmentSummary(struct PairwiseAlignment *pA) {
-    st_uglyf("contig 1: %s\n", pA->contig1);
-    st_uglyf("strand 1: %lld\n", pA->strand1);
-    st_uglyf("start  1: %lld\n", pA->start1);
-    st_uglyf("end    1: %lld\n", pA->end1);
-    st_uglyf("contig 2: %s\n", pA->contig2);
-    st_uglyf("strand 2: %lld\n", pA->strand2);
-    st_uglyf("start  2: %lld\n", pA->start2);
-    st_uglyf("end    2: %lld\n", pA->end2);
-}
-
 int main(int argc, char *argv[]) {
     StateMachineType sMtype = vanilla;
     bool banded = FALSE;
@@ -468,10 +478,12 @@ int main(int argc, char *argv[]) {
     pA = cigarRead(fileHandleIn);
 
     // todo put in to help with debuging:
-    printPairwiseAlignmentSummary(pA);
+    //printPairwiseAlignmentSummary(pA);
 
     // slice out the section of the reference we're aligning to
     char *trimmedRefSeq = getSubSequence(referenceSequence, pA->start1, pA->end1, pA->strand1);
+    trimmedRefSeq = (pA->strand1 ? trimmedRefSeq : stString_reverseComplementString(trimmedRefSeq));
+    referenceSequence = (pA->strand1 ? referenceSequence : stString_reverseComplementString(referenceSequence));
 
     // reverse complement for complement event sequence
     char *rc_trimmedRefSeq = stString_reverseComplementString(trimmedRefSeq);
@@ -486,24 +498,15 @@ int main(int argc, char *argv[]) {
                                                                       npRead->complementEventMap);
 
 
-    // the alignments start at (0,0) so we need to correct them based on the guide alignment later.
-    // record this shift here
+    // the aligned pairs start at (0,0) so we need to correct them based on the guide alignment later.
+    // record the pre-zeroed alignment start and end coordinates here
+    // for the events:
     int64_t tCoordinateShift = npRead->templateEventMap[pA->start2];
     int64_t cCoordinateShift = npRead->complementEventMap[pA->start2];
-
-    // orig
-    int64_t rCoordinateShift_t = (pA->strand1 ? pA->start1 : pA->end1);
-    //int64_t rCoordinateShift_c = (int64_t)strlen(referenceSequence) - (pA->strand1 ? pA->end1 : pA->start1);
-    int64_t rCoordinateShift_c = (pA->strand1 ? pA->end1 : pA->start1);
-
-    // next try works for ecoli not for zymo
-    //int64_t rCoordinateShift_t = (pA->strand1 ? pA->start1 : (int64_t)strlen(referenceSequence) - pA->start1);
-    //int64_t rCoordinateShift_c = (pA->strand1 ? (int64_t)strlen(referenceSequence) - pA->end1 : pA->end1);
-
-    //int64_t rCoordinateShift_t = (pA->strand1 ? pA->start1 : (int64_t)strlen(referenceSequence) - pA->end1);
-    //int64_t rCoordinateShift_c = (pA->strand1 ? (int64_t)strlen(referenceSequence) - pA->end1 : pA->start1);
-
-    st_uglyf("tOffset: %lld, cOffset %lld \n", rCoordinateShift_t, rCoordinateShift_c);
+    // and for the reference:
+    int64_t rCoordinateShift_t = pA->start1;
+    int64_t rCoordinateShift_c = pA->end1;
+    bool forward = pA->strand1;  // keep track of whether this is a forward mapped read or not
 
     stList *anchorPairs = guideAlignmentToRebasedAnchorPairs(pA, p);
 
@@ -565,8 +568,8 @@ int main(int argc, char *argv[]) {
         // write to file
         if (posteriorProbsFile != NULL) {
             writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_PROBS,
-                                npRead->templateEvents, referenceSequence,   // use non-trimmed objects here
-                                tCoordinateShift, rCoordinateShift_t,        // correction is in function
+                                npRead->templateEvents, trimmedRefSeq, forward, pA->contig1,
+                                tCoordinateShift, rCoordinateShift_t,
                                 templateAlignedPairs, template);
         }
 
@@ -594,8 +597,8 @@ int main(int argc, char *argv[]) {
         // write to file
         if (posteriorProbsFile != NULL) {
             writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_PROBS,
-                                npRead->complementEvents, stString_reverseComplementString(referenceSequence),
-                                cCoordinateShift, rCoordinateShift_c,  // see above
+                                npRead->complementEvents, rc_trimmedRefSeq,
+                                forward, pA->contig1, cCoordinateShift, rCoordinateShift_c,
                                 complementAlignedPairs, complement);
         }
 
