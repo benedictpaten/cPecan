@@ -23,7 +23,7 @@ void printPairwiseAlignmentSummary(struct PairwiseAlignment *pA) {
     st_uglyf("end    2: %lld\n", pA->end2);
 }
 
-void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *matchModel,
+void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *matchModel, double scale, double shift,
                          double *events, char *target, bool forward, char *contig,
                          int64_t eventSequenceOffset, int64_t referenceSequenceOffset,
                          stList *alignedPairs, Strand strand) {
@@ -58,6 +58,7 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
         double eventMean = events[(y * NB_EVENT_PARAMS)];
         double eventNoise = events[(y * NB_EVENT_PARAMS) + 1];
         double eventDuration = events[(y * NB_EVENT_PARAMS) + 2];
+        double descaledMean = (eventMean - shift) / scale;
 
         // make the kmer string at the target index,
         char *k_i = st_malloc(KMER_LENGTH * sizeof(char));
@@ -70,6 +71,7 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
         // get the expected event mean amplitude and noise
         double E_levelu = matchModel[1 + (targetKmerIndex * MODEL_PARAMS)];
         double E_noiseu = matchModel[1 + (targetKmerIndex * MODEL_PARAMS + 2)];
+        double deScaled_E_levelu = (E_levelu - shift) / scale;
 
         // make reference kmer
         char *refKmer;
@@ -80,13 +82,12 @@ void writePosteriorProbs(char *posteriorProbsFile, char *readFile, double *match
             refKmer = stString_reverseComplementString(k_i);
         }
         // write to disk
-        // contig	position	reference_kmer	read_index	strand	event_index	event_level_mean	event_stdv	event_length	model_kmer	model_mean	model_stdv	event_length
-        fprintf(fH, "%s\t%lld\t%s\t%s\t%s\t%lld\t%f\t%f\t%f\t%s\t%f\t%f\t%f\n",
+        fprintf(fH, "%s\t%lld\t%s\t%s\t%s\t%lld\t%f\t%f\t%f\t%s\t%f\t%f\t%f\t%f\t%f\n",
                 contig, x_adj, refKmer, readFile, strandLabel, y, eventMean, eventNoise, eventDuration, k_i, E_levelu,
-                E_noiseu, p);
-        //fprintf(fH, "%s\t%lld\t%lld\t%s\t%s\t%s\t%f\t%f\t%f\t%f\t%f\t%f\n", contig, x_adj, y, k_i, readFile, strandLabel, eventMean,
-        //        eventNoise, eventDuration, p, E_levelu, E_noiseu);
-
+                E_noiseu, p, descaledMean, deScaled_E_levelu);
+        // old format
+        //fprintf(fH, "%lld\t%lld\t%s\t%s\t%s\t%f\t%f\t%f\t%f\t%f\t%f\n",
+        //        x_adj, y, k_i, readFile, strandLabel, eventMean, eventNoise, eventDuration, p, E_levelu, E_noiseu);
         // cleanup
         free(k_i);
     }
@@ -568,6 +569,7 @@ int main(int argc, char *argv[]) {
         // write to file
         if (posteriorProbsFile != NULL) {
             writePosteriorProbs(posteriorProbsFile, readLabel, sMt->EMISSION_MATCH_PROBS,
+                                npRead->templateParams.scale, npRead->templateParams.shift,
                                 npRead->templateEvents, trimmedRefSeq, forward, pA->contig1,
                                 tCoordinateShift, rCoordinateShift_t,
                                 templateAlignedPairs, template);
@@ -597,6 +599,7 @@ int main(int argc, char *argv[]) {
         // write to file
         if (posteriorProbsFile != NULL) {
             writePosteriorProbs(posteriorProbsFile, readLabel, sMc->EMISSION_MATCH_PROBS,
+                                npRead->complementParams.scale, npRead->complementParams.shift,
                                 npRead->complementEvents, rc_trimmedRefSeq,
                                 forward, pA->contig1, cCoordinateShift, rCoordinateShift_c,
                                 complementAlignedPairs, complement);

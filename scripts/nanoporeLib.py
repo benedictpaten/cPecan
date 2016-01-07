@@ -799,8 +799,6 @@ class SignalAlignment(object):
             print("signalAlign - {} didn't map".format(read_label), file=sys.stderr)
             return False
 
-        print("-------->signalAlign - Continuing to alignment routine!", file=sys.stderr)
-
         # Alignment routine
 
         # containers and defaults

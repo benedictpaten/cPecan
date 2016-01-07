@@ -660,7 +660,7 @@ void emissions_signal_scaleModelNoiseOnly(StateMachine *sM,
         // level_mean = mean * scale + shift
         //sM->EMISSION_MATCH_PROBS[i] = sM->EMISSION_MATCH_PROBS[i] * scale + shift;
         // level_stdev = stdev * var
-        //sM->EMISSION_MATCH_PROBS[i+1] = sM->EMISSION_MATCH_PROBS[i+1] * var;
+        sM->EMISSION_MATCH_PROBS[i+1] = sM->EMISSION_MATCH_PROBS[i+1] * var;
 
         // Fluctuation (noise) adjustments
         // noise_mean *= scale_sd

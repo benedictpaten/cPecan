@@ -130,8 +130,8 @@ def main(args):
         p.join()
 
     done_queue.put('STOP')
-    print("signalAlign - finished alignments\n", file=sys.stderr)
-    print("signalAlign - finished alignments\n", file=sys.stdout)
+    print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
+    print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
 
 
 if __name__ == "__main__":

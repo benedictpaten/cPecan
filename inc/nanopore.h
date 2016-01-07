@@ -33,6 +33,8 @@ stList *nanopore_remapAnchorPairs(stList *anchorPairs, int64_t *eventMap);
 
 stList *nanopore_remapAnchorPairsWithOffset(stList *unmappedPairs, int64_t *eventMap, int64_t mapOffset);
 
+void nanopore_descaleEvents(int64_t nb_events, double *events, double scale, double shift, double var);
+
 void nanopore_nanoporeReadDestruct(NanoporeRead *npRead);
 
 #endif

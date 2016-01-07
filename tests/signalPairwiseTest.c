@@ -1308,6 +1308,77 @@ static void test_vanilla_getAlignedPairsWithBanding(CuTest *testCase) {
     stateMachine_destruct(sMt);
 }
 
+static void test_vanilla_getAlignedPairsWithoutScaling(CuTest *testCase) {
+    // load the reference sequence and the nanopore read
+    char *ZymoReference = stString_print("../../cPecan/tests/test_npReads/ZymoRef.txt");
+    FILE *fH = fopen(ZymoReference, "r");
+    char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
+    char *npReadFile = stString_print("../../cPecan/tests/test_npReads/ZymoC_ch_1_file1.npRead");
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+
+    // get sequence lengths
+    int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
+    int64_t lY = npRead->nbTemplateEvents;
+
+    // load stateMachine from model file
+    char *templateModelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    StateMachine *sMt = getSignalStateMachine3Vanilla(templateModelFile);
+
+    // scale model
+    emissions_signal_scaleModelNoiseOnly(sMt, npRead->templateParams.scale, npRead->templateParams.shift,
+                                         npRead->templateParams.var, npRead->templateParams.scale_sd,
+                                         npRead->templateParams.var_sd); // clunky
+
+
+    // parameters for pairwise alignment using defaults
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+    p->constraintDiagonalTrim = 0;
+
+    // get anchors using lastz
+    stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
+
+    // remap and filter
+    stList *remappedAnchors = nanopore_remapAnchorPairs(anchorPairs, npRead->templateEventMap);
+    stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
+
+    // make Sequences for reference and template events
+    Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer2,
+                                           sequence_sliceNucleotideSequence2);
+    Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
+                                                sequence_sliceEventSequence2);
+    // de-scale events
+    nanopore_descaleEvents(templateSeq->length, templateSeq->elements, npRead->templateParams.scale,
+                           npRead->templateParams.shift, npRead->templateParams.var);
+
+    // do alignment of template events
+    stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
+                                                       diagonalCalculationPosteriorMatchProbs,
+                                                       0, 0);
+    checkAlignedPairs(testCase, alignedPairs, lX, lY);
+    st_uglyf("there are %lld aligned pairs with banding\n", stList_length(alignedPairs));
+    // for ch1_file1 template there should be this many aligned pairs with banding
+    //CuAssertTrue(testCase, stList_length(alignedPairs) == 999);
+
+    // check against alignment without banding
+    stList *alignedPairs2 = getAlignedPairsWithoutBanding(sMt, ZymoReferenceSeq, templateSeq->elements, lX,
+                                                          lY, p,
+                                                          sequence_getKmer2, sequence_getEvent,
+                                                          diagonalCalculationPosteriorMatchProbs,
+                                                          0, 0);
+    st_uglyf("there are %lld aligned pairs without banding\n", stList_length(alignedPairs2));
+    checkAlignedPairs(testCase, alignedPairs2, lX, lY);
+    //CuAssertTrue(testCase, stList_length(alignedPairs2) == 953);
+
+    // clean
+    pairwiseAlignmentBandingParameters_destruct(p);
+    nanopore_nanoporeReadDestruct(npRead);
+    sequence_sequenceDestroy(refSeq);
+    sequence_sequenceDestroy(templateSeq);
+    stList_destruct(alignedPairs);
+    stList_destruct(alignedPairs2);
+    stateMachine_destruct(sMt);
+}
+
 static void test_echelon_getAlignedPairsWithBanding(CuTest *testCase) {
     // load the reference sequence and the nanopore read
     char *ZymoReference = stString_print("../../cPecan/tests/test_npReads/ZymoRef.txt");
@@ -1746,6 +1817,7 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_strawMan_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_stateMachine4_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithoutScaling);
     SUITE_ADD_TEST(suite, test_echelon_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_vanillaHmm);
