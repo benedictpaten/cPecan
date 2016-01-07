@@ -4,7 +4,7 @@
 #include <inttypes.h>
 #include "nanopore.h"
 #include "pairwiseAligner.h"
-#include "nanopore.h"
+
 
 
 NanoporeRead *nanopore_nanoporeReadConstruct(int64_t readLength, int64_t nbTemplateEvents, int64_t nbComplementEvents) {

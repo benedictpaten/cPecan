@@ -43,7 +43,6 @@ def parse_args():
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
 
-
     args = parser.parse_args()
     return args
 

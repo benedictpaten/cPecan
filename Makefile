@@ -9,6 +9,7 @@ cPecanDependencies =  ${basicLibsDependencies}
 cPecanLibs = ${basicLibs}
 
 all : ${libPath}/cPecanLib.a ${binPath}/cPecanLibTests ${binPath}/vanillaAlign ${binPath}/trainModels ${binPath}/signalAlign ${sonLibrootPath}/nanoporelib.py
+	# disabled right now so that we don't build Lastz every time I do an update
 	#cd externalTools && make all
 	
 clean : 
@@ -26,7 +27,6 @@ ${binPath}/vanillaAlign : vanillaAlign.c ${libPath}/cPecanLib.a ${cPecanDependen
 
 ${binPath}/trainModels : ${rootPath}scripts/trainModels.py
 	cp ${rootPath}scripts/trainModels.py ${binPath}/trainModels
-	#cp ${rootPath}scripts/nanoporeLib.py ${sonLibRootPath}/nanoporeLib.py
 	chmod +x ${binPath}/trainModels
 	
 ${binPath}/signalAlign : ${rootPath}scripts/signalAlign.py
