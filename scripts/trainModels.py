@@ -232,8 +232,8 @@ def main(argv):
                                                               c_likelihood=complement_model.running_likelihoods[-1],
                                                               i=i))
 
-    print("signalAlign - finished training routine", file=sys.stdout)
-    print("signalAlign - finished training routine", file=sys.stderr)
+    print("trainModels - finished training routine", file=sys.stdout)
+    print("trainModels - finished training routine", file=sys.stderr)
 
 
 if __name__ == "__main__":
