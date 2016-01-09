@@ -1396,10 +1396,12 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
 
         //List of anchor pairs
         stList *subListOfAnchorPoints = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
+
         while (j < stList_length(anchorPairs)) {
             stIntTuple *anchorPair = stList_get(anchorPairs, j);
             int64_t x = stIntTuple_get(anchorPair, 0);
             int64_t y = stIntTuple_get(anchorPair, 1);
+
             assert(x + y >= x1 + y1);
             if (x + y >= x2 + y2) {
                 break;
@@ -1411,6 +1413,7 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         }
 
         //Make the alignments
+
         getPosteriorProbsWithBanding(sM, subListOfAnchorPoints, sX3, sY3, p,
                                      (alignmentHasRaggedLeftEnd || i > 0),
                                      (alignmentHasRaggedRightEnd || i < stList_length(splitPoints) - 1),
@@ -1476,7 +1479,9 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM,
     stList *alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
     void *extraArgs[2] = { subListOfAlignedPairs, alignedPairs };
 
-    getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(sM, anchorPairs, SsX, SsY, p,
+    getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(sM, anchorPairs,
+                                                               SsX, SsY,
+                                                               p,
                                                                alignmentHasRaggedLeftEnd,
                                                                alignmentHasRaggedRightEnd,
                                                                diagonalPosteriorProbFn,
@@ -1604,8 +1609,6 @@ void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
     // get anchors
     stList *anchorPairs = getAnchorPairFcn(sX, sY, p);
     // make Sequence objects
-    //Sequence *SsX = sequence_construct(lX, sX, getFcn);
-    //Sequence *SsY = sequence_construct(lY, sY, getFcn);
     Sequence *SsX = sequence_construct2(lX, sX, getFcn, sequence_sliceNucleotideSequence2);
     Sequence *SsY = sequence_construct2(lY, sY, getFcn, sequence_sliceNucleotideSequence2);
 

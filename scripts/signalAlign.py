@@ -66,9 +66,10 @@ def main(args):
 #   Aligning to reference: {reference}
 #   Aligning {nbFiles}
 #   Using model: {model}
+#   Using banding: {banding}
 #   Input template HMM: {inThmm}
 #   Input complement HMM: {inChmm}
-    """.format(fileDir=args.files_dir, reference=args.ref, nbFiles=args.nb_files,
+    """.format(fileDir=args.files_dir, reference=args.ref, nbFiles=args.nb_files, banding=args.banded,
                inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm, model=args.stateMachineType)
 
     print(start_message, file=sys.stdout)

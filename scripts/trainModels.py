@@ -17,36 +17,33 @@ def parse_args():
     parser.add_argument('--file_directory', '-d', action='append',
                         dest='files_dir', required=True, type=str,
                         help="directories with fast5 files to train on")
-
     parser.add_argument('--ref', '-r', action='store',
                         dest='ref', required=True, type=str,
                         help="location of refrerence sequence in FASTA")
-
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the trained model, and use for working directory.")
-
-    parser.add_argument('--iterations', '-t', action='store', dest='iter',
+    parser.add_argument('--iterations', '-i', action='store', dest='iter',
                         required=True, type=int)
-
-    parser.add_argument('--train_amount', '-m', action='store', dest='amount',
+    parser.add_argument('--train_amount', '-a', action='store', dest='amount',
                         required=True, type=int,
                         help="limit the total length of sequence to use in training.")
-
+    parser.add_argument('--diagonalExpansion', '-e', action='store', dest='diag_expansion', type=int,
+                        required=False, default=None, help="number of diagonals to expand around each anchor")
+    parser.add_argument('--constraintTrim', '-m', action='store', dest='constraint_trim', type=int,
+                        required=False, default=None, help='amount to remove from an anchor constraint')
+    parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
+                        default=None, help="posterior match probability threshold")
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
-
     parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for complement events, if you don't want the default")
-
-    parser.add_argument('--banded', '-b', action='store_true', dest='banded',
+    parser.add_argument('--un-banded', '-ub', action='store_true', dest='banded',
                         default=False, help='flag, use banded alignment heuristic')
-
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=True,
                         type=int, help="number of jobs to run concurrently")
-
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                         required=True, help="decide which model to use, vanilla by default")
 
@@ -144,6 +141,8 @@ def main(argv):
     # make directory to put the files we're using files
     working_folder = FolderHandler()
     working_directory_path = working_folder.open_folder(args.out + "tempFiles_expectations")
+    reference_seq = working_folder.add_file_path("reference_seq.txt")
+    make_temp_sequence(args.ref, True, reference_seq)
 
     # index the reference for bwa
     print("signalAlign - indexing reference", file=sys.stderr)
@@ -182,15 +181,20 @@ def main(argv):
         # get expectations for all the files in the queue
         for fast5 in training_files:
             alignment_args = {
-                "reference": args.ref,
+                "in_fast5": fast5,
+                "reference": reference_seq,
                 "destination": working_directory_path,
                 "stateMachineType": args.stateMachineType,
+                "banded": args.banded,
                 "bwa_index": bwa_ref_index,
                 "in_templateHmm": in_template_hmm,
                 "in_complementHmm": in_complement_hmm,
-                "banded": args.banded,
-                "in_fast5": fast5
+                "threshold": args.threshold,
+                "diagonal_expansion": args.diag_expansion,
+                "constraint_trim": args.constraint_trim,
             }
+            #alignment = SignalAlignment(**alignment_args)
+            #alignment.run(get_expectations=True)
             work_queue.put(alignment_args)
 
         for w in xrange(workers):

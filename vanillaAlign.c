@@ -162,7 +162,6 @@ stList *performSignalAlignmentP(StateMachine *sM, Sequence *sY, int64_t *eventMa
                                                          void *extraArgs),
                                 bool banded) {
     int64_t lX = sequence_correctSeqLength(strlen(target), event);
-
     if (banded) {
         fprintf(stderr, "vanillaAlign - doing banded alignment\n");
 
@@ -308,8 +307,6 @@ void getSignalExpectations(const char *model, const char *inputHmm, Hmm *hmmExpe
 
     // make sequence objects, seperate the target sequences based on HMM type, also implant the match model if we're
     // using a conditional model
-    //Sequence *eventS = sequence_construct2(nbEvents, events, sequence_getEvent, sequence_sliceEventSequence2);
-
     if (type == vanilla) {
         Sequence *target = sequence_construct2(lX, trainingTarget, sequence_getKmer2,
                                                sequence_sliceNucleotideSequence2);
@@ -479,12 +476,11 @@ int main(int argc, char *argv[]) {
     pA = cigarRead(fileHandleIn);
 
     // todo put in to help with debuging:
-    //printPairwiseAlignmentSummary(pA);
+    printPairwiseAlignmentSummary(pA);
 
     // slice out the section of the reference we're aligning to
     char *trimmedRefSeq = getSubSequence(referenceSequence, pA->start1, pA->end1, pA->strand1);
     trimmedRefSeq = (pA->strand1 ? trimmedRefSeq : stString_reverseComplementString(trimmedRefSeq));
-    referenceSequence = (pA->strand1 ? referenceSequence : stString_reverseComplementString(referenceSequence));
 
     // reverse complement for complement event sequence
     char *rc_trimmedRefSeq = stString_reverseComplementString(trimmedRefSeq);
@@ -522,11 +518,11 @@ int main(int argc, char *argv[]) {
         Hmm *templateExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001);
         Hmm *complementExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001);
 
+
         // get expectations for template
         fprintf(stderr, "vanillaAlign - getting expectations for template\n");
         getSignalExpectations(templateModelFile, templateHmmFile, templateExpectations, sMtype, npRead->templateParams,
-                              tEventSequence, npRead->templateEventMap, pA->start2,
-                              trimmedRefSeq, p,
+                              tEventSequence, npRead->templateEventMap, pA->start2, trimmedRefSeq, p,
                               anchorPairs, template);
 
         // write to file

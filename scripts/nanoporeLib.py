@@ -885,7 +885,7 @@ class SignalAlignment(object):
                         trim=trim_flag)
 
         # run
-        print("signalAlign - running command", command, end="\n", file=sys.stderr)
+        print("signalAlign - running command: ", command, end="\n", file=sys.stderr)
         os.system(command)
         temp_folder.remove_folder()
         return True
