@@ -33,6 +33,8 @@ def parse_args():
                         required=False, default=None, help="number of diagonals to expand around each anchor")
     parser.add_argument('--constraintTrim', '-m', action='store', dest='constraint_trim', type=int,
                         required=False, default=None, help='amount to remove from an anchor constraint')
+    parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
+                        required=False, default=None, help="tab separated table with regions to align to")
     parser.add_argument('---un-banded', '-ub', action='store_false', dest='banded',
                         default=True, help='flag, turn off banding')
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
@@ -66,11 +68,12 @@ def main(args):
 #   Aligning to reference: {reference}
 #   Aligning {nbFiles}
 #   Using model: {model}
-#   Using banding: {banding}
+#   Using banding: {banding} DEPRECIATE this ASAP
+#   Aligning to regions in: {regions}
 #   Input template HMM: {inThmm}
 #   Input complement HMM: {inChmm}
     """.format(fileDir=args.files_dir, reference=args.ref, nbFiles=args.nb_files, banding=args.banded,
-               inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm, model=args.stateMachineType)
+               inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm, model=args.stateMachineType, regions=args.target_regions)
 
     print(start_message, file=sys.stdout)
 
@@ -84,11 +87,16 @@ def main(args):
     reference_seq = temp_folder.add_file_path("reference_seq.txt")
     make_temp_sequence(args.ref, True, reference_seq)
 
-
     # index the reference for bwa
     print("signalAlign - indexing reference", file=sys.stderr)
     bwa_ref_index = get_bwa_index(args.ref, temp_dir_path)
     print("signalAlign - indexing reference, done", file=sys.stderr)
+
+    # parse the target regions, if provided
+    if args.target_regions is not None:
+        target_regions = TargetRegions(args.target_regions)
+    else:
+        target_regions = None
 
     workers = args.nb_jobs
     work_queue = Manager().Queue()
@@ -114,7 +122,8 @@ def main(args):
             "in_fast5": args.files_dir + fast5,
             "threshold": args.threshold,
             "diagonal_expansion": args.diag_expansion,
-            "constraint_trim": args.constraint_trim
+            "constraint_trim": args.constraint_trim,
+            "target_regions": target_regions,
         }
         #alignment = SignalAlignment(**alignment_args)
         #alignment.run()

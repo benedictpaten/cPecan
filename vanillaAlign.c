@@ -515,8 +515,8 @@ int main(int argc, char *argv[]) {
         }
 
         // make empty HMM to collect expectations
-        Hmm *templateExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001);
-        Hmm *complementExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001);
+        Hmm *templateExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold);
+        Hmm *complementExpectations = hmmContinuous_getEmptyHmm(sMtype, 0.0001, p->threshold);
 
 
         // get expectations for template

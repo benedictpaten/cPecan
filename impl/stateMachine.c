@@ -131,7 +131,7 @@ int64_t emissions_discrete_getKmerIndex(void *kmer) {
         i += 1;
         l = l/SYMBOL_NUMBER_NO_N;
     }
-    int64_t last = strlen(kmer)-1;
+    int64_t last = strlen(kmer) - 1;
     x += emissions_discrete_getBaseIndex((char *)kmer + last);
 
     return x;
@@ -1701,7 +1701,8 @@ StateMachine *getStrawManStateMachine3(const char *modelFile) {
                                                 emissions_kmer_getGapProb,
                                                 emissions_signal_strawManGetKmerEventMatchProb,
                                                 emissions_signal_strawManGetKmerEventMatchProb,
-                                                cell_signal_updateTransAndKmerSkipExpectations);
+                                                //cell_signal_updateTransAndKmerSkipExpectations);
+                                                cell_signal_updateTransAndKmerSkipExpectations2);
     emissions_signal_loadPoreModel(sM3, modelFile, sM3->type);
     return sM3;
 }

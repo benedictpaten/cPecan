@@ -452,6 +452,34 @@ void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *t
     }
 }
 
+void cell_signal_updateTransAndKmerSkipExpectations2(double *fromCells, double *toCells, int64_t from, int64_t to,
+                                                    double eP, double tP, void *extraArgs) {
+    //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
+    double totalProbability = *((double *) ((void **) extraArgs)[0]);
+    ContinuousPairHmm *hmmExpectations = ((void **) extraArgs)[1];
+
+    // this gives you the kmer index
+    int64_t x = hmmExpectations->baseContinuousHmm.baseHmm.getElementIndexFcn(((void **) extraArgs)[2]);
+
+    //st_uglyf("SENTINAL - got kmer index %lld", x);
+    double event = *(double *)((void **) extraArgs)[3];
+    //st_uglyf(" - got event: %f\n", event);
+
+    // Calculate posterior probability of the transition/emission pair
+    double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
+
+    // update transitions expectation
+    hmmExpectations->baseContinuousHmm.baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, from, to, p);
+    //
+    if (to == shortGapX) {
+        hmmExpectations->baseContinuousHmm.baseHmm.addToEmissionExpectationFcn((Hmm *)hmmExpectations, 0, x, 0, p);
+    }
+    if ((to == match) & (p >= hmmExpectations->baseContinuousHmm.threshold)) {
+        stList_append(hmmExpectations->baseContinuousHmm.assignments, stDoubleTuple_construct(2, event, (double) x));
+        hmmExpectations->baseContinuousHmm.numberOfAssignments += 1;
+    }
+}
+
 void cell_signal_updateBetaAndAlphaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP,
                                         double tP, void *extraArgs) {
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };

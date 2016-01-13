@@ -165,27 +165,6 @@ def make_temp_sequence(fasta, forward, destination):
         break
 
 
-class Bwa(object):
-    """run BWA easily
-    """
-    def __init__(self, target):
-        self.target = target
-        #self.bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"
-        self.db_handle = ''
-
-    def build_index(self, destination):
-        # make a place to put the database
-        path_to_bwa_index = destination
-
-        # build database
-        self.db_handle = path_to_bwa_index + '/temp_bwaIndex'
-        #os.system("{0}bwa index -p {1} {2}".format(self.bwa_dir, self.db_handle, self.target))
-        os.system("bwa index -p {0} {1}".format(self.db_handle, self.target))
-
-    def run(self, query):
-        # run alignment
-        #os.system("{0}bwa mem -x ont2d {1} {2}".format(self.bwa_dir, self.db_handle, query))
-        os.system("bwa mem -x ont2d {0} {1}".format(self.db_handle, query))
 
 
 def parse_cigar(cigar_string, ref_start):
@@ -224,18 +203,19 @@ def parse_cigar(cigar_string, ref_start):
     return query_start, query_end, reference_start, reference_end, exonerated_cigar
 
 
-def exonerated_bwa(bwa_index, query):
+def exonerated_bwa(bwa_index, query, target_regions=None):
     # align with bwa
     command = "bwa mem -x ont2d {index} {query}".format(index=bwa_index, query=query)
 
     # this is a small SAM file that comes from bwa
     aln = subprocess.check_output(command.split())
-    aln = aln.split("\t") # split
+    aln = aln.split("\t")  # split
 
     query_start, query_end, reference_start, reference_end, cigar_string = parse_cigar(aln[11], int(aln[9]))
 
     strand = ""
     if int(aln[7]) == 16:
+        # todo redo this swap
         strand = "-"
         temp = reference_start
         reference_start = reference_end
@@ -249,6 +229,13 @@ def exonerated_bwa(bwa_index, query):
     completeCigarString = "cigar: %s %i %i + %s %i %i %s 1 %s" % (
     aln[6].split()[-1], query_start, query_end, aln[8], reference_start, reference_end, strand, cigar_string)
 
+    if target_regions is not None:
+        keep = target_regions.check_aligned_region(reference_start, reference_end)
+        if keep is False:
+            return False, False
+        else:
+            pass
+
     return completeCigarString, strand
 
 
@@ -258,6 +245,57 @@ def get_proceding_kmers(kmer, alphabet="ACGT"):
     for n in alphabet:
         proceding_kmers.append(n + suffix)
     return proceding_kmers
+
+
+class TargetRegions(object):
+    def __init__(self, tsv, already_sorted=False):
+        assert(os.stat(tsv).st_size != 0), "Empty regions file"
+
+        self.region_array = np.loadtxt(tsv,
+                                       usecols=(0, 1),
+                                       dtype=np.int32)
+
+        if len(self.region_array.shape) == 1:
+            a = np.empty([1, 2], dtype=np.int32)
+            a[0] = self.region_array
+            self.region_array = a
+
+        if not already_sorted:
+            self.region_array = np.sort(self.region_array, axis=1)
+
+    def check_aligned_region(self, left, right):
+        if right < left:
+            left, right = right, left
+        for region in self.region_array:
+            if (region[0] >= left) and (region[1] <= right):
+                return True
+            else:
+                continue
+        return False
+
+
+class Bwa(object):
+    # TODO check if project is using this.
+    """run BWA easily
+    """
+    def __init__(self, target):
+        self.target = target
+        #self.bwa_dir = "/Users/Rand/projects/BGCs/submodules/bwa/"
+        self.db_handle = ''
+
+    def build_index(self, destination):
+        # make a place to put the database
+        path_to_bwa_index = destination
+
+        # build database
+        self.db_handle = path_to_bwa_index + '/temp_bwaIndex'
+        #os.system("{0}bwa index -p {1} {2}".format(self.bwa_dir, self.db_handle, self.target))
+        os.system("bwa index -p {0} {1}".format(self.db_handle, self.target))
+
+    def run(self, query):
+        # run alignment
+        #os.system("{0}bwa mem -x ont2d {1} {2}".format(self.bwa_dir, self.db_handle, query))
+        os.system("bwa mem -x ont2d {0} {1}".format(self.db_handle, query))
 
 
 class NanoporeRead(object):
@@ -706,7 +744,7 @@ class ComplementModel(NanoporeModel):
 class SignalAlignment(object):
     def __init__(self, in_fast5, reference, destination, stateMachineType, banded, bwa_index,
                  in_templateHmm, in_complementHmm, threshold, diagonal_expansion,
-                 constraint_trim):
+                 constraint_trim, target_regions):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.reference = reference  # reference sequence
         self.destination = destination  # place where the alignments go, should already exist
@@ -718,6 +756,7 @@ class SignalAlignment(object):
         self.threshold = threshold
         self.diagonal_expansion = diagonal_expansion
         self.constraint_trim = constraint_trim
+        self.target_regions = target_regions
 
         # if we're using an input hmm, make sure it exists
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
@@ -758,9 +797,6 @@ class SignalAlignment(object):
                                                                           template_model_path=temp_t_model,
                                                                           complement_model_path=temp_c_model)
 
-        #print("signalAlign - temp template match model", temp_t_model, file=sys.stderr)
-        #print("signalAlign - temp complement match model", temp_c_model, file=sys.stderr)
-
         if success is False:
             return False
 
@@ -779,7 +815,8 @@ class SignalAlignment(object):
             stateMachineType_flag = ""
 
         # get orientation and cigar from BWA this serves as the guide alignment
-        cigar_string, strand = exonerated_bwa(bwa_index=self.bwa_index, query=temp_2d_read)
+        cigar_string, strand = exonerated_bwa(bwa_index=self.bwa_index, query=temp_2d_read,
+                                              target_regions=self.target_regions)
 
         # this gives the format: /directory/for/files/file.model.orientation.tsv
         posteriors_file_path = ''
@@ -797,6 +834,7 @@ class SignalAlignment(object):
         # didn't map
         elif (strand != "+") and (strand != "-"):
             print("signalAlign - {} didn't map".format(read_label), file=sys.stderr)
+            temp_folder.remove_folder()
             return False
 
         # Alignment routine
