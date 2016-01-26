@@ -66,7 +66,7 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path, template_mod
         npRead.close()
         return False
 
-    if npRead.get_twoD_event_map() and npRead.get_template_events() and npRead.get_complement_evnets():
+    if npRead.get_twoD_event_map() and npRead.get_template_events() and npRead.get_complement_events():
         # get model params
         t_model_bool = npRead.get_template_model_adjustments()
         c_model_bool = npRead.get_complement_model_adjustments()
@@ -127,8 +127,7 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path, template_mod
 
         # handle models
         # template model
-        if npRead.get_model_id("/Analyses/Basecall_2D_000/Summary/basecall_1d_template") == \
-                "template_median68pA.model":
+        if npRead.template_model_id == "template_median68pA.model":
             print("signalAlign - found default template model", file=sys.stderr)
             template_model_path = None
         else:
@@ -137,8 +136,7 @@ def get_npRead_2dseq_and_models(fast5, npRead_path, twod_read_path, template_mod
             # TODO put fail check here
 
         # complement model
-        if npRead.get_model_id("/Analyses/Basecall_2D_000/Summary/basecall_1d_complement") == \
-            "complement_median68pA_pop2.model":
+        if npRead.complement_model_id == "complement_median68pA_pop2.model":
             print("signalAlign - found default complement model", file=sys.stderr)
             complement_model_path = None
         else:
@@ -163,8 +161,6 @@ def make_temp_sequence(fasta, forward, destination):
             sequence = reverse_complement(sequence)
         print(sequence, end='\n', file=out_file)
         break
-
-
 
 
 def parse_cigar(cigar_string, ref_start):
@@ -338,6 +334,28 @@ class NanoporeRead(object):
                 self.twoD_read_sequence = self.fastFive[twoD_read_sequence_address][()].split()[2]
                 self.twoD_id = self.fastFive[twoD_read_sequence_address][()].split()[0:2][0][1:]
 
+        # initialize version-specific paths TODO come back and make this cleaner (use a version flag)
+        if self.fastFive["/Analyses/Basecall_2D_000"].attrs["dragonet version"] == "1.15.0":
+            self.template_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_template/Events'
+            self.template_model_address = "/Analyses/Basecall_2D_000/BaseCalled_template/Model"
+            self.template_model_id = self.get_model_id("/Analyses/Basecall_2D_000/Summary/basecall_1d_template")
+
+            self.complement_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_complement/Events'
+            self.complement_model_address = "/Analyses/Basecall_2D_000/BaseCalled_complement/Model"
+            self.complement_model_id = self.get_model_id("/Analyses/Basecall_2D_000/Summary/basecall_1d_complement")
+
+        elif self.fastFive["/Analyses/Basecall_2D_000"].attrs["dragonet version"] == '1.19.0':
+            self.template_event_table_address = '/Analyses/Basecall_1D_000/BaseCalled_template/Events'
+            self.template_model_address = "/Analyses/Basecall_1D_000/BaseCalled_template/Model"
+            self.template_model_id = self.get_model_id("/Analyses/Basecall_1D_000/Summary/basecall_1d_template")
+
+            self.complement_event_table_address = '/Analyses/Basecall_1D_000/BaseCalled_complement/Events'
+            self.complement_model_address = "/Analyses/Basecall_1D_000/BaseCalled_complement/Model"
+            self.complement_model_id = self.get_model_id("/Analyses/Basecall_1D_000/Summary/basecall_1d_complement")
+        else:
+            print("Unsupported Version (1.15.0 and 1.19.0 supported)", file=sys.stdout)
+            return False
+
     def get_alignment_sequence(self):
         """The 2D read sequence contains kmers that may not map to a tempalte or complement event, which can make
         mapping difficult downstream. This function makes a sequence from the 2D alignment table, which is usually
@@ -412,7 +430,9 @@ class NanoporeRead(object):
         previous_complement_event = None
         previous_template_event = None
 
-        self.initialize_twoD()
+        twoD_init = self.initialize_twoD()
+        if twoD_init is False:
+            return False
 
         if not self.has2D_alignment_table:
             return False
@@ -511,61 +531,62 @@ class NanoporeRead(object):
         return True
 
     def get_template_events(self):
-        template_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_template/Events'
+        #template_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_template/Events'
 
-        if template_event_table_address in self.fastFive:
-            #self.has_template_events = True
-            self.template_event_table = self.fastFive[template_event_table_address]
+        if self.template_event_table_address in self.fastFive:
+            self.template_event_table = self.fastFive[self.template_event_table_address]
             # maybe move to transform function
             self.template_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
                                     for e in self.template_event_table]
             return True
 
-        if template_event_table_address not in self.fastFive:
+        if self.template_event_table_address not in self.fastFive:
             return False
 
-    def get_complement_evnets(self):
-        complement_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_complement/Events'
+    def get_complement_events(self):
+        #complement_event_table_address = '/Analyses/Basecall_2D_000/BaseCalled_complement/Events'
 
-        if complement_event_table_address in self.fastFive:
-            self.has_complement_events = True
-            self.complement_event_table = self.fastFive[complement_event_table_address]
+        if self.complement_event_table_address in self.fastFive:
+            #self.has_complement_events = True
+            self.complement_event_table = self.fastFive[self.complement_event_table_address]
             self.complement_events = [[e[0], e[1], e[2], e[3]]  # mean, start, stdev, length
                                       for e in self.complement_event_table]
             return True
 
-        if complement_event_table_address not in self.fastFive:
+        if self.complement_event_table_address not in self.fastFive:
             return False
 
     def get_template_model_adjustments(self):
-        template_model_address = "/Analyses/Basecall_2D_000/BaseCalled_template/Model"
+        #template_model_address = "/Analyses/Basecall_2D_000/BaseCalled_template/Model"
 
-        if template_model_address in self.fastFive:
+        if self.template_model_address in self.fastFive:
             self.has_template_model = True
-            self.template_scale = self.fastFive[template_model_address].attrs["scale"]
-            self.template_shift = self.fastFive[template_model_address].attrs["shift"]
-            self.template_drift = self.fastFive[template_model_address].attrs["drift"]
-            self.template_var = self.fastFive[template_model_address].attrs["var"]
-            self.template_scale_sd = self.fastFive[template_model_address].attrs["scale_sd"]
-            self.template_var_sd = self.fastFive[template_model_address].attrs["var_sd"]
+            self.template_scale = self.fastFive[self.template_model_address].attrs["scale"]
+            self.template_shift = self.fastFive[self.template_model_address].attrs["shift"]
+            self.template_drift = self.fastFive[self.template_model_address].attrs["drift"]
+            self.template_var = self.fastFive[self.template_model_address].attrs["var"]
+            self.template_scale_sd = self.fastFive[self.template_model_address].attrs["scale_sd"]
+            self.template_var_sd = self.fastFive[self.template_model_address].attrs["var_sd"]
             return True
 
-        if template_model_address not in self.fastFive:
+        if self.template_model_address not in self.fastFive:
+            self.has_template_model = False
             return False
 
     def get_complement_model_adjustments(self):
-        complement_model_address = "/Analyses/Basecall_2D_000/BaseCalled_complement/Model"
+        #complement_model_address = "/Analyses/Basecall_2D_000/BaseCalled_complement/Model"
 
-        if complement_model_address in self.fastFive:
+        if self.complement_model_address in self.fastFive:
             self.has_complement_model = True
-            self.complement_scale = self.fastFive[complement_model_address].attrs["scale"]
-            self.complement_shift = self.fastFive[complement_model_address].attrs["shift"]
-            self.complement_drift = self.fastFive[complement_model_address].attrs["drift"]
-            self.complement_var = self.fastFive[complement_model_address].attrs["var"]
-            self.complement_scale_sd = self.fastFive[complement_model_address].attrs["scale_sd"]
-            self.complement_var_sd = self.fastFive[complement_model_address].attrs["var_sd"]
+            self.complement_scale = self.fastFive[self.complement_model_address].attrs["scale"]
+            self.complement_shift = self.fastFive[self.complement_model_address].attrs["shift"]
+            self.complement_drift = self.fastFive[self.complement_model_address].attrs["drift"]
+            self.complement_var = self.fastFive[self.complement_model_address].attrs["var"]
+            self.complement_scale_sd = self.fastFive[self.complement_model_address].attrs["scale_sd"]
+            self.complement_var_sd = self.fastFive[self.complement_model_address].attrs["var_sd"]
             return True
-        if complement_model_address not in self.fastFive:
+        if self.complement_model_address not in self.fastFive:
+            self.has_complement_model = False
             return False
 
     @staticmethod
@@ -744,7 +765,7 @@ class ComplementModel(NanoporeModel):
 class SignalAlignment(object):
     def __init__(self, in_fast5, reference, destination, stateMachineType, banded, bwa_index,
                  in_templateHmm, in_complementHmm, threshold, diagonal_expansion,
-                 constraint_trim, target_regions):
+                 constraint_trim, target_regions=None):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.reference = reference  # reference sequence
         self.destination = destination  # place where the alignments go, should already exist
