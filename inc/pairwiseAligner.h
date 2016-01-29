@@ -70,8 +70,11 @@ void *sequence_getBase(void *elements, int64_t index);
 
 void *sequence_getKmer(void *elements, int64_t index);
 
-//get the kmer at index and the previous kmer
+// get the kmer at index and the previous kmer
 void *sequence_getKmer2(void *elements, int64_t index);
+
+// for HDP, different 'NULL'
+void *sequence_getKmer3(void *elements, int64_t index);
 
 void *sequence_getEvent(void *elements, int64_t index);
 
@@ -118,8 +121,8 @@ void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, i
 void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *toCells, int64_t from, int64_t to,
                                                     double eP, double tP, void *extraArgs);
 
-void cell_signal_updateTransAndKmerSkipExpectations2(double *fromCells, double *toCells, int64_t from, int64_t to,
-                                                     double eP, double tP, void *extraArgs);
+//void cell_signal_updateTransAndKmerSkipExpectations2(double *fromCells, double *toCells, int64_t from, int64_t to,
+//                                                     double eP, double tP, void *extraArgs);
 
 void cell_signal_updateBetaAndAlphaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP,
                                         double tP,

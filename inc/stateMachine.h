@@ -9,6 +9,7 @@
 #define STATEMACHINE_H_
 
 #include "sonLib.h"
+#include "nanopore_hdp.h"
 
 #define SYMBOL_NUMBER 5
 #define SYMBOL_NUMBER_NO_N 4
@@ -191,6 +192,27 @@ struct _StateMachine3 {
     double (*getMatchProbFcn)(const double *emissionMatchProbs, void *x, void *y);
 };
 
+typedef struct _StateMachine3_HDP StateMachine3_HDP;
+
+struct _StateMachine3_HDP {
+    //3 state state machine, allowing for symmetry in x and y.
+    StateMachine model;
+    double TRANSITION_MATCH_CONTINUE; //0.9703833696510062f
+    double TRANSITION_MATCH_FROM_GAP_X; //1.0 - gapExtend - gapSwitch = 0.280026392297485
+    double TRANSITION_MATCH_FROM_GAP_Y; //1.0 - gapExtend - gapSwitch = 0.280026392297485
+    double TRANSITION_GAP_OPEN_X; //0.0129868352330243
+    double TRANSITION_GAP_OPEN_Y; //0.0129868352330243
+    double TRANSITION_GAP_EXTEND_X; //0.7126062401851738f;
+    double TRANSITION_GAP_EXTEND_Y; //0.7126062401851738f;
+    double TRANSITION_GAP_SWITCH_TO_X; //0.0073673675173412815f;
+    double TRANSITION_GAP_SWITCH_TO_Y; //0.0073673675173412815f;
+
+    double (*getXGapProbFcn)(const double *emissionXGapProbs, void *i);
+    NanoporeHDP *hdpModel;
+    double (*getYGapProbFcn)(NanoporeHDP *hdp, void *x, void *y);
+    double (*getMatchProbFcn)(NanoporeHDP *hdp, void *x, void *y);
+};
+
 typedef struct _StateMachine3vanilla {
     // reimplementation of nanopolish HMM by JTS.
     StateMachine model;
@@ -255,6 +277,17 @@ StateMachine *stateMachine5_construct(StateMachineType type, int64_t parameterSe
                                       void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
                                                                    int64_t from, int64_t to,
                                                                    double eP, double tP, void *extraArgs));
+
+StateMachine *stateMachine3Hdp_construct(StateMachineType type, int64_t parameterSetSize,
+                                         void (*setTransitionsToDefaults)(StateMachine *sM),
+                                         void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
+                                         NanoporeHDP *hdpModel,
+                                         double (*gapXProbFcn)(const double *, void *),
+                                         double (*gapYProbFcn)(NanoporeHDP *, void *, void *),
+                                         double (*matchProbFcn)(NanoporeHDP *, void *, void *),
+                                         void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
+                                                                      int64_t from, int64_t to,
+                                                                      double eP, double tP, void *extraArgs));
 
 StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSetSize,
                                       void (*setTransitionsToDefaults)(StateMachine *sM),
@@ -352,6 +385,8 @@ void emissions_signal_scaleModelNoiseOnly(StateMachine *sM, double scale, double
 double emissions_signal_getDurationProb(void *event, int64_t n);
 
 StateMachine *getStrawManStateMachine3(const char *modelFile);
+
+StateMachine *getHdpStateMachine3(NanoporeHDP *hdp);
 
 StateMachine *getStateMachine4(const char *modelFile);
 

@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stateMachine.h>
 #include "nanopore.h"
+#include "nanopore_hdp.h"
 #include "bioioC.h"
 #include "sonLib.h"
 #include "pairwiseAligner.h"
@@ -119,7 +120,7 @@ int64_t emissions_discrete_getBaseIndex(void *base) {
 int64_t emissions_discrete_getKmerIndex(void *kmer) {
     int64_t kmerLen = strlen((char*) kmer);
     if (kmerLen == 0) {
-        return NUM_OF_KMERS+1;
+        return NUM_OF_KMERS + 1;
     }
     // TODO hardwire this for speed?
     int64_t axisLength = intPow(SYMBOL_NUMBER_NO_N, KMER_LENGTH);
@@ -129,7 +130,7 @@ int64_t emissions_discrete_getKmerIndex(void *kmer) {
     while(l > 1) {
         x += l * emissions_discrete_getBaseIndex((char *)kmer + i);
         i += 1;
-        l = l/SYMBOL_NUMBER_NO_N;
+        l = l / SYMBOL_NUMBER_NO_N;
     }
     int64_t last = strlen(kmer) - 1;
     x += emissions_discrete_getBaseIndex((char *)kmer + last);
@@ -1333,6 +1334,37 @@ static void stateMachine3_cellCalculate(StateMachine *sM,
     }
 }
 
+static void stateMachine3HDP_cellCalculate(StateMachine *sM,
+                                           double *current, double *lower, double *middle, double *upper,
+                                           void *cX, void *cY,
+                                           void (*doTransition)(double *, double *,
+                                                                int64_t, int64_t,
+                                                                double, double,
+                                                                void *),
+                                           void *extraArgs) {
+    StateMachine3_HDP *sM3 = (StateMachine3_HDP *) sM;
+    if (lower != NULL) {
+        double eP = sM3->getXGapProbFcn(sM3->model.EMISSION_GAP_X_PROBS, cX);
+        doTransition(lower, current, match, shortGapX, eP, sM3->TRANSITION_GAP_OPEN_X, extraArgs);
+        doTransition(lower, current, shortGapX, shortGapX, eP, sM3->TRANSITION_GAP_EXTEND_X, extraArgs);
+        doTransition(lower, current, shortGapY, shortGapX, eP, sM3->TRANSITION_GAP_SWITCH_TO_X, extraArgs);
+    }
+    if (middle != NULL) {
+        double eP = sM3->getMatchProbFcn(sM3->hdpModel, cX, cY);
+        doTransition(middle, current, match, match, eP, sM3->TRANSITION_MATCH_CONTINUE, extraArgs);
+        doTransition(middle, current, shortGapX, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_X, extraArgs);
+        doTransition(middle, current, shortGapY, match, eP, sM3->TRANSITION_MATCH_FROM_GAP_Y, extraArgs);
+
+    }
+    if (upper != NULL) {
+        double eP = sM3->getYGapProbFcn(sM3->hdpModel, cX, cY);
+        doTransition(upper, current, match, shortGapY, eP, sM3->TRANSITION_GAP_OPEN_Y, extraArgs);
+        doTransition(upper, current, shortGapY, shortGapY, eP, sM3->TRANSITION_GAP_EXTEND_Y, extraArgs);
+        // shortGapX -> shortGapY not allowed, this would be going from a kmer skip to extra event?
+        //doTransition(upper, current, shortGapX, shortGapY, eP, sM3->TRANSITION_GAP_SWITCH_TO_Y, extraArgs);
+    }
+}
+
 static void stateMachine3Vanilla_cellCalculate(StateMachine *sM,
                                                double *current, double *lower, double *middle, double *upper,
                                                void *cX, void *cY,
@@ -1478,7 +1510,6 @@ static void stateMachineEchelonB_cellCalculate(StateMachine *sM,
 }
 
 ///////////////////////////////////////////// CORE FUNCTIONS ////////////////////////////////////////////////////////
-
 StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSetSize,
                                       void (*setTransitionsToDefaults)(StateMachine *sM),
                                       void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
@@ -1526,6 +1557,53 @@ StateMachine *stateMachine3_construct(StateMachineType type, int64_t parameterSe
         sM3->model.EMISSION_GAP_X_PROBS[i] = -2.3025850929940455; // log(0.1)
     }
 
+    return (StateMachine *) sM3;
+}
+
+StateMachine *stateMachine3Hdp_construct(StateMachineType type, int64_t parameterSetSize,
+                                         void (*setTransitionsToDefaults)(StateMachine *sM),
+                                         void (*setEmissionsDefaults)(StateMachine *sM, int64_t nbSkipParams),
+                                         NanoporeHDP *hdpModel,
+                                         double (*gapXProbFcn)(const double *, void *),
+                                         double (*gapYProbFcn)(NanoporeHDP *, void *, void *),
+                                         double (*matchProbFcn)(NanoporeHDP *, void *, void *),
+                                         void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
+                                                                      int64_t from, int64_t to,
+                                                                      double eP, double tP, void *extraArgs)) {
+    StateMachine3_HDP *sM3 = st_malloc(sizeof(StateMachine3_HDP));
+    if (type != threeState && type != threeStateAsymmetric) {
+        st_errAbort("Tried to create a three state state-machine with the wrong type");
+    }
+
+    // setup the parent class
+    sM3->model.type = type;
+    sM3->model.parameterSetSize = parameterSetSize;
+    sM3->model.stateNumber = 3;
+    sM3->model.matchState = match;
+    sM3->model.startStateProb = stateMachine3_startStateProb;
+    sM3->model.endStateProb = stateMachine3_endStateProb;
+    sM3->model.raggedStartStateProb = stateMachine3_raggedStartStateProb;
+    sM3->model.raggedEndStateProb = stateMachine3_raggedEndStateProb;
+    sM3->model.cellCalculate = stateMachine3HDP_cellCalculate;
+    sM3->model.cellCalculateUpdateExpectations = cellCalcUpdateExpFcn;
+
+    // setup functions
+    sM3->getXGapProbFcn = gapXProbFcn;
+    sM3->getYGapProbFcn = gapYProbFcn;
+    sM3->getMatchProbFcn = matchProbFcn;
+
+    // setup HDP
+    sM3->hdpModel = hdpModel;
+
+    // setup transitions
+    setTransitionsToDefaults((StateMachine *) sM3);
+    // set emissions to defaults or zeros
+    setEmissionsDefaults((StateMachine *) sM3, parameterSetSize);
+
+    // initialize kmer emission gap probs
+    for (int64_t i = 0; i < parameterSetSize; i++) {
+        sM3->model.EMISSION_GAP_X_PROBS[i] = -2.3025850929940455; // log(0.1)
+    }
     return (StateMachine *) sM3;
 }
 
@@ -1701,11 +1779,25 @@ StateMachine *getStrawManStateMachine3(const char *modelFile) {
                                                 emissions_kmer_getGapProb,
                                                 emissions_signal_strawManGetKmerEventMatchProb,
                                                 emissions_signal_strawManGetKmerEventMatchProb,
-                                                //cell_signal_updateTransAndKmerSkipExpectations);
-                                                cell_signal_updateTransAndKmerSkipExpectations2);
+                                                cell_signal_updateTransAndKmerSkipExpectations);
+                                                //cell_signal_updateTransAndKmerSkipExpectations2);
     emissions_signal_loadPoreModel(sM3, modelFile, sM3->type);
     return sM3;
 }
+
+/*
+StateMachine *getHdpStateMachine3(NanoporeHDP *hdp) {
+    StateMachine *sM3 = stateMachine3Hdp_construct(threeState, NUM_OF_KMERS,
+                                                   stateMachine3_setTransitionsToNanoporeDefaults,
+                                                   emissions_signal_initEmissionsToZero,
+                                                   hdp,
+                                                   emissions_kmer_getGapProb,
+                                                   get_nanopore_kmer_density,
+                                                   get_nanopore_kmer_density,
+                                                   cell_signal_updateTransAndKmerSkipExpectations2);
+    return sM3;
+}
+*/
 
 StateMachine *getStateMachine4(const char *modelFile) {
     StateMachine *sM4 = stateMachine4_construct(fourState, NUM_OF_KMERS,

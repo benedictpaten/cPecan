@@ -8,9 +8,6 @@ typedef struct _hmmContinuous {
     Hmm baseHmm;
     //double *matchModel;
     //double *extraEventMatchModel;
-    double threshold;
-    stList *assignments;
-    int64_t numberOfAssignments;
 } HmmContinuous;
 
 typedef struct _strawManHmm {
@@ -27,8 +24,16 @@ typedef struct _vanillaHmm {
     int64_t (*getKmerSkipBin)(double *matchModel, void *cX);
 } VanillaHmm;
 
+typedef struct _hdpHmm {
+    HmmContinuous baseContinuousHmm;
+    double threshold;
+    stList *eventAssignments;
+    stList *kmerAssignments;
+    int64_t numberOfAssignments;
+} HdpHmm;
+
 Hmm *continuousPairHmm_constructEmpty(
-        double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type, double threshold,
+        double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
         void (*addToTransitionExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
         void (*setTransitionFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
         double (*getTransitionsExpFcn)(Hmm *hmm, int64_t from, int64_t to),
@@ -62,7 +67,7 @@ void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle, double scale, dou
 Hmm *continuousPairHmm_loadFromFile(const char *fileName);
 
 Hmm *vanillaHmm_constructEmpty(double pseudocount,
-                               int64_t stateNumber, int64_t symbolSetSize, StateMachineType type, double threshold,
+                               int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
                                void (*addToKmerBinExpFcn)(Hmm *hmm, int64_t bin, int64_t ignore, double p),
                                void (*setKmerBinFcn)(Hmm *hmm, int64_t bin, int64_t ignore, double p),
                                double (*getKmerBinExpFcn)(Hmm *hmm, int64_t bin, int64_t ignore));
@@ -93,7 +98,7 @@ void hmmContinuous_loadExpectations(StateMachine *sM, Hmm *hmm, StateMachineType
 
 void hmmContinuous_destruct(Hmm *hmm, StateMachineType type);
 
-Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount, double threshold);
+Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount);
 
 void hmmContinuous_normalize(Hmm *hmm, StateMachineType type);
 

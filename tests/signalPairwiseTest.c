@@ -1348,7 +1348,7 @@ static void test_vanilla_getAlignedPairsWithoutScaling(CuTest *testCase) {
                                                 sequence_sliceEventSequence2);
     // de-scale events
     nanopore_descaleEvents(templateSeq->length, templateSeq->elements, npRead->templateParams.scale,
-                           npRead->templateParams.shift, npRead->templateParams.var);
+                           npRead->templateParams.shift);
 
     // do alignment of template events
     stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
@@ -1454,7 +1454,7 @@ static void test_echelon_getAlignedPairsWithBanding(CuTest *testCase) {
 
 static void test_continuousPairHmm(CuTest *testCase) {
     // make the hmm object
-    Hmm *hmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState, 0.01,
+    Hmm *hmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState,
                                                  continuousPairHmm_addToTransitionsExpectation,
                                                  continuousPairHmm_setTransitionExpectation,
                                                  continuousPairHmm_getTransitionExpectation,
@@ -1482,13 +1482,14 @@ static void test_continuousPairHmm(CuTest *testCase) {
         cpHmm->baseContinuousHmm.baseHmm.setEmissionExpectationFcn((Hmm *)cpHmm, 0, i, 0, dummy);
         dummyTotal += dummy;
     }
-    int64_t nb_matches = st_randomInt64(50, 2000);
-    double b = st_random(); // a random decimal to generate doubles as a proxy for current means
-    for (int64_t a = 0; a < nb_matches; a++) {
-        double fakeMean = (a + 1) * b;
-        stList_append(cpHmm->baseContinuousHmm.assignments, stDoubleTuple_construct(2, fakeMean, (double) a));
-        cpHmm->baseContinuousHmm.numberOfAssignments += 1;
-    }
+
+    /// /int64_t nb_matches = st_randomInt64(50, 2000);
+    //double b = st_random(); // a random decimal to generate doubles as a proxy for current means
+    //for (int64_t a = 0; a < nb_matches; a++) {
+    //    double fakeMean = (a + 1) * b;
+    //    stList_append(cpHmm->baseContinuousHmm.assignments, stDoubleTuple_construct(2, fakeMean, (double) a));
+    //    cpHmm->baseContinuousHmm.numberOfAssignments += 1;
+    //}
 
     // dump the HMM to a file
     char *tempFile = stString_print("./temp%" PRIi64 ".hmm", st_randomInt(0, INT64_MAX));
@@ -1503,7 +1504,7 @@ static void test_continuousPairHmm(CuTest *testCase) {
     cpHmm = (ContinuousPairHmm *)hmm;
     stFile_rmrf(tempFile);
 
-    CuAssertTrue(testCase, (nb_matches == cpHmm->baseContinuousHmm.numberOfAssignments));
+    //CuAssertTrue(testCase, (nb_matches == cpHmm->baseContinuousHmm.numberOfAssignments));
 
     // Check the transition expectations
     for (int64_t from = 0; from < nStates; from++) {
@@ -1522,13 +1523,13 @@ static void test_continuousPairHmm(CuTest *testCase) {
     }
 
     // check the assignments
-    for (int64_t a = 0; a < cpHmm->baseContinuousHmm.numberOfAssignments; a++) {
-        stDoubleTuple *assignment = stList_get(cpHmm->baseContinuousHmm.assignments, a);
-        double retrievedMean = stDoubleTuple_getPosition(assignment, 0);
-        int64_t retrievedKmerIdx = (int64_t )stDoubleTuple_getPosition(assignment, 1);
-        CuAssertDblEquals(testCase, retrievedMean, ((a + 1) * b), 0.001);
-        CuAssertTrue(testCase, retrievedKmerIdx == a);
-    }
+    //for (int64_t a = 0; a < cpHmm->baseContinuousHmm.numberOfAssignments; a++) {
+    //    stDoubleTuple *assignment = stList_get(cpHmm->baseContinuousHmm.assignments, a);
+    //    double retrievedMean = stDoubleTuple_getPosition(assignment, 0);
+    //    int64_t retrievedKmerIdx = (int64_t )stDoubleTuple_getPosition(assignment, 1);
+    //    CuAssertDblEquals(testCase, retrievedMean, ((a + 1) * b), 0.001);
+    //    CuAssertTrue(testCase, retrievedKmerIdx == a);
+    //}
 
     // normalize
     continuousPairHmm_normalize((Hmm *)cpHmm);
@@ -1552,7 +1553,7 @@ static void test_continuousPairHmm(CuTest *testCase) {
 }
 
 static void test_vanillaHmm(CuTest *testCase) {
-    Hmm *hmm = vanillaHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, vanilla, 0.01,
+    Hmm *hmm = vanillaHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, vanilla,
                                           vanillaHmm_addToKmerSkipBinExpectation,
                                           vanillaHmm_setKmerSkipBinExpectation,
                                           vanillaHmm_getKmerSkipBinExpectation);
@@ -1627,7 +1628,7 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
 
     // start with random model
     double pLikelihood = -INFINITY;
-    Hmm *cpHmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState, 0.01,
+    Hmm *cpHmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState,
                                                   continuousPairHmm_addToTransitionsExpectation,
                                                   continuousPairHmm_setTransitionExpectation,
                                                   continuousPairHmm_getTransitionExpectation,
@@ -1656,7 +1657,7 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
     continuousPairHmm_destruct(cpHmm);
 
     for (int64_t iter = 0; iter < 10; iter++) {
-        cpHmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState, p->threshold,
+        cpHmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState,
                                                  continuousPairHmm_addToTransitionsExpectation,
                                                  continuousPairHmm_setTransitionExpectation,
                                                  continuousPairHmm_getTransitionExpectation,
@@ -1694,7 +1695,7 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
             st_logInfo("Emission x %" PRIi64 " has expectation %f\n", x, cpHmm->getEmissionExpFcn(cpHmm, 0, x, 0));
 
         }
-        st_logInfo("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", cpHmm->likelihood, iter);
+        //st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", cpHmm->likelihood, iter);
 
         // M step
         continuousPairHmm_loadTransitionsAndKmerGapProbs(sMt, cpHmm);
@@ -1739,7 +1740,7 @@ static void test_vanillaHmm_em(CuTest *testCase) {
 
     // start with random model
     double pLikelihood = -INFINITY;
-    Hmm *vHmm = vanillaHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, vanilla, 0.01,
+    Hmm *vHmm = vanillaHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, vanilla,
                                           vanillaHmm_addToKmerSkipBinExpectation,
                                           vanillaHmm_setKmerSkipBinExpectation,
                                           vanillaHmm_getKmerSkipBinExpectation);
@@ -1765,7 +1766,7 @@ static void test_vanillaHmm_em(CuTest *testCase) {
     vanillaHmm_destruct(vHmm);
 
     for (int64_t iter = 0; iter < 10; iter++) {
-        vHmm = vanillaHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, vanilla, p->threshold,
+        vHmm = vanillaHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, vanilla,
                                          vanillaHmm_addToKmerSkipBinExpectation,
                                          vanillaHmm_setKmerSkipBinExpectation,
                                          vanillaHmm_getKmerSkipBinExpectation);
@@ -1798,7 +1799,7 @@ static void test_vanillaHmm_em(CuTest *testCase) {
         for (int64_t bin = 0; bin < 30; bin++) {
             st_logInfo("bin %lld has prob %f\n", bin, vHmm->getTransitionsExpFcn(vHmm, bin, 0));
         }
-        st_logInfo("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", vHmm->likelihood, iter);
+        //st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", vHmm->likelihood, iter);
 
         // M step
         vanillaHmm_loadKmerSkipBinExpectations(sMt, vHmm);
@@ -1853,5 +1854,6 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_vanillaHmm);
     SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
     SUITE_ADD_TEST(suite, test_vanillaHmm_em);
+
     return suite;
 }

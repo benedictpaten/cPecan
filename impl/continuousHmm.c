@@ -11,14 +11,14 @@
 
 
 static HmmContinuous *hmmContinuous_constructEmpty(
-        int64_t stateNumber, int64_t symbolSetSize, StateMachineType type, double threshold,
+        int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
         void (*addToTransitionExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
         void (*setTransitionFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
         double (*getTransitionsExpFcn)(Hmm *hmm, int64_t from, int64_t to),
         void (*addEmissionsExpFcn)(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p),
         void (*setEmissionExpFcn)(Hmm *hmm, int64_t state, int64_t x, int64_t y, double p),
         double (*getEmissionExpFcn)(Hmm *hmm, int64_t state, int64_t x, int64_t y),
-        int64_t (*getElementIndexFcn)(void *)){
+        int64_t (*getElementIndexFcn)(void *)) {
     // malloc
     HmmContinuous *hmmC = st_malloc(sizeof(HmmContinuous));
 
@@ -36,9 +36,11 @@ static HmmContinuous *hmmContinuous_constructEmpty(
     //                                       * sizeof(double));
 
     // setup assignments list
-    hmmC->threshold = threshold; // threshold is the minimum posterior match prob that we will make an assignment
-    hmmC->assignments = stList_construct3(0, (void (*)(void *)) stDoubleTuple_destruct);
-    hmmC->numberOfAssignments = 0;
+    //hmmC->threshold = threshold; // threshold is the minimum posterior match prob that we will make an assignment
+    //hmmC->assignments = stList_construct3(0, (void (*)(void *)) stDoubleTuple_destruct);
+    //hmmC->eventAssignments = stList_construct3(0, &free);
+    //hmmC->kmerAssignments = stList_construct3(0, &free);
+    //hmmC->numberOfAssignments = 0;
 
     // Set up functions
     // transitions
@@ -69,7 +71,7 @@ static bool hmmContinuous_checkTransitions(double *transitions, int64_t nbTransi
 ///////////////////////////////////////////// Continuous Pair HMM /////////////////////////////////////////////////////
 
 Hmm *continuousPairHmm_constructEmpty(
-        double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type, double threshold,
+        double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
         void (*addToTransitionExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
         void (*setTransitionFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
         double (*getTransitionsExpFcn)(Hmm *hmm, int64_t from, int64_t to),
@@ -82,7 +84,7 @@ Hmm *continuousPairHmm_constructEmpty(
         st_errAbort("ContinuousPair HMM construct: Wrong HMM type for this function got: %i", type);
     }
     ContinuousPairHmm *cpHmm = st_malloc(sizeof(ContinuousPairHmm));
-    cpHmm->baseContinuousHmm =  *hmmContinuous_constructEmpty(stateNumber, symbolSetSize, type, threshold,
+    cpHmm->baseContinuousHmm =  *hmmContinuous_constructEmpty(stateNumber, symbolSetSize, type,
                                                               addToTransitionExpFcn,
                                                               setTransitionFcn,
                                                               getTransitionsExpFcn,
@@ -149,7 +151,8 @@ void continuousPairHmm_destruct(Hmm *hmm) {
     ContinuousPairHmm *cpHmm = (ContinuousPairHmm *) hmm;
     free(cpHmm->transitions);
     free(cpHmm->individualKmerGapProbs);
-    stList_destruct(cpHmm->baseContinuousHmm.assignments);
+    //stList_destruct(cpHmm->baseContinuousHmm.eventAssignments);
+    //stList_destruct(cpHmm->baseContinuousHmm.kmerAssignments);
     free(cpHmm);
 }
 
@@ -204,7 +207,6 @@ void continuousPairHmm_loadTransitionsAndKmerGapProbs(StateMachine *sM, Hmm *hmm
     //sM3->TRANSITION_GAP_SWITCH_TO_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapX, shortGapY));
     //sM3->TRANSITION_GAP_SWITCH_TO_X = LOG_ZERO;
 
-
     /// / load kmer gap probs
     for (int64_t i = 0; i < hmm->symbolSetSize; i++) {
         //sM3->model.EMISSION_GAP_X_PROBS[i] = hmm->getEmissionExpFcn(hmm, 0, i, 0);
@@ -212,6 +214,7 @@ void continuousPairHmm_loadTransitionsAndKmerGapProbs(StateMachine *sM, Hmm *hmm
     }
 }
 
+// TODO pass in sequence also to get kmers
 void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle, double scale, double shift) {
     /*
      * Format:
@@ -226,8 +229,8 @@ void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle, double scale, dou
     fprintf(fileHandle, "%i\t", cpHmm->baseContinuousHmm.baseHmm.type); // type 0:0
     fprintf(fileHandle, "%lld\t", cpHmm->baseContinuousHmm.baseHmm.stateNumber); // stateNumber 0:1
     fprintf(fileHandle, "%lld\t", cpHmm->baseContinuousHmm.baseHmm.symbolSetSize); // symbolSetSize 0:2
-    fprintf(fileHandle, "%lf\t", cpHmm->baseContinuousHmm.threshold); // threshold 0:3
-    fprintf(fileHandle, "%lld\t", cpHmm->baseContinuousHmm.numberOfAssignments); // number of assignments 0:4
+    //fprintf(fileHandle, "%lf\t", cpHmm->baseContinuousHmm.threshold); // threshold 0:3
+    //fprintf(fileHandle, "%lld\t", cpHmm->baseContinuousHmm.numberOfAssignments); // number of assignments 0:4
     fprintf(fileHandle, "\n"); // newLine
 
     // write the transitions to disk
@@ -251,7 +254,8 @@ void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle, double scale, dou
         fprintf(fileHandle, "\n"); // newLine
 
         // write out assignments in format: event(observed current) \t assignment
-        int64_t nb_assignments = stList_length(cpHmm->baseContinuousHmm.assignments);
+        //int64_t nb_assignments = stList_length(cpHmm->baseContinuousHmm.assignments);
+        /*
         for (int64_t i = 0; i < nb_assignments; i++) {
             stDoubleTuple *assignment = stList_get(cpHmm->baseContinuousHmm.assignments, i);
 
@@ -261,7 +265,7 @@ void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle, double scale, dou
             // descale the event
             double meanCurrent = (stDoubleTuple_getPosition(assignment, 0) - shift) / scale;
             fprintf(fileHandle, "%lf\t%lld\n", meanCurrent, kmerIdx);
-        }
+        }*/
     }
 }
 
@@ -274,8 +278,9 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName) {
     stList *tokens = stString_split(string);
 
     int type;
-    int64_t stateNumber, symbolSetSize, numberOfAssignments;
-    double threshold;
+    int64_t stateNumber, symbolSetSize;
+    //int64_t stateNumber, symbolSetSize, numberOfAssignments;
+    //double threshold;
 
     int64_t j = sscanf(stList_get(tokens, 0), "%i", &type); // type
     if (j != 1) {
@@ -289,18 +294,18 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName) {
     if (n != 1) {
         st_errAbort("Failed to parse symbol set size (int) from string: %s\n", string);
     }
-    int64_t m = sscanf(stList_get(tokens, 3), "%lf", &threshold);
-    if (m != 1) {
-        st_errAbort("Failed to parse threshold (double) from string: %s\n", string);
-    }
-    j = sscanf(stList_get(tokens, 4), "%lld", &numberOfAssignments); // number of assignments
-    if (j != 1) {
-        st_errAbort("Failed to parse number of assignments (int) from string: %s\n", string);
-    }
+    //int64_t m = sscanf(stList_get(tokens, 3), "%lf", &threshold);
+    //if (m != 1) {
+    //    st_errAbort("Failed to parse threshold (double) from string: %s\n", string);
+    //}
+    //j = sscanf(stList_get(tokens, 4), "%lld", &numberOfAssignments); // number of assignments
+    //if (j != 1) {
+    //    st_errAbort("Failed to parse number of assignments (int) from string: %s\n", string);
+    //}
 
     // make empty cpHMM
     Hmm *hmm = continuousPairHmm_constructEmpty(0.0,
-                                                stateNumber, symbolSetSize, type, threshold,
+                                                stateNumber, symbolSetSize, type,
                                                 continuousPairHmm_addToTransitionsExpectation,
                                                 continuousPairHmm_setTransitionExpectation,
                                                 continuousPairHmm_getTransitionExpectation,
@@ -311,7 +316,7 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName) {
 
     // Downcast
     ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
-    cpHmm->baseContinuousHmm.numberOfAssignments = numberOfAssignments;
+    //cpHmm->baseContinuousHmm.numberOfAssignments = numberOfAssignments;
 
     // cleanup
     free(string);
@@ -369,6 +374,7 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName) {
     stList_destruct(tokens);
 
     // load the assignments
+    /*
     for (int64_t i = 0; i < cpHmm->baseContinuousHmm.numberOfAssignments; i++) {
         // read the line, split it, make sure there are only two elements in the list
         string = stFile_getLineFromFile(fH);
@@ -398,6 +404,7 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName) {
         free(string);
         stList_destruct(tokens);
     }
+    */
     // close file
     fclose(fH);
 
@@ -407,7 +414,7 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName) {
 
 ////////////////////////////////////////////////// Vanilla HMM ///////////////////////////////////////////////////////
 Hmm *vanillaHmm_constructEmpty(double pseudocount,
-                               int64_t stateNumber, int64_t symbolSetSize, StateMachineType type, double threshold,
+                               int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
                                void (*addToKmerBinExpFcn)(Hmm *hmm, int64_t bin, int64_t ignore, double p),
                                void (*setKmerBinFcn)(Hmm *hmm, int64_t bin, int64_t ignore, double p),
                                double (*getKmerBinExpFcn)(Hmm *hmm, int64_t bin, int64_t ignore)) {
@@ -417,7 +424,7 @@ Hmm *vanillaHmm_constructEmpty(double pseudocount,
 
     VanillaHmm *vHmm = st_malloc(sizeof(VanillaHmm));
 
-    vHmm->baseContinuousHmm =  *hmmContinuous_constructEmpty(stateNumber, symbolSetSize, type, threshold,
+    vHmm->baseContinuousHmm =  *hmmContinuous_constructEmpty(stateNumber, symbolSetSize, type,
                                                              addToKmerBinExpFcn,
                                                              setKmerBinFcn,
                                                              getKmerBinExpFcn,
@@ -526,7 +533,7 @@ void vanillaHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
     fprintf(fileHandle, "%i\t", vHmm->baseContinuousHmm.baseHmm.type); // type 0:0
     fprintf(fileHandle, "%lld\t", vHmm->baseContinuousHmm.baseHmm.stateNumber); // stateNumber 0:1
     fprintf(fileHandle, "%lld\t", vHmm->baseContinuousHmm.baseHmm.symbolSetSize); // symbolSetSize 0:2
-    fprintf(fileHandle, "%lf\t", vHmm->baseContinuousHmm.threshold); // threshold 0:3
+    //fprintf(fileHandle, "%lf\t", vHmm->baseContinuousHmm.threshold); // threshold 0:3
     fprintf(fileHandle, "\n"); // newLine
 
     // check
@@ -565,7 +572,7 @@ Hmm *vanillaHmm_loadFromFile(const char *fileName) {
 
     int type;
     int64_t stateNumber, symbolSetSize;
-    double threshold;
+    //double threshold;
 
     int64_t j = sscanf(stList_get(tokens, 0), "%i", &type); // type
     if (j != 1) {
@@ -579,13 +586,9 @@ Hmm *vanillaHmm_loadFromFile(const char *fileName) {
     if (n != 1) {
         st_errAbort("Failed to parse symbol set size (int) from string: %s\n", string);
     }
-    int64_t m = sscanf(stList_get(tokens, 3), "%lf", &threshold);
-    if (m != 1) {
-        st_errAbort("Failed to parse threshold (double) from string: %s\n", string);
-    }
 
     // make empty vanillaHmm
-    Hmm *hmm = vanillaHmm_constructEmpty(0.0, stateNumber, symbolSetSize, type, threshold,
+    Hmm *hmm = vanillaHmm_constructEmpty(0.0, stateNumber, symbolSetSize, type,
                                           vanillaHmm_addToKmerSkipBinExpectation,
                                           vanillaHmm_setKmerSkipBinExpectation,
                                           vanillaHmm_getKmerSkipBinExpectation);
@@ -704,17 +707,17 @@ void hmmContinuous_destruct(Hmm *hmm, StateMachineType type) {
     }
 }
 
-Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount, double threshold) {
+Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount) {
     assert((type == vanilla) || (type == threeState));
     if (type == vanilla) {
-        Hmm *hmm = vanillaHmm_constructEmpty(pseudocount, 3, NUM_OF_KMERS, vanilla, threshold,
+        Hmm *hmm = vanillaHmm_constructEmpty(pseudocount, 3, NUM_OF_KMERS, vanilla,
                                              vanillaHmm_addToKmerSkipBinExpectation,
                                              vanillaHmm_setKmerSkipBinExpectation,
                                              vanillaHmm_getKmerSkipBinExpectation);
         return hmm;
     }
     if (type == threeState) {
-        Hmm *hmm = continuousPairHmm_constructEmpty(pseudocount, 3, NUM_OF_KMERS, threeState, threshold,
+        Hmm *hmm = continuousPairHmm_constructEmpty(pseudocount, 3, NUM_OF_KMERS, threeState,
                                                     continuousPairHmm_addToTransitionsExpectation,
                                                     continuousPairHmm_setTransitionExpectation,
                                                     continuousPairHmm_getTransitionExpectation,

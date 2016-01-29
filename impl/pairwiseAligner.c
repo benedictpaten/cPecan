@@ -340,6 +340,12 @@ void *sequence_getKmer2(void *elements, int64_t index) {
     return index > 0 ? &(((char *) elements)[index - 1]) : &(((char *) elements)[index]);
 }
 
+void *sequence_getKmer3(void *elements, int64_t index) {
+    //char *n = "N";
+    //int64_t i = index;
+    return index >= 0 ? &(((char *) elements)[index]) : &(((char *) elements)[0]);
+}
+
 void *sequence_getEvent(void *elements, int64_t index) {
     index = index * NB_EVENT_PARAMS;
     //return index >= 0 ? &(((double *)elements)[index]) : NULL;
@@ -451,7 +457,7 @@ void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *t
         hmmExpectations->addToEmissionExpectationFcn(hmmExpectations, 0, x, 0, p);
     }
 }
-
+/*
 void cell_signal_updateTransAndKmerSkipExpectations2(double *fromCells, double *toCells, int64_t from, int64_t to,
                                                     double eP, double tP, void *extraArgs) {
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
@@ -461,7 +467,7 @@ void cell_signal_updateTransAndKmerSkipExpectations2(double *fromCells, double *
     // this gives you the kmer index
     int64_t x = hmmExpectations->baseContinuousHmm.baseHmm.getElementIndexFcn(((void **) extraArgs)[2]);
 
-    //st_uglyf("SENTINAL - got kmer index %lld", x);
+    //st_uglyf("SENTINAL - got kmer %s index %lld\n", ((void **) extraArgs)[2], x);
     double event = *(double *)((void **) extraArgs)[3];
     //st_uglyf(" - got event: %f\n", event);
 
@@ -479,7 +485,7 @@ void cell_signal_updateTransAndKmerSkipExpectations2(double *fromCells, double *
         hmmExpectations->baseContinuousHmm.numberOfAssignments += 1;
     }
 }
-
+*/
 void cell_signal_updateBetaAndAlphaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP,
                                         double tP, void *extraArgs) {
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };

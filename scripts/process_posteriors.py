@@ -75,7 +75,7 @@ def main(args):
         if npRead.is_open is False:
             continue
         has_t_events = npRead.get_template_events()
-        has_c_events = npRead.get_complement_evnets()
+        has_c_events = npRead.get_complement_events()
 
         t_model_bool = npRead.get_template_model_adjustments()
         c_model_bool = npRead.get_complement_model_adjustments()
