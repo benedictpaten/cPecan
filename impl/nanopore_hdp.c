@@ -14,6 +14,7 @@
 
 #define MODEL_ROW_HEADER_LENGTH 1
 #define MODEL_MEAN_ENTRY 0
+#define MODEL_NOISE_ENTRY 1
 #define MODEL_ENTRY_LENGTH 5
 
 #include <stdio.h>
@@ -31,6 +32,12 @@ struct NanoporeHDP {
     char* alphabet;
     int64_t alphabet_size;
     int64_t kmer_length;
+    stSet* distr_metric_memos;
+};
+
+struct NanoporeDistributionMetricMemo {
+    NanoporeHDP* nhdp;
+    DistributionMetricMemo* memo;
 };
 
 NanoporeHDP* package_nanopore_hdp(HierarchicalDirichletProcess* hdp, const char* alphabet, int64_t alphabet_size,
@@ -72,11 +79,15 @@ NanoporeHDP* package_nanopore_hdp(HierarchicalDirichletProcess* hdp, const char*
     nhdp->alphabet_size = alphabet_size;
     nhdp->kmer_length = kmer_length;
     
+    // note: destroying the HDP housed in the NHDP will destroy the DistributionMetricMemo
+    nhdp->distr_metric_memos = stSet_construct2(&free);
+    
     return nhdp;
 }
 
 void destroy_nanopore_hdp(NanoporeHDP* nhdp) {
     destroy_hier_dir_proc(nhdp->hdp);
+    stSet_destruct(nhdp->distr_metric_memos);
     free(nhdp->alphabet);
     free(nhdp);
 }
@@ -119,6 +130,32 @@ void finalize_nhdp_distributions(NanoporeHDP* nhdp) {
     finalize_distributions(nhdp->hdp);
 }
 
+//void normal_inverse_gamma_params_from_minION(const char* model_filepath, double* mu_out, double* nu_out,
+//                                             double* alpha_out, double* beta_out) {
+//    
+//    FILE* model_file = fopen(model_filepath, "r");
+//    
+//    char* line = stFile_getLineFromFile(model_file);
+//    stList* tokens = stString_split(line);
+//    
+//    int64_t table_length = (stList_length(tokens) - MODEL_ROW_HEADER_LENGTH) / MODEL_ENTRY_LENGTH;
+//    double* means = (double*) malloc(sizeof(double) * table_length);
+//    
+//    int64_t offset = MODEL_ROW_HEADER_LENGTH + MODEL_MEAN_ENTRY;
+//    char* mean_str;
+//    for (int i = 0; i < table_length; i++) {
+//        mean_str = (char*) stList_get(tokens, offset + i * MODEL_ENTRY_LENGTH);
+//        sscanf(mean_str, "%lf", &(means[i]));
+//    }
+//    
+//    free(line);
+//    stList_destruct(tokens);
+//    
+//    normal_inverse_gamma_params(means, table_length, mu_out, nu_out, alpha_out, beta_out);
+//    
+//    fclose(model_file);
+//}
+
 void normal_inverse_gamma_params_from_minION(const char* model_filepath, double* mu_out, double* nu_out,
                                              double* alpha_out, double* beta_out) {
     
@@ -129,18 +166,29 @@ void normal_inverse_gamma_params_from_minION(const char* model_filepath, double*
     
     int64_t table_length = (stList_length(tokens) - MODEL_ROW_HEADER_LENGTH) / MODEL_ENTRY_LENGTH;
     double* means = (double*) malloc(sizeof(double) * table_length);
+    double* precisions = (double*) malloc(sizeof(double) * table_length);
     
-    int64_t offset = MODEL_ROW_HEADER_LENGTH + MODEL_MEAN_ENTRY;
+    int64_t mean_offset = MODEL_ROW_HEADER_LENGTH + MODEL_MEAN_ENTRY;
+    int64_t noise_offset = MODEL_ROW_HEADER_LENGTH + MODEL_NOISE_ENTRY;
     char* mean_str;
+    char* noise_str;
+    double noise;
     for (int i = 0; i < table_length; i++) {
-        mean_str = (char*) stList_get(tokens, offset + i * MODEL_ENTRY_LENGTH);
+        mean_str = (char*) stList_get(tokens, mean_offset + i * MODEL_ENTRY_LENGTH);
         sscanf(mean_str, "%lf", &(means[i]));
+        
+        noise_str = (char*) stList_get(tokens, noise_offset + i * MODEL_ENTRY_LENGTH);
+        sscanf(mean_str, "%lf", &noise);
+        precisions[i] = 1.0 / (noise * noise);
     }
     
     free(line);
     stList_destruct(tokens);
     
-    normal_inverse_gamma_params(means, table_length, mu_out, nu_out, alpha_out, beta_out);
+    mle_normal_inverse_gamma_params(means, precisions, table_length, mu_out, nu_out, alpha_out, beta_out);
+    
+    free(means);
+    free(precisions);
     
     fclose(model_file);
 }
@@ -378,24 +426,32 @@ double get_nanopore_kmer_density(NanoporeHDP* nhdp, void *kmer, void *x) {
     return dir_proc_density(nhdp->hdp, *(double*) x, nhdp_kmer_id(nhdp, (char *)kmer));
 }
 
-double get_kmer_distr_distance(NanoporeHDP* nhdp, DistributionMetricMemo* memo, char* kmer_1, char* kmer_2) {
-    return get_dir_proc_distance(memo, nhdp_kmer_id(nhdp, kmer_1), nhdp_kmer_id(nhdp, kmer_2));
+double get_kmer_distr_distance(NanoporeDistributionMetricMemo* memo, char* kmer_1, char* kmer_2) {
+    NanoporeHDP* nhdp = memo->nhdp;
+    return get_dir_proc_distance(memo->memo, nhdp_kmer_id(nhdp, kmer_1), nhdp_kmer_id(nhdp, kmer_2));
 }
 
-DistributionMetricMemo* new_nhdp_kl_divergence_memo(NanoporeHDP* nhdp) {
-    return new_kl_divergence_memo(nhdp->hdp);
+NanoporeDistributionMetricMemo* package_nanopore_metric_memo(NanoporeHDP* nhdp, DistributionMetricMemo* memo) {
+    NanoporeDistributionMetricMemo* nanopore_memo = (NanoporeDistributionMetricMemo*) malloc(sizeof(NanoporeDistributionMetricMemo));
+    nanopore_memo->nhdp = nhdp;
+    nanopore_memo->memo = memo;
+    return nanopore_memo;
 }
 
-DistributionMetricMemo* new_nhdp_hellinger_distance_memo(NanoporeHDP* nhdp) {
-    return new_hellinger_distance_memo(nhdp->hdp);
+NanoporeDistributionMetricMemo* new_nhdp_kl_divergence_memo(NanoporeHDP* nhdp) {
+    return package_nanopore_metric_memo(nhdp, new_kl_divergence_memo(nhdp->hdp));
 }
 
-DistributionMetricMemo* new_nhdp_l2_distance_memo(NanoporeHDP* nhdp) {
-    return new_l2_distance_memo(nhdp->hdp);
+NanoporeDistributionMetricMemo* new_nhdp_hellinger_distance_memo(NanoporeHDP* nhdp) {
+    return package_nanopore_metric_memo(nhdp, new_hellinger_distance_memo(nhdp->hdp));
 }
 
-DistributionMetricMemo* new_nhdp_shannon_jensen_distance_memo(NanoporeHDP* nhdp) {
-    return new_shannon_jensen_distance_memo(nhdp->hdp);
+NanoporeDistributionMetricMemo* new_nhdp_l2_distance_memo(NanoporeHDP* nhdp) {
+    return package_nanopore_metric_memo(nhdp, new_l2_distance_memo(nhdp->hdp));
+}
+
+NanoporeDistributionMetricMemo* new_nhdp_shannon_jensen_distance_memo(NanoporeHDP* nhdp) {
+    return package_nanopore_metric_memo(nhdp, new_shannon_jensen_distance_memo(nhdp->hdp));
 }
 
 int64_t flat_hdp_num_dps(int64_t alphabet_size, int64_t kmer_length) {

@@ -13,7 +13,8 @@
 
 CuSuite *pairwiseAlignmentTestSuite(void);
 CuSuite *signalPairwiseTestSuite(void);
-//CuSuite *NanoporeHdpTestSuite(void);
+CuSuite *NanoporeHdpTestSuite(void);
+CuSuite *HdpTestSuite(void);
 //CuSuite* multipleAlignerTestSuite(void);
 //CuSuite* pairwiseAlignmentLongTestSuite(void);
 
@@ -23,7 +24,8 @@ int stBaseAlignerRunAllTests(void) {
     CuSuite *suite = CuSuiteNew();
     CuSuiteAddSuite(suite, pairwiseAlignmentTestSuite());
     CuSuiteAddSuite(suite, signalPairwiseTestSuite());
-    //CuSuiteAddSuite(suite, NanoporeHdpTestSuite());
+    CuSuiteAddSuite(suite, NanoporeHdpTestSuite());
+    CuSuiteAddSuite(suite, HdpTestSuite());
     //CuSuiteAddSuite(suite, multipleAlignerTestSuite());
     //CuSuiteAddSuite(suite, pairwiseAlignmentLongTestSuite());
     CuSuiteRun(suite);

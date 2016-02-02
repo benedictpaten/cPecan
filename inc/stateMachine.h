@@ -23,7 +23,8 @@ typedef enum {
     threeStateAsymmetric=3,
     vanilla=4,
     echelon=5,
-    fourState=6
+    fourState=6,
+    threeState_hdp=7,
 } StateMachineType;
 
 typedef enum {

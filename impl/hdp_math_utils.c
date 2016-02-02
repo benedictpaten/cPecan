@@ -1,4 +1,5 @@
 #include <math.h>
+#include <tgmath.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -8,6 +9,18 @@
 
 #define LOG_ROOT_PI 0.572364942924700087071713
 #define LOG_4 1.386294361119890618834464
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846264338
+#endif
+
+#ifndef EULER_MASCHERONI
+#define EULER_MASCHERONI 0.57721566490153286060651209008240243
+#endif
+
+#ifndef MACHEP
+#define MACHEP 1.11022302462515654042E-16
+#endif
 
 typedef struct LogGammaHalfMemo LogGammaHalfMemo;
 
@@ -434,10 +447,11 @@ double rand_exponential(double lambda) {
 }
 
 double log_posterior_conditional_term(double nu_post, double two_alpha_post,
-                                      double beta_post, SumOfLogsMemo* memo) {
+                                      double beta_post) {//, SumOfLogsMemo* memo) {
 
-    return log_gamma_half((int64_t) two_alpha_post, memo)
-           - .5 * (log(nu_post) + two_alpha_post * log(beta_post));
+//    return log_gamma_half((int64_t) two_alpha_post, memo)
+//           - .5 * (log(nu_post) + two_alpha_post * log(beta_post));
+    return lgamma( 0.5 * two_alpha_post) - .5 * (log(nu_post) + two_alpha_post * log(beta_post));
 }
 
 void normal_inverse_gamma_params(double* x, int64_t length, double* mu_out, double* nu_out,
@@ -459,6 +473,257 @@ void normal_inverse_gamma_params(double* x, int64_t length, double* mu_out, doub
     *nu_out = (double) length;
     *alpha_out = ((double) length - 1.0) / 2.0;
     *beta_out = .5 * sum_sq_devs;
+}
+
+static double A_digamma[] = {
+    8.33333333333333333333E-2,
+    -2.10927960927960927961E-2,
+    7.57575757575757575758E-3,
+    -4.16666666666666666667E-3,
+    3.96825396825396825397E-3,
+    -8.33333333333333333333E-3,
+    8.33333333333333333333E-2
+};
+
+// modified from Scipy source: https://github.com/scipy/scipy/blob/master/scipy/special/cephes/psi.c
+static double polevl(double x, double coef[], int N)
+{
+    double ans;
+    int i;
+    double *p;
+    
+    p = coef;
+    ans = *p++;
+    i = N;
+    
+    do
+        ans = ans * x + *p++;
+    while (--i);
+    
+    return (ans);
+}
+
+double digamma(double x) {
+    double p, q, nz, s, w, y, z;
+    int i, n, negative;
+    
+    negative = 0;
+    nz = 0.0;
+    
+    if (x <= 0.0) {
+        negative = 1;
+        q = x;
+        p = floor(q);
+        if (p == q) {
+            fprintf(stderr, "Digamma evaluated at singularity.\n");
+            exit(EXIT_FAILURE);
+        }
+        /* Remove the zeros of tan(NPY_PI x)
+         * by subtracting the nearest integer from x
+         */
+        nz = q - p;
+        if (nz != 0.5) {
+            if (nz > 0.5) {
+                p += 1.0;
+                nz = q - p;
+            }
+            nz = M_PI / tan(M_PI * nz);
+        }
+        else {
+            nz = 0.0;
+        }
+        x = 1.0 - x;
+    }
+    
+    /* check for positive integer up to 10 */
+    if ((x <= 10.0) && (x == floor(x))) {
+        y = 0.0;
+        n = x;
+        for (i = 1; i < n; i++) {
+            w = i;
+            y += 1.0 / w;
+        }
+        y -= EULER_MASCHERONI;
+        goto digamma_done;
+    }
+    
+    s = x;
+    w = 0.0;
+    while (s < 10.0) {
+        w += 1.0 / s;
+        s += 1.0;
+    }
+    
+    if (s < 1.0e17) {
+        z = 1.0 / (s * s);
+        y = z * polevl(z, A_digamma, 6);
+    }
+    else
+        y = 0.0;
+    
+    y = log(s) - (0.5 / s) - y - w;
+    
+digamma_done:
+    
+    if (negative) {
+        y -= nz;
+    }
+    
+    return y;
+}
+
+// modified from SciPy source: https://github.com/scipy/scipy/blob/master/scipy/special/cephes/zeta.c
+static double A_zeta[] = {
+    12.0,
+    -720.0,
+    30240.0,
+    -1209600.0,
+    47900160.0,
+    -1.8924375803183791606e9,	/*1.307674368e12/691 */
+    7.47242496e10,
+    -2.950130727918164224e12,	/*1.067062284288e16/3617 */
+    1.1646782814350067249e14,	/*5.109094217170944e18/43867 */
+    -4.5979787224074726105e15,	/*8.028576626982912e20/174611 */
+    1.8152105401943546773e17,	/*1.5511210043330985984e23/854513 */
+    -7.1661652561756670113e18	/*1.6938241367317436694528e27/236364091 */
+};
+
+double hurwitz_zeta(double x, double q)
+{
+    int i;
+    double a, b, k, s, t, w;
+    
+    if (x == 1.0)
+        goto retinf;
+    
+    if (x < 1.0) {
+    domerr:
+        fprintf(stderr, "Domain error in zeta function.\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    if (q <= 0.0) {
+        if (q == floor(q)) {
+        retinf:
+            fprintf(stderr, "Evaluted zeta function at singularity.\n");
+            exit(EXIT_FAILURE);
+        }
+        if (x != floor(x))
+            goto domerr;	/* because q^-x not defined */
+    }
+    
+    /* Asymptotic expansion
+     * http://dlmf.nist.gov/25.11#E43
+     */
+    if (q > 1e8) {
+        return (1/(x - 1) + 1/(2*q)) * pow(q, 1 - x);
+    }
+    
+    /* Euler-Maclaurin summation formula */
+    
+    /* Permit negative q but continue sum until n+q > +9 .
+     * This case should be handled by a reflection formula.
+     * If q<0 and x is an integer, there is a relation to
+     * the polyGamma function.
+     */
+    s = pow(q, -x);
+    a = q;
+    i = 0;
+    b = 0.0;
+    while ((i < 9) || (a <= 9.0)) {
+        i += 1;
+        a += 1.0;
+        b = pow(a, -x);
+        s += b;
+        if (fabs(b / s) < MACHEP)
+            goto zeta_done;
+    }
+    
+    w = a;
+    s += b * w / (x - 1.0);
+    s -= 0.5 * b;
+    a = 1.0;
+    k = 0.0;
+    for (i = 0; i < 12; i++) {
+        a *= x + k;
+        b /= w;
+        t = a * b / A_zeta[i];
+        s = s + t;
+        t = fabs(t / s);
+        if (t < MACHEP)
+            goto zeta_done;
+        k += 1.0;
+        a *= x + k;
+        b /= w;
+        k += 1.0;
+    }
+zeta_done:
+    return (s);
+}
+
+double trigamma(double x) {
+    return hurwitz_zeta(2.0, x);
+}
+
+double newton_approx_alpha(int64_t length, double sum_log_tau, double sum_tau) {
+    double constant = sum_log_tau / length - log( sum_tau / length);
+    
+    double alpha = (double) 1.0;
+    
+    double f_alpha;
+    double df_alpha;
+    double alpha_prime;
+    while (true) {
+        f_alpha = log(alpha) - digamma(alpha) + constant;
+        df_alpha = 1.0 / alpha - trigamma(alpha);
+        
+        if (df_alpha == 0.0 || df_alpha != df_alpha) {
+            fprintf(stderr, "MLE estimation of alpha numerically unstable at designated starting value.\n");
+            exit(EXIT_FAILURE);
+        }
+        
+        alpha_prime = alpha - f_alpha / df_alpha;
+        if (fabs(alpha - alpha_prime) < MACHEP) {
+            return alpha_prime;
+        }
+        alpha = alpha_prime;
+    }
+}
+
+
+void mle_normal_inverse_gamma_params(double* mus, double* taus, int64_t length, double* mu_0_out,
+                                     double* nu_out, double* alpha_out, double* beta_out) {
+    double sum_tau = 0.0;
+    double sum_log_tau = 0.0;
+    for (int64_t i = 0; i < length; i++) {
+        sum_tau += taus[i];
+        sum_log_tau += log(taus[i]);
+    }
+    
+    double mu_0 = 0.0;
+    for (int64_t i = 0; i < length; i++) {
+        mu_0 += mus[i] * taus[i];
+    }
+    
+    mu_0 /= sum_tau;
+    
+    double sum_weighted_sq_devs = 0.0;
+    double dev;
+    for (int64_t i = 0; i < length; i++) {
+        dev = mus[i] - mu_0;
+        sum_weighted_sq_devs += taus[i] * dev * dev;
+    }
+    
+    double nu = ((double) length) / sum_weighted_sq_devs;
+    
+    double alpha = newton_approx_alpha(length, sum_log_tau, sum_tau);
+    
+    double beta = length * alpha / sum_tau;
+    
+    *mu_0_out = mu_0;
+    *nu_out = nu;
+    *alpha_out = alpha;
+    *beta_out = beta;
 }
 
 int64_t* stList_toIntPtr(stList* list, int64_t* length_out) {

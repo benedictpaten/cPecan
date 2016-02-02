@@ -52,7 +52,7 @@ static HmmContinuous *hmmContinuous_constructEmpty(
     hmmC->baseHmm.setEmissionExpectationFcn = setEmissionExpFcn;         // set
     hmmC->baseHmm.getEmissionExpFcn = getEmissionExpFcn;                 // get
     // indexing
-    hmmC->baseHmm.getElementIndexFcn = getElementIndexFcn;               // indexing
+    hmmC->baseHmm.getElementIndexFcn = getElementIndexFcn;               // indexing kmers
 
     return hmmC;
 }
@@ -84,14 +84,14 @@ Hmm *continuousPairHmm_constructEmpty(
         st_errAbort("ContinuousPair HMM construct: Wrong HMM type for this function got: %i", type);
     }
     ContinuousPairHmm *cpHmm = st_malloc(sizeof(ContinuousPairHmm));
-    cpHmm->baseContinuousHmm =  *hmmContinuous_constructEmpty(stateNumber, symbolSetSize, type,
-                                                              addToTransitionExpFcn,
-                                                              setTransitionFcn,
-                                                              getTransitionsExpFcn,
-                                                              addToKmerGapExpFcn,
-                                                              setKmerGapExpFcn,
-                                                              getKmerGapExpFcn,
-                                                              getElementIndexFcn);
+    cpHmm->baseContinuousHmm = *hmmContinuous_constructEmpty(stateNumber, symbolSetSize, type,
+                                                             addToTransitionExpFcn,
+                                                             setTransitionFcn,
+                                                             getTransitionsExpFcn,
+                                                             addToKmerGapExpFcn,
+                                                             setKmerGapExpFcn,
+                                                             getKmerGapExpFcn,
+                                                             getElementIndexFcn);
     // transitions
     int64_t nb_states = cpHmm->baseContinuousHmm.baseHmm.stateNumber;
     cpHmm->transitions = st_malloc(nb_states * nb_states * sizeof(double));
@@ -151,8 +151,6 @@ void continuousPairHmm_destruct(Hmm *hmm) {
     ContinuousPairHmm *cpHmm = (ContinuousPairHmm *) hmm;
     free(cpHmm->transitions);
     free(cpHmm->individualKmerGapProbs);
-    //stList_destruct(cpHmm->baseContinuousHmm.eventAssignments);
-    //stList_destruct(cpHmm->baseContinuousHmm.kmerAssignments);
     free(cpHmm);
 }
 
@@ -672,6 +670,42 @@ Hmm *vanillaHmm_loadFromFile(const char *fileName) {
 
     return (Hmm *)vHmm;
 }
+/////////////////////////////////////////////////// HDP HMM  //////////////////////////////////////////////////////////
+static void hdpHmm_addToAssignment(Hmm *self, void *kmer, void *event) {
+    HdpHmm *hdpHmm = (HdpHmm *)self;
+    stList_append(hdpHmm->kmerAssignments, kmer);
+    stList_append(hdpHmm->eventAssignments, event);
+    hdpHmm->numberOfAssignments += 1;
+}
+
+Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
+                           double threshold,
+                           void (*addToTransitionExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
+                           void (*setTransitionFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
+                           double (*getTransitionsExpFcn)(Hmm *hmm, int64_t from, int64_t to),
+                           void (*addToKmerGapExpFcn)(Hmm *hmm, int64_t state, int64_t ki, int64_t ignore, double p),
+                           void (*setKmerGapExpFcn)(Hmm *hmm, int64_t state, int64_t ki, int64_t ignore, double p),
+                           double (*getKmerGapExpFcn)(Hmm *hmm, int64_t state, int64_t ki, int64_t ignore),
+                           int64_t (*getElementIndexFcn)(void *)){
+    HdpHmm *hmm = st_malloc(sizeof(HdpHmm));
+    hmm->baseContinuousPairHmm = *(ContinuousPairHmm *)continuousPairHmm_constructEmpty(pseudocount, stateNumber,
+                                                                                        symbolSetSize, type,
+                                                                                        addToTransitionExpFcn,
+                                                                                        setTransitionFcn,
+                                                                                        getTransitionsExpFcn,
+                                                                                        addToKmerGapExpFcn,
+                                                                                        setKmerGapExpFcn,
+                                                                                        getKmerGapExpFcn,
+                                                                                        getElementIndexFcn);
+    hmm->threshold = threshold;
+    hmm->addToAssignments = hdpHmm_addToAssignment;
+    hmm->kmerAssignments = stList_construct3(0, &free);
+    hmm->eventAssignments = stList_construct3(0, &free);
+    hmm->numberOfAssignments = 0;
+
+    return (Hmm *)hmm;
+}
+
 
 ///////////////////////////////////////////////// CORE FUNCTIONS //////////////////////////////////////////////////////
 Hmm *hmmContinuous_loadSignalHmm(const char *fileName, StateMachineType type) {

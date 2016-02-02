@@ -1780,12 +1780,11 @@ StateMachine *getStrawManStateMachine3(const char *modelFile) {
                                                 emissions_signal_strawManGetKmerEventMatchProb,
                                                 emissions_signal_strawManGetKmerEventMatchProb,
                                                 cell_signal_updateTransAndKmerSkipExpectations);
-                                                //cell_signal_updateTransAndKmerSkipExpectations2);
     emissions_signal_loadPoreModel(sM3, modelFile, sM3->type);
     return sM3;
 }
 
-/*
+
 StateMachine *getHdpStateMachine3(NanoporeHDP *hdp) {
     StateMachine *sM3 = stateMachine3Hdp_construct(threeState, NUM_OF_KMERS,
                                                    stateMachine3_setTransitionsToNanoporeDefaults,
@@ -1797,7 +1796,6 @@ StateMachine *getHdpStateMachine3(NanoporeHDP *hdp) {
                                                    cell_signal_updateTransAndKmerSkipExpectations2);
     return sM3;
 }
-*/
 
 StateMachine *getStateMachine4(const char *modelFile) {
     StateMachine *sM4 = stateMachine4_construct(fourState, NUM_OF_KMERS,

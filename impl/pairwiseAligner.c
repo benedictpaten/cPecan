@@ -457,35 +457,39 @@ void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *t
         hmmExpectations->addToEmissionExpectationFcn(hmmExpectations, 0, x, 0, p);
     }
 }
-/*
+
 void cell_signal_updateTransAndKmerSkipExpectations2(double *fromCells, double *toCells, int64_t from, int64_t to,
                                                     double eP, double tP, void *extraArgs) {
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
-    ContinuousPairHmm *hmmExpectations = ((void **) extraArgs)[1];
+    HdpHmm *hmmExpectations = ((void **) extraArgs)[1];
 
-    // this gives you the kmer index
-    int64_t x = hmmExpectations->baseContinuousHmm.baseHmm.getElementIndexFcn(((void **) extraArgs)[2]);
-
-    //st_uglyf("SENTINAL - got kmer %s index %lld\n", ((void **) extraArgs)[2], x);
-    double event = *(double *)((void **) extraArgs)[3];
-    //st_uglyf(" - got event: %f\n", event);
+    // pointer to the position in the sequence (kmer)
+    char *kmer = (char *)((void **) extraArgs)[2];
+    // pointer to the event mean
+    double *event = (double *)((void **) extraArgs)[3];
+    // kmer index
+    int64_t kmerIdx = hmmExpectations->baseContinuousPairHmm.baseContinuousHmm.baseHmm.getElementIndexFcn(
+            ((void **) extraArgs)[2]); // this gives you the kmer index
 
     // Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
 
     // update transitions expectation
-    hmmExpectations->baseContinuousHmm.baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, from, to, p);
+    hmmExpectations->baseContinuousPairHmm.baseContinuousHmm.baseHmm.addToTransitionExpectationFcn(
+            (Hmm *)hmmExpectations, from, to, p);
     //
     if (to == shortGapX) {
-        hmmExpectations->baseContinuousHmm.baseHmm.addToEmissionExpectationFcn((Hmm *)hmmExpectations, 0, x, 0, p);
+        hmmExpectations->baseContinuousPairHmm.baseContinuousHmm.baseHmm.addToEmissionExpectationFcn(
+                (Hmm *)hmmExpectations, 0, kmerIdx, 0, p);
     }
-    if ((to == match) & (p >= hmmExpectations->baseContinuousHmm.threshold)) {
-        stList_append(hmmExpectations->baseContinuousHmm.assignments, stDoubleTuple_construct(2, event, (double) x));
-        hmmExpectations->baseContinuousHmm.numberOfAssignments += 1;
+    if ((to == match) & (p >= hmmExpectations->threshold)) {
+        // add to emissions expectations function here
+        hmmExpectations->addToAssignments((Hmm *)hmmExpectations, kmer, event);
+        //stList_append(hmmExpectations->assignments, stDoubleTuple_construct(2, event, (double) x));
     }
 }
-*/
+
 void cell_signal_updateBetaAndAlphaProb(double *fromCells, double *toCells, int64_t from, int64_t to, double eP,
                                         double tP, void *extraArgs) {
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };

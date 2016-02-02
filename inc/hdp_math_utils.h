@@ -35,12 +35,14 @@ double rand_beta(double a, double b);
 bool rand_bernoulli(double p);
 
 // explained further in Jordan's math notebook section "Cached variables for improved performance"
-double log_posterior_conditional_term(double nu_post, double two_alpha_post, double beta_post,
-                                      SumOfLogsMemo* memo);
+double log_posterior_conditional_term(double nu_post, double two_alpha_post, double beta_post);//,
+                                      //SumOfLogsMemo* memo);
 
 
 void normal_inverse_gamma_params(double* x, int64_t length, double* mu_out, double* nu_out,
                                  double* alpha_out, double* beta_out);
+void mle_normal_inverse_gamma_params(double* mus, double* taus, int64_t length, double* mu_0_out,
+                                     double* nu_out, double* alpha_out, double* beta_out);
 
 int64_t* stList_toIntPtr(stList* list, int64_t* length_out);
 double* stList_toDoublePtr(stList* list, int64_t* length_out);

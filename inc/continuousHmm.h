@@ -25,8 +25,9 @@ typedef struct _vanillaHmm {
 } VanillaHmm;
 
 typedef struct _hdpHmm {
-    HmmContinuous baseContinuousHmm;
+    ContinuousPairHmm baseContinuousPairHmm;
     double threshold;
+    void (*addToAssignments)(Hmm *, void *, void *);
     stList *eventAssignments;
     stList *kmerAssignments;
     int64_t numberOfAssignments;

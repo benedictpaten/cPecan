@@ -593,7 +593,6 @@ class NanoporeRead(object):
     def calculate_lambda(noise_mean, noise_stdev):
         return (np.power(noise_mean, 3)) / (np.power(noise_stdev, 2))
 
-
     def export_model(self, skip_bins, model_address, destination):
         """Exports the model to a file. Format:
         line 1: [correlation coefficient] [level_mean] [level_sd] [noise_mean]
