@@ -479,17 +479,13 @@ void test_nhdp_serialization(CuTest* ct) {
 
 static void test_sm3hdp_cell(CuTest *testCase) {
     // load model and make stateMachine
-    char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
     char *strand = "t";
     // make nanopore HDP
-    char *canonicalAlphabet = "ACGT\0";
-    NanoporeHDP *nHdp = flat_hdp_model(canonicalAlphabet, 4, KMER_LENGTH, 1.0, 1.0, 40.0, 100.0, 100, modelFile);
-
+    NanoporeHDP *nHdp = flat_hdp_model("ACGT", 4, 6, 4.0, 20.0, 0.0, 100.0, 100,
+                                       "../../cPecan/models/template_median68pA.model");
     update_nhdp_from_alignment_with_filter(nHdp, alignmentFile, FALSE, strand);
-
-    execute_nhdp_gibbs_sampling(nHdp, 200, 10000, 50, FALSE);
-
+    execute_nhdp_gibbs_sampling(nHdp, 100, 0, 1, FALSE);
     finalize_nhdp_distributions(nHdp);
 
     StateMachine *sM = getHdpStateMachine3(nHdp);
@@ -565,13 +561,9 @@ static void test_sm3Hdp_dpDiagonal(CuTest *testCase) {
     char *canonicalAlphabet = "ACGT\0";
 
     NanoporeHDP *nHdp = flat_hdp_model(canonicalAlphabet, 4, KMER_LENGTH, 1.0, 1.0, 40.0, 100.0, 100, modelFile);
-
     update_nhdp_from_alignment_with_filter(nHdp, alignmentFile, FALSE, strand);
-
     execute_nhdp_gibbs_sampling(nHdp, 200, 10000, 50, FALSE);
-
     finalize_nhdp_distributions(nHdp);
-
     StateMachine *sM = getHdpStateMachine3(nHdp);
 
     Diagonal diagonal = diagonal_construct(3, -1, 1);
@@ -637,11 +629,8 @@ static void test_sm3Hdp_diagonalDPCalculations(CuTest *testCase) {
     char *canonicalAlphabet = "ACGT\0";
 
     NanoporeHDP *nHdp = flat_hdp_model(canonicalAlphabet, 4, KMER_LENGTH, 1.0, 1.0, 40.0, 100.0, 100, modelFile);
-
     update_nhdp_from_alignment_with_filter(nHdp, alignmentFile, FALSE, strand);
-
     execute_nhdp_gibbs_sampling(nHdp, 200, 10000, 50, FALSE);
-
     finalize_nhdp_distributions(nHdp);
 
     StateMachine *sM = getHdpStateMachine3(nHdp);
@@ -676,7 +665,7 @@ static void test_sm3Hdp_diagonalDPCalculations(CuTest *testCase) {
             dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY), sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(
             dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
-    st_uglyf("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
+    //st_uglyf("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
 
     // Test the posterior probabilities along the diagonals of the matrix.
     for (int64_t i = 0; i <= lX + lY; i++) {
@@ -719,7 +708,7 @@ static void test_sm3Hdp_diagonalDPCalculations(CuTest *testCase) {
         //st_uglyf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
         //CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
-    //CuAssertIntEquals(testCase, 8, (int) stList_length(alignedPairs));
+    CuAssertIntEquals(testCase, 12, (int) stList_length(alignedPairs));
 
     // clean up
     stateMachine_destruct(sM);
@@ -809,7 +798,7 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
 
     // for ch1_file1 template there should be this many aligned pairs with banding
     //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
-    CuAssertTrue(testCase, stList_length(alignedPairs) == 2886);
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 2887);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
@@ -820,12 +809,127 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     stateMachine_destruct(sMt);
 }
 
-static void test_continuousPairHDPHmm_em(CuTest *testCase) {
+static void test_hdpHmm(CuTest *testCase) {
+    // make the hmm object
+    char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
+    char *strand = "t";
+    // make nanopore HDP
+    NanoporeHDP *nHdp = flat_hdp_model("ACGT", 4, 6, 4.0, 20.0, 0.0, 100.0, 100,
+                                       "../../cPecan/models/template_median68pA.model");
+    update_nhdp_from_alignment_with_filter(nHdp, alignmentFile, FALSE, strand);
+    execute_nhdp_gibbs_sampling(nHdp, 100, 0, 1, FALSE);
+    finalize_nhdp_distributions(nHdp);
+
+    Hmm *hmm = hdpHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState_hdp, 0.02,
+                                        continuousPairHmm_addToTransitionsExpectation,
+                                        continuousPairHmm_setTransitionExpectation,
+                                        continuousPairHmm_getTransitionExpectation,
+                                        continuousPairHmm_addToKmerGapExpectation,
+                                        continuousPairHmm_setKmerGapExpectation,
+                                        continuousPairHmm_getKmerGapExpectation,
+                                        emissions_discrete_getKmerIndexFromKmer);
+    HdpHmm *hdpHmm = (HdpHmm *) hmm;
+
+    // Add some transition expectations
+    int64_t nStates = hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.stateNumber;
+
+    for (int64_t from = 0; from < nStates; from++) {
+        for (int64_t to = 0; to < nStates; to++) {
+            double dummy = from * nStates + to;
+            hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.addToTransitionExpectationFcn(
+                    (Hmm *) hdpHmm, from, to, dummy);
+        }
+    }
+
+    // Add some emissions to the kmer skip probs
+    int64_t nSymbols = hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.symbolSetSize;
+    double dummyTotal = 0.0;
+    for (int64_t i = 0; i < nSymbols; i++) {
+        double dummy = (nSymbols * nStates) + i;
+        hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.setEmissionExpectationFcn(
+                (Hmm *) hdpHmm, 0, i, 0, dummy);
+        dummyTotal += dummy;
+    }
+
+    char *sequence = "ACGTCATACATGACTATA";
+    double fakeMeans[3] = { 65.0, 64.0, 63.0 };
+    for (int64_t a = 0; a < 3; a++) {
+        hdpHmm->addToAssignments((Hmm *)hdpHmm, sequence + (a * KMER_LENGTH), fakeMeans + a);
+    }
+    CuAssertTrue(testCase, hdpHmm->numberOfAssignments == 3);
+
+    // dump the HMM to a file
+    char *tempFile = stString_print("./temp%" PRIi64 ".hmm", st_randomInt(0, INT64_MAX));
+    CuAssertTrue(testCase, !stFile_exists(tempFile)); //Quick check that we don't write over anything.
+    FILE *fH = fopen(tempFile, "w");
+    hdpHmm_writeToFile((Hmm *) hdpHmm, fH);
+    fclose(fH);
+    hdpHmm_destruct((Hmm *) hdpHmm);
+    /*
+
+    //Load from a file
+    hmm = continuousPairHmm_loadFromFile(tempFile);
+    hdpHmm = (HdpHmm *)hmm;
+    stFile_rmrf(tempFile);
+
+    //CuAssertTrue(testCase, (nb_matches == hdpHmm->baseContinuousHmm.numberOfAssignments));
+
+    // Check the transition expectations
+    for (int64_t from = 0; from < nStates; from++) {
+        for (int64_t to = 0; to < nStates; to++) {
+            double retrievedProb = hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.getTransitionsExpFcn(
+                    (Hmm *) hdpHmm, from, to);
+            double correctProb = from * nStates + to;
+            CuAssertTrue(testCase, retrievedProb == correctProb);
+        }
+    }
+
+    // check the kmer skip probs
+    for (int64_t i = 0; i < nSymbols; i++) {
+        double received = hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.getEmissionExpFcn(
+                (Hmm *) hdpHmm, 0, i, 0);
+        double correct = (nSymbols * nStates) + i;
+        CuAssertDblEquals(testCase, received, correct, 0.0);
+    }
+
+    // check the assignments
+    //for (int64_t a = 0; a < hdpHmm->baseContinuousHmm.numberOfAssignments; a++) {
+    //    stDoubleTuple *assignment = stList_get(hdpHmm->baseContinuousHmm.assignments, a);
+    //    double retrievedMean = stDoubleTuple_getPosition(assignment, 0);
+    //    int64_t retrievedKmerIdx = (int64_t )stDoubleTuple_getPosition(assignment, 1);
+    //    CuAssertDblEquals(testCase, retrievedMean, ((a + 1) * b), 0.001);
+    //    CuAssertTrue(testCase, retrievedKmerIdx == a);
+    //}
+
+    // normalize
+    continuousPairHmm_normalize((Hmm *) hdpHmm);
+
+    // Recheck transitions
+    for (int64_t from = 0; from < nStates; from++) {
+        for (int64_t to = 0; to < nStates; to++) {
+            double z = from * nStates * nStates + (nStates * (nStates - 1)) / 2;
+            double retrievedNormedProb = hdpHmm->baseContinuousHmm.baseHmm.getTransitionsExpFcn((Hmm *) hdpHmm, from, to);
+            CuAssertDblEquals(testCase, (from * nStates + to) / z, retrievedNormedProb, 0.0);
+        }
+    }
+
+    // Recheck kmerGap emissions
+    for (int64_t i = 0; i < nSymbols; i++) {
+        double received = hdpHmm->baseContinuousHmm.baseHmm.getEmissionExpFcn((Hmm *) hdpHmm, 0, i, 0);
+        double correctNormed = ((nSymbols * nStates) + i) / dummyTotal;
+        CuAssertDblEquals(testCase, received, correctNormed, 0.001);
+    }
+    continuousPairHmm_destruct((Hmm *) hdpHmm);
+    */
+}
+
+static void test_hdpHmm_em(CuTest *testCase) {
     // load the reference sequence
     char *referencePath = stString_print("../../cPecan/tests/test_npReads/ZymoRef.txt");
     FILE *fH = fopen(referencePath, "r");
     char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
-
+    // parameters for pairwise alignment using defaults
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
     // load the npRead
     char *npReadFile = stString_print("../../cPecan/tests/test_npReads/ZymoC_ch_1_file1.npRead");
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
@@ -840,15 +944,15 @@ static void test_continuousPairHDPHmm_em(CuTest *testCase) {
 
     // start with random model
     double pLikelihood = -INFINITY;
-    Hmm *cpHmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState,
-                                                  continuousPairHmm_addToTransitionsExpectation,
-                                                  continuousPairHmm_setTransitionExpectation,
-                                                  continuousPairHmm_getTransitionExpectation,
-                                                  continuousPairHmm_addToKmerGapExpectation,
-                                                  continuousPairHmm_setKmerGapExpectation,
-                                                  continuousPairHmm_getKmerGapExpectation,
-                                                  emissions_discrete_getKmerIndexFromKmer);
-    continuousPairHmm_randomize(cpHmm);
+    Hmm *hdpHmm = hdpHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState_hdp, p->threshold,
+                                        continuousPairHmm_addToTransitionsExpectation,
+                                        continuousPairHmm_setTransitionExpectation,
+                                        continuousPairHmm_getTransitionExpectation,
+                                        continuousPairHmm_addToKmerGapExpectation,
+                                        continuousPairHmm_setKmerGapExpectation,
+                                        continuousPairHmm_getKmerGapExpectation,
+                                        emissions_discrete_getKmerIndexFromKmer);
+    continuousPairHmm_randomize(hdpHmm);
 
     char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
@@ -863,23 +967,20 @@ static void test_continuousPairHDPHmm_em(CuTest *testCase) {
     StateMachine *sMt = getHdpStateMachine3(nHdp);
 
     // load (random) transitions into stateMachine
-    continuousPairHmm_loadTransitionsAndKmerGapProbs(sMt, cpHmm);
-
-    // parameters for pairwise alignment using defaults
-    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+    continuousPairHmm_loadTransitionsAndKmerGapProbs(sMt, hdpHmm);
 
     // close hmm
-    continuousPairHmm_destruct(cpHmm);
+    continuousPairHmm_destruct(hdpHmm);
 
     for (int64_t iter = 0; iter < 10; iter++) {
-        cpHmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState,
-                                                 continuousPairHmm_addToTransitionsExpectation,
-                                                 continuousPairHmm_setTransitionExpectation,
-                                                 continuousPairHmm_getTransitionExpectation,
-                                                 continuousPairHmm_addToKmerGapExpectation,
-                                                 continuousPairHmm_setKmerGapExpectation,
-                                                 continuousPairHmm_getKmerGapExpectation,
-                                                 emissions_discrete_getKmerIndexFromKmer);
+        hdpHmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState,
+                                                  continuousPairHmm_addToTransitionsExpectation,
+                                                  continuousPairHmm_setTransitionExpectation,
+                                                  continuousPairHmm_getTransitionExpectation,
+                                                  continuousPairHmm_addToKmerGapExpectation,
+                                                  continuousPairHmm_setKmerGapExpectation,
+                                                  continuousPairHmm_getKmerGapExpectation,
+                                                  emissions_discrete_getKmerIndexFromKmer);
         // E step
         // get anchors using lastz
         stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
@@ -894,38 +995,38 @@ static void test_continuousPairHDPHmm_em(CuTest *testCase) {
         Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
                                                     sequence_sliceEventSequence2);
 
-        getExpectationsUsingAnchors(sMt, cpHmm, refSeq, templateSeq, filteredRemappedAnchors,
+        getExpectationsUsingAnchors(sMt, hdpHmm, refSeq, templateSeq, filteredRemappedAnchors,
                                     p, diagonalCalculation_signal_Expectations, 0, 0);
 
-        continuousPairHmm_normalize(cpHmm);
+        continuousPairHmm_normalize(hdpHmm);
 
         //Log stuff
         for (int64_t from = 0; from < sMt->stateNumber; from++) {
             for (int64_t to = 0; to < sMt->stateNumber; to++) {
                 st_logInfo("Transition from %" PRIi64 " to %" PRIi64 " has expectation %f\n", from, to,
-                           cpHmm->getTransitionsExpFcn(cpHmm, from, to));
+                           hdpHmm->getTransitionsExpFcn(hdpHmm, from, to));
             }
         }
-        for (int64_t x = 0; x < cpHmm->symbolSetSize; x++) {
-            st_logInfo("Emission x %" PRIi64 " has expectation %f\n", x, cpHmm->getEmissionExpFcn(cpHmm, 0, x, 0));
+        for (int64_t x = 0; x < hdpHmm->symbolSetSize; x++) {
+            st_logInfo("Emission x %" PRIi64 " has expectation %f\n", x, hdpHmm->getEmissionExpFcn(hdpHmm, 0, x, 0));
 
         }
-        //st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", cpHmm->likelihood, iter);
+        //st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", hdpHmm->likelihood, iter);
 
         // M step
         // make new HDP here
 
         // then load transitions
-        continuousPairHmm_loadTransitionsAndKmerGapProbs(sMt, cpHmm);
+        continuousPairHmm_loadTransitionsAndKmerGapProbs(sMt, hdpHmm);
 
         // Tests
-        assert(pLikelihood <= cpHmm->likelihood * 0.95);
-        CuAssertTrue(testCase, pLikelihood <= cpHmm->likelihood * 0.95);
+        assert(pLikelihood <= hdpHmm->likelihood * 0.95);
+        CuAssertTrue(testCase, pLikelihood <= hdpHmm->likelihood * 0.95);
         // update
-        pLikelihood = cpHmm->likelihood;
+        pLikelihood = hdpHmm->likelihood;
 
         // per iteration clean up
-        continuousPairHmm_destruct(cpHmm);
+        continuousPairHmm_destruct(hdpHmm);
         sequence_sequenceDestroy(refSeq);
         sequence_sequenceDestroy(templateSeq);
         stList_destruct(filteredRemappedAnchors);
@@ -947,9 +1048,10 @@ CuSuite *NanoporeHdpTestSuite(void) {
     SUITE_ADD_TEST(suite, test_serialization);
     SUITE_ADD_TEST(suite, test_nhdp_serialization);
     SUITE_ADD_TEST(suite, test_sm3hdp_cell);
-    //SUITE_ADD_TEST(suite, test_sm3Hdp_dpDiagonal);
-    //SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
-    //SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_sm3Hdp_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
+    //SUITE_ADD_TEST(suite, test_hdpHmm);
     //SUITE_ADD_TEST(suite, test_continuousPairHDPHmm_em);
     return suite;
 }

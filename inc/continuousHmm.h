@@ -93,6 +93,21 @@ Hmm *vanillaHmm_loadFromFile(const char *fileName);
 
 void vanillaHmm_destruct(Hmm *hmm);
 
+Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
+                           double threshold,
+                           void (*addToTransitionExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
+                           void (*setTransitionFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
+                           double (*getTransitionsExpFcn)(Hmm *hmm, int64_t from, int64_t to),
+                           void (*addToKmerGapExpFcn)(Hmm *hmm, int64_t state, int64_t ki, int64_t ignore, double p),
+                           void (*setKmerGapExpFcn)(Hmm *hmm, int64_t state, int64_t ki, int64_t ignore, double p),
+                           double (*getKmerGapExpFcn)(Hmm *hmm, int64_t state, int64_t ki, int64_t ignore),
+                           int64_t (*getElementIndexFcn)(void *));
+
+void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle);
+
+void hdpHmm_destruct(Hmm *hmm);
+
+// CORE
 Hmm *hmmContinuous_loadSignalHmm(const char *fileName, StateMachineType type);
 
 void hmmContinuous_loadExpectations(StateMachine *sM, Hmm *hmm, StateMachineType type);

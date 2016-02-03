@@ -27,19 +27,6 @@
 #include "nanopore_hdp.h"
 #include "sonLib.h"
 
-struct NanoporeHDP {
-    HierarchicalDirichletProcess* hdp;
-    char* alphabet;
-    int64_t alphabet_size;
-    int64_t kmer_length;
-    stSet* distr_metric_memos;
-};
-
-struct NanoporeDistributionMetricMemo {
-    NanoporeHDP* nhdp;
-    DistributionMetricMemo* memo;
-};
-
 NanoporeHDP* package_nanopore_hdp(HierarchicalDirichletProcess* hdp, const char* alphabet, int64_t alphabet_size,
                                   int64_t kmer_length) {
     

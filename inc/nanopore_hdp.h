@@ -13,8 +13,18 @@
 #include <inttypes.h>
 #include "hdp.h"
 
-typedef struct NanoporeHDP NanoporeHDP;
-typedef struct NanoporeDistributionMetricMemo NanoporeDistributionMetricMemo;
+typedef struct _nanoporeHDP {
+    HierarchicalDirichletProcess* hdp;
+    char* alphabet;
+    int64_t alphabet_size;
+    int64_t kmer_length;
+    stSet* distr_metric_memos;
+} NanoporeHDP;
+
+typedef struct _nanoporeDistributionMetricMemo {
+    NanoporeHDP* nhdp;
+    DistributionMetricMemo* memo;
+} NanoporeDistributionMetricMemo;
 
 void destroy_nanopore_hdp(NanoporeHDP* nhdp);
 
