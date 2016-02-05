@@ -2,6 +2,7 @@
 #include <tgmath.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <float.h>
 #include <stdbool.h>
 #include <inttypes.h>
 #include "hdp_math_utils.h"
@@ -21,6 +22,88 @@
 #ifndef MACHEP
 #define MACHEP 1.11022302462515654042E-16
 #endif
+
+#ifndef MINUS_INF
+#define MINUS_INF -0.5 * DBL_MAX
+#endif
+
+void parallel_cdf(double* cdf, double* probs, int64_t length, int64_t chunk_size) {
+    
+    if (2 * chunk_size >= length) {
+        double cumul = 0.0;
+        for (int64_t i = 0; i < length; i++) {
+            cumul += probs[i];
+            cdf[i] = cumul;
+        }
+        return;
+    }
+    
+    int64_t num_chunks = (length - 1) / chunk_size + 1;
+    
+#pragma omp parallel for shared(cdf,probs)
+    for (int64_t i = 0; i < num_chunks; i++) {
+        int64_t start = i * chunk_size;
+        int64_t stop = start + chunk_size;
+        if (stop > length) {
+            stop = length;
+        }
+        
+        double partial_cumul = 0.0;
+        for (int64_t j = start; j < stop; j++) {
+            partial_cumul += probs[j];
+            cdf[j] = partial_cumul;
+        }
+    }
+    
+    double* partial_sums = (double*) malloc(sizeof(double) * num_chunks);
+    double partial_sums_cumul = 0.0;
+    for (int64_t i = chunk_size - 1; i < length; i += chunk_size) {
+        partial_sums_cumul += cdf[i];
+        partial_sums[i / chunk_size] = partial_sums_cumul;
+    }
+    
+#pragma omp parallel for shared(cdf,partial_sums)
+    for (int64_t i = chunk_size; i < length; i++) {
+        cdf[i] += partial_sums[i / chunk_size - 1];
+    }
+    
+    free(partial_sums);
+}
+
+double parallel_max(double* x, int64_t length) {
+    double max_val = MINUS_INF;
+#pragma omp parallel shared(max_val)
+    {
+        double local_max = MINUS_INF;
+#pragma omp for nowait
+        for (int64_t i = 0; i < length; i++) {
+            if (x[i] > local_max) {
+                local_max = x[i];
+            }
+        }
+#pragma omp critical
+        {
+            if (local_max > max_val) {
+                max_val = local_max;
+            }
+        }
+    }
+    return max_val;
+}
+
+void parallel_add(double add_val, double* x, int64_t length) {
+#pragma omp parallel for
+    for (int64_t i = 0; i < length; i++) {
+        x[i] += add_val;
+    }
+}
+
+void parallel_exp(double* x, int64_t length) {
+#pragma omp parallel for
+    for (int64_t i = 0; i < length; i++) {
+        x[i] = exp(x[i]);
+    }
+}
 
 typedef struct LogGammaHalfMemo LogGammaHalfMemo;
 
@@ -42,13 +125,13 @@ LogGammaHalfMemo* new_log_gamma_memo(double alpha) {
     memo->zero_offset_final_entry = 0;
     memo->zero_offset_memo = zero_base_case;
     memo->zero_offset_length = 1;
-
+    
     double* half_base_case = (double*) malloc(sizeof(double));
     half_base_case[0] = lgamma(alpha + .5);
     memo->half_offset_final_entry = 0;
     memo->half_offset_memo = half_base_case;
     memo->half_offset_length = 1;
-
+    
     return memo;
 }
 
@@ -62,17 +145,17 @@ void extend_gamma_zero_offset_memo(LogGammaHalfMemo* memo) {
     int64_t final_entry = memo->half_offset_final_entry + 1;
     memo->zero_offset_final_entry = final_entry;
     double* current_array = memo->zero_offset_memo;
-
+    
     int64_t current_length = memo->zero_offset_length;
     if (current_length == final_entry) {
-
+        
         int64_t new_array_length = current_length * 2;
         double* new_array = (double*) malloc(sizeof(double) * new_array_length);
-
+        
         for (int64_t i = 0; i < current_length; i++) {
             new_array[i] = current_array[i];
         }
-
+        
         memo->zero_offset_length = new_array_length;
         memo->zero_offset_memo = new_array;
         free(current_array);
@@ -86,17 +169,17 @@ void extend_gamma_half_offset_memo(LogGammaHalfMemo* memo) {
     int64_t final_entry = memo->half_offset_final_entry + 1;
     memo->half_offset_final_entry = final_entry;
     double* current_array = memo->half_offset_memo;
-
+    
     int64_t current_length = memo->half_offset_length;
     if (current_length == final_entry) {
-
+        
         int64_t new_array_length = current_length * 2;
         double* new_array = (double*) malloc(sizeof(double) * new_array_length);
-
+        
         for (int64_t i = 0; i < current_length; i++) {
             new_array[i] = current_array[i];
         }
-
+        
         memo->half_offset_length = new_array_length;
         memo->half_offset_memo = new_array;
         free(current_array);
@@ -149,14 +232,14 @@ void extend_log_sum_memo(SumOfLogsMemo* memo) {
     int64_t current_length = memo->array_length;
     if (current_length == final_entry) {
         double* current_array = memo->memo_array;
-
+        
         int64_t new_array_length = current_length * 2;
         double* new_array = (double*) malloc(sizeof(double) * new_array_length);
-
+        
         for (int64_t i = 0; i < current_length; i++) {
             new_array[i] = current_array[i];
         }
-
+        
         memo->array_length = new_array_length;
         memo->memo_array = new_array;
         free(current_array);
@@ -184,7 +267,7 @@ double log_gamma_half(int64_t n, SumOfLogsMemo* sum_of_logs_memo) {
     }
     else {
         return LOG_ROOT_PI - (n / 2) * LOG_4 + sum_of_logs(sum_of_logs_memo, n - 1)
-               - sum_of_logs(sum_of_logs_memo, n / 2);
+        - sum_of_logs(sum_of_logs_memo, n / 2);
     }
 }
 
@@ -204,18 +287,18 @@ double quickselect(double* arr, int64_t length, int64_t target_idx) {
         fprintf(stderr, "Order statistic outside of array bounds\n");
         exit(EXIT_FAILURE);
     }
-
+    
     double* arr_copy = (double*) malloc(sizeof(double) * length);
     for (int64_t i = 0; i < length; i++ ) {
         arr_copy[i] = arr[i];
     }
-
+    
     int64_t low = 0;
     int64_t hi = length - 1;
     int64_t mid;
     int64_t median;
     double temp;
-
+    
     while (true) {
         // median of three technique
         mid = (hi + low) / 2;
@@ -245,12 +328,12 @@ double quickselect(double* arr, int64_t length, int64_t target_idx) {
                 }
             }
         }
-
+        
         // remove pivot
         temp = arr_copy[median];
         arr_copy[median] = arr_copy[hi];
         arr_copy[hi] = temp;
-
+        
         // partition array
         int64_t pivot = low;
         for (int64_t i = low; i < hi; i++) {
@@ -261,11 +344,11 @@ double quickselect(double* arr, int64_t length, int64_t target_idx) {
                 pivot++;
             }
         }
-
+        
         temp = arr_copy[pivot];
         arr_copy[pivot] = arr_copy[hi];
         arr_copy[hi] = temp;
-
+        
         if (pivot == target_idx) {
             return arr_copy[pivot];
         }
@@ -318,43 +401,43 @@ int64_t bisect_left(double x, double* arr, int64_t length) {
 
 void spline_knot_slopes_internal(double* x, double* y, double* k, int64_t idx, double center_coef_prev,
                                  double right_coef_prev, double rhs_prev, int64_t final_idx) {
-
+    
     if (idx == final_idx) {
         double left_coef = 1.0 / (x[idx] - x[idx - 1]);
         double center_coef = 2.0 * left_coef;
         double rhs = 3.0 * (y[idx] - y[idx - 1]) * left_coef * left_coef;
         // Cramer's rule
         k[idx] = (rhs * center_coef_prev - rhs_prev * left_coef) /
-                 (center_coef * center_coef_prev - right_coef_prev * left_coef);
+        (center_coef * center_coef_prev - right_coef_prev * left_coef);
         return;
     }
-
+    
     double left_coef = 1.0 / (x[idx] - x[idx - 1]);
     double right_coef = 1.0 / (x[idx + 1] - x[idx]);
     double center_coef = 2.0 * (left_coef + right_coef);
-
+    
     double rhs = 3.0 * ((y[idx] - y[idx - 1]) * left_coef * left_coef +
                         (y[idx + 1] - y[idx]) * right_coef * right_coef);
-
+    
     center_coef -= left_coef * right_coef_prev / center_coef_prev;
     rhs -= left_coef * rhs_prev / center_coef_prev;
-
+    
     spline_knot_slopes_internal(x, y, k, idx + 1, center_coef, right_coef, rhs, final_idx);
-
+    
     k[idx] = (rhs - right_coef * k[idx + 1]) / center_coef;
 }
 
 double* spline_knot_slopes(double* x, double* y, int64_t length) {
     double* k = (double*) malloc(sizeof(double) * length);
-
+    
     double right_coef = 1.0 / (x[1] - x[0]);
     double center_coef = 2.0 * right_coef;
     double rhs = 3.0 * (y[1] - y[0]) * right_coef * right_coef;
-
+    
     spline_knot_slopes_internal(x, y, k, 1, center_coef, right_coef, rhs, length - 1);
-
+    
     k[0] = (rhs - right_coef * k[1]) / center_coef;
-
+    
     return k;
 }
 
@@ -369,18 +452,18 @@ double spline_interp(double query_x, double* x, double* y, double* slope, int64_
     else {
         int64_t idx_right = bisect_left(query_x, x, length);
         int64_t idx_left = idx_right - 1;
-
+        
         double dx = x[idx_right] - x[idx_left];
         double dy = y[idx_right] - y[idx_left];
-
+        
         double a = slope[idx_left] * dx - dy;
         double b = dy - slope[idx_right] * dx;
-
+        
         double t_left = (query_x - x[idx_left]) / dx;
         double t_right = 1.0 - t_left;
-
+        
         return t_right * y[idx_left] + t_left * y[idx_right] +
-               t_left * t_right * (a * t_right + b * t_left);
+        t_left * t_right * (a * t_right + b * t_left);
     }
 }
 
@@ -407,7 +490,7 @@ double grid_spline_interp(double query_x, double* x, double* y, double* slope, i
         double t_right = 1.0 - t_left;
         
         return t_right * y[idx_left] + t_left * y[idx_right]
-               + t_left * t_right * (a * t_right + b * t_left);
+        + t_left * t_right * (a * t_right + b * t_left);
     }
 }
 
@@ -448,9 +531,9 @@ double rand_exponential(double lambda) {
 
 double log_posterior_conditional_term(double nu_post, double two_alpha_post,
                                       double beta_post) {//, SumOfLogsMemo* memo) {
-
-//    return log_gamma_half((int64_t) two_alpha_post, memo)
-//           - .5 * (log(nu_post) + two_alpha_post * log(beta_post));
+    
+    //    return log_gamma_half((int64_t) two_alpha_post, memo)
+    //           - .5 * (log(nu_post) + two_alpha_post * log(beta_post));
     return lgamma( 0.5 * two_alpha_post) - .5 * (log(nu_post) + two_alpha_post * log(beta_post));
 }
 
@@ -461,14 +544,14 @@ void normal_inverse_gamma_params(double* x, int64_t length, double* mu_out, doub
         mean += x[i];
     }
     mean /= (double) length;
-
+    
     double dev;
     double sum_sq_devs = 0.0;
     for (int64_t i = 0; i < length; i++) {
         dev = x[i] - mean;
         sum_sq_devs += dev * dev;
     }
-
+    
     *mu_out = mean;
     *nu_out = (double) length;
     *alpha_out = ((double) length - 1.0) / 2.0;

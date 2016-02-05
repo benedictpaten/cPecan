@@ -919,7 +919,7 @@ static void test_HdpHmmWithAssignments(CuTest *testCase) {
     HdpHmm *hdpHmm = (HdpHmm *)hmm;
 
     // test against model updated with simple alignment
-    
+
     // do serialization-type tests
 
 
