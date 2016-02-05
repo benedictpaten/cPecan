@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
+#include "hdp_math_utils.h"
 #include "discreteHmm.h"
 #include "emissionMatrix.h"
 #include "stateMachine.h"
@@ -670,6 +671,7 @@ Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symb
     hmm->kmerAssignments = stList_construct3(0, &free);
     hmm->eventAssignments = stList_construct3(0, &free);
     hmm->numberOfAssignments = 0;
+    hmm->nhdp = NULL;
 
     return (Hmm *)hmm;
 }
@@ -680,6 +682,7 @@ void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
      * type \t stateNumber \t symbolSetSize \t threshold \t numberOfAssignments \n
      * [transitions... \t] likelihood \n
      * [kmer skip probs ... \t] \n
+     * TODO finalize format and comment here
      */
     HdpHmm *hdpHmm = (HdpHmm *)hmm;
     // write the basic stuff to disk (positions are line:item#, not line:col)
@@ -712,7 +715,6 @@ void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
             fprintf(fileHandle, "%f\t", hdpHmm->baseContinuousPairHmm.individualKmerGapProbs[i]);
         }
         fprintf(fileHandle, "\n"); // newLine
-        // write out assignments in format: event(observed current) \t assignment
         for (int64_t i = 0; i < hdpHmm->numberOfAssignments; i++) {
             double *meanCurrent = stList_get(hdpHmm->eventAssignments, i);
             fprintf(fileHandle, "%lf\t", *meanCurrent);
@@ -729,8 +731,8 @@ void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
         fprintf(fileHandle, "\n"); // newLine
     }
 }
-/*
-Hmm *hdpHmm_loadFromFile(const char *fileName) {
+
+Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *nHdp) {
     // open file
     FILE *fH = fopen(fileName, "r");
 
@@ -772,8 +774,8 @@ Hmm *hdpHmm_loadFromFile(const char *fileName) {
                                      continuousPairHmm_getKmerGapExpectation,
                                      emissions_discrete_getKmerIndexFromKmer);
     HdpHmm *hdpHmm = (HdpHmm *) hmm;
-
-
+    hdpHmm->numberOfAssignments = numberOfAssignments;
+    hdpHmm->nhdp = nHdp;
     // cleanup
     free(string);
     stList_destruct(tokens);
@@ -808,10 +810,9 @@ Hmm *hdpHmm_loadFromFile(const char *fileName) {
     free(string);
     stList_destruct(tokens);
 
-    // Emissions
+    // Emissions (Kmer skip probabilities)
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
-
     // check
     if (stList_length(tokens) != hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.symbolSetSize) {
         st_errAbort(
@@ -829,43 +830,50 @@ Hmm *hdpHmm_loadFromFile(const char *fileName) {
     free(string);
     stList_destruct(tokens);
 
-    // load the assignments
+    // load the assignments into the Nanopore Hdp
+    if (hdpHmm->nhdp != NULL) {
 
-    for (int64_t i = 0; i < hdpHmm->numberOfAssignments; i++) {
-        // read the line, split it, make sure there are only two elements in the list
+        // get the line of events
+        string = stFile_getLineFromFile(fH);
+        // parse the events
+        tokens = stString_split(string);
+        if (stList_length(tokens) != hdpHmm->numberOfAssignments) {
+            st_errAbort("Incorrect number of events got %lld, should be %lld\n",
+                        stList_length(tokens), hdpHmm->numberOfAssignments);
+        }
+        int64_t dataLength;
+        double *signal = stList_toDoublePtr(tokens, &dataLength); // there is a malloc here...
+        // cleanup event parsing
+        free(string);
+        stList_destruct(tokens);
+        // get the line for kmer assignments
         string = stFile_getLineFromFile(fH);
         tokens = stString_split(string);
-        if (stList_length(tokens) != 2) {
-            st_errAbort("got incorrect number of tokens for assignment, got %lld, should be 2\n",
-                        stList_length(tokens));
+        if (stList_length(tokens) != hdpHmm->numberOfAssignments) {
+            st_errAbort("Incorrect number of events got %lld, should be %lld\n",
+                        stList_length(tokens), hdpHmm->numberOfAssignments);
         }
-
-        double meanCurrent;
-        char *kmer;
-
-        j = sscanf(stList_get(tokens, 0), "%lf", &meanCurrent);
-        if (j != 1) {
-            st_errnoAbort("error loading assignment mean current from assignment %lld, continuing on..\n", i);
-            continue;
+        char *assignedKmer;
+        int64_t *dp_ids = st_malloc(sizeof(int64_t) * hdpHmm->numberOfAssignments);
+        for (int64_t i = 0; i < hdpHmm->numberOfAssignments; i++) {
+            assignedKmer = (char *)stList_get(tokens, i);
+            dp_ids[i] = kmer_id(assignedKmer,
+                                hdpHmm->nhdp->alphabet,
+                                hdpHmm->nhdp->alphabet_size,
+                                hdpHmm->nhdp->kmer_length);
         }
-
-        kmer = (char *)stList_get(tokens, 1);
-        //j = sscanf(stList_get(tokens, 1), "%s", &kmerIdx);
-        //if (j != 1) {
-        //    st_errnoAbort("error loading assignment kmer index %lld, continuing on..\n", i);
-        //    continue;
-        //}
-
-        stList_append(hdpHmm->baseContinuousHmm.assignments, stDoubleTuple_construct(2, meanCurrent, (double) kmerIdx));
-
+        // cleanup
         free(string);
-        //stList_destruct(tokens);
-    }
+        stList_destruct(tokens);
 
+        reset_hdp_data(hdpHmm->nhdp->hdp);
+        pass_data_to_hdp(hdpHmm->nhdp->hdp, signal, dp_ids, dataLength);
+        //pass_data_to_hdp(hdpHmm->nhdp->hdp, signal, dp_ids, hdpHmm->numberOfAssignments;
+    }
     // close file
     fclose(fH);
+    return (Hmm *)hdpHmm;
 }
-*/
 
 void hdpHmm_destruct(Hmm *hmm) {
     HdpHmm *hdpHmm = (HdpHmm *)hmm;

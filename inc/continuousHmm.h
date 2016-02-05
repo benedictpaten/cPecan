@@ -31,6 +31,7 @@ typedef struct _hdpHmm {
     stList *eventAssignments;
     stList *kmerAssignments;
     int64_t numberOfAssignments;
+    NanoporeHDP *nhdp;
 } HdpHmm;
 
 Hmm *continuousPairHmm_constructEmpty(
@@ -104,6 +105,8 @@ Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symb
                            int64_t (*getElementIndexFcn)(void *));
 
 void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle);
+
+Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *ndhp);
 
 void hdpHmm_destruct(Hmm *hmm);
 

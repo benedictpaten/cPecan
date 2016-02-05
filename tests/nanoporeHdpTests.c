@@ -764,9 +764,9 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
     char *strand = "t";
     // make nanopore HDP
-    char *canonicalAlphabet = "ACGT\0";
+    char *canonicalAlphabet = "ACGT";
     // todo try other hdp models
-    NanoporeHDP *nHdp = flat_hdp_model(canonicalAlphabet, 4, KMER_LENGTH, 1.0, 1.0, 40.0, 100.0, 100, modelFile);
+    NanoporeHDP *nHdp = flat_hdp_model(canonicalAlphabet, 4, KMER_LENGTH, 4.0, 20.0, 0.0, 100.0, 100, modelFile);
     update_nhdp_from_alignment_with_filter(nHdp, alignmentFile, FALSE, strand);
     execute_nhdp_gibbs_sampling(nHdp, 200, 10000, 50, FALSE);
     finalize_nhdp_distributions(nHdp);
@@ -809,17 +809,8 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     stateMachine_destruct(sMt);
 }
 
-static void test_hdpHmm(CuTest *testCase) {
+static void test_hdpHmmWithoutAssignments(CuTest *testCase) {
     // make the hmm object
-    char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
-    char *strand = "t";
-    // make nanopore HDP
-    NanoporeHDP *nHdp = flat_hdp_model("ACGT", 4, 6, 4.0, 20.0, 0.0, 100.0, 100,
-                                       "../../cPecan/models/template_median68pA.model");
-    update_nhdp_from_alignment_with_filter(nHdp, alignmentFile, FALSE, strand);
-    execute_nhdp_gibbs_sampling(nHdp, 100, 0, 1, FALSE);
-    finalize_nhdp_distributions(nHdp);
-
     Hmm *hmm = hdpHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState_hdp, 0.02,
                                         continuousPairHmm_addToTransitionsExpectation,
                                         continuousPairHmm_setTransitionExpectation,
@@ -865,14 +856,12 @@ static void test_hdpHmm(CuTest *testCase) {
     hdpHmm_writeToFile((Hmm *) hdpHmm, fH);
     fclose(fH);
     hdpHmm_destruct((Hmm *) hdpHmm);
-    /*
 
     //Load from a file
-    hmm = continuousPairHmm_loadFromFile(tempFile);
+    hmm = hdpHmm_loadFromFile(tempFile, NULL);
     hdpHmm = (HdpHmm *)hmm;
     stFile_rmrf(tempFile);
-
-    //CuAssertTrue(testCase, (nb_matches == hdpHmm->baseContinuousHmm.numberOfAssignments));
+    CuAssertTrue(testCase, (3 == hdpHmm->numberOfAssignments));
 
     // Check the transition expectations
     for (int64_t from = 0; from < nStates; from++) {
@@ -892,15 +881,6 @@ static void test_hdpHmm(CuTest *testCase) {
         CuAssertDblEquals(testCase, received, correct, 0.0);
     }
 
-    // check the assignments
-    //for (int64_t a = 0; a < hdpHmm->baseContinuousHmm.numberOfAssignments; a++) {
-    //    stDoubleTuple *assignment = stList_get(hdpHmm->baseContinuousHmm.assignments, a);
-    //    double retrievedMean = stDoubleTuple_getPosition(assignment, 0);
-    //    int64_t retrievedKmerIdx = (int64_t )stDoubleTuple_getPosition(assignment, 1);
-    //    CuAssertDblEquals(testCase, retrievedMean, ((a + 1) * b), 0.001);
-    //    CuAssertTrue(testCase, retrievedKmerIdx == a);
-    //}
-
     // normalize
     continuousPairHmm_normalize((Hmm *) hdpHmm);
 
@@ -908,19 +888,41 @@ static void test_hdpHmm(CuTest *testCase) {
     for (int64_t from = 0; from < nStates; from++) {
         for (int64_t to = 0; to < nStates; to++) {
             double z = from * nStates * nStates + (nStates * (nStates - 1)) / 2;
-            double retrievedNormedProb = hdpHmm->baseContinuousHmm.baseHmm.getTransitionsExpFcn((Hmm *) hdpHmm, from, to);
+            double retrievedNormedProb = hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.getTransitionsExpFcn(
+                    (Hmm *) hdpHmm, from, to);
             CuAssertDblEquals(testCase, (from * nStates + to) / z, retrievedNormedProb, 0.0);
         }
     }
 
     // Recheck kmerGap emissions
     for (int64_t i = 0; i < nSymbols; i++) {
-        double received = hdpHmm->baseContinuousHmm.baseHmm.getEmissionExpFcn((Hmm *) hdpHmm, 0, i, 0);
+        double received = hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.getEmissionExpFcn(
+                (Hmm *) hdpHmm, 0, i, 0);
         double correctNormed = ((nSymbols * nStates) + i) / dummyTotal;
         CuAssertDblEquals(testCase, received, correctNormed, 0.001);
     }
     continuousPairHmm_destruct((Hmm *) hdpHmm);
-    */
+}
+
+static void test_HdpHmmWithAssignments(CuTest *testCase) {
+    char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
+    char *templateModelFile = "../../cPecan/models/template_median68pA.model";
+    // make NanoporeHDP to compare to
+    NanoporeHDP *nHdp1 = flat_hdp_model("ACGT", 4, 6, 4.0, 20.0, 0.0, 100.0, 100, templateModelFile);
+    update_nhdp_from_alignment_with_filter(nHdp1, alignmentFile, FALSE, "t");
+    execute_nhdp_gibbs_sampling(nHdp1, 100, 0, 1, FALSE);
+    finalize_nhdp_distributions(nHdp1);
+
+    // make NanoporeHDP from Hmm
+    NanoporeHDP *nHdp2 = flat_hdp_model("ACGT", 4, 6, 4.0, 20.0, 0.0, 100.0, 100, templateModelFile);
+    Hmm *hmm = hdpHmm_loadFromFile("../../cPecan/tests/test_hdp/test_expectations.expectations", nHdp2);
+    HdpHmm *hdpHmm = (HdpHmm *)hmm;
+
+    // test against model updated with simple alignment
+    
+    // do serialization-type tests
+
+
 }
 
 static void test_hdpHmm_em(CuTest *testCase) {
@@ -1045,13 +1047,14 @@ CuSuite *NanoporeHdpTestSuite(void) {
     SUITE_ADD_TEST(suite, test_multiset_creation);
     SUITE_ADD_TEST(suite, test_word_id_to_multiset_id);
     SUITE_ADD_TEST(suite, test_kmer_id);
-    SUITE_ADD_TEST(suite, test_serialization);
-    SUITE_ADD_TEST(suite, test_nhdp_serialization);
-    SUITE_ADD_TEST(suite, test_sm3hdp_cell);
-    SUITE_ADD_TEST(suite, test_sm3Hdp_dpDiagonal);
-    SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
-    SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
-    //SUITE_ADD_TEST(suite, test_hdpHmm);
+    //SUITE_ADD_TEST(suite, test_serialization);
+    //SUITE_ADD_TEST(suite, test_nhdp_serialization);
+    //SUITE_ADD_TEST(suite, test_sm3hdp_cell);
+    //SUITE_ADD_TEST(suite, test_sm3Hdp_dpDiagonal);
+    //SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
+    //SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
+    SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments);
     //SUITE_ADD_TEST(suite, test_continuousPairHDPHmm_em);
     return suite;
 }

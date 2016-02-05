@@ -1422,7 +1422,6 @@ void pass_data_to_hdp(HierarchicalDirichletProcess* hdp, double* data, int64_t* 
         fprintf(stderr, "Hierarchical Dirichlet process must be reset before passing new data.\n");
         exit(EXIT_FAILURE);
     }
-    
 
     hdp->data = data;
     hdp->data_pt_dp_id = dp_ids;
