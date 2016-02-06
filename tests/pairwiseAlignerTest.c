@@ -325,7 +325,6 @@ static void test_diagonalDPCalculations(CuTest *testCase) {
     double totalProbForward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY), sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
     st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
-    //st_uglyf("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
     //Check the forward and back probabilities are about equal
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);
 

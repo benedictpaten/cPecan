@@ -231,8 +231,8 @@ void test_nhdp_distrs(CuTest* ct) {
 
 CuSuite *HdpTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, test_mle_params);
-    SUITE_ADD_TEST(suite, test_distr_metrics);
-    SUITE_ADD_TEST(suite, test_nhdp_distrs);
+    //SUITE_ADD_TEST(suite, test_mle_params);
+    //SUITE_ADD_TEST(suite, test_distr_metrics);
+    //SUITE_ADD_TEST(suite, test_nhdp_distrs);
     return suite;
 }

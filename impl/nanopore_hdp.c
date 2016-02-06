@@ -259,7 +259,7 @@ void update_nhdp_from_alignment_with_filter(NanoporeHDP* nhdp, const char* align
             dp_id_ptr = (int64_t*) malloc(sizeof(int64_t));
             sscanf(signal_str, "%lf", signal_ptr);
             *dp_id_ptr = kmer_id(kmer, nhdp->alphabet, nhdp->alphabet_size, nhdp->kmer_length);
-            
+
             stList_append(signal_list, signal_ptr);
             stList_append(dp_id_list, dp_id_ptr);
         }
@@ -454,9 +454,10 @@ void flat_hdp_model_internal(HierarchicalDirichletProcess* hdp, int64_t alphabet
     }
 }
 
-NanoporeHDP* flat_hdp_model(const char* alphabet, int64_t alphabet_size, int64_t kmer_length, double base_gamma,
-                            double leaf_gamma, double sampling_grid_start, double sampling_grid_stop,
-                            int64_t sampling_grid_length, const char* model_filepath) {
+NanoporeHDP* flat_hdp_model(const char* alphabet, int64_t alphabet_size, int64_t kmer_length,
+                            double base_gamma, double leaf_gamma,
+                            double sampling_grid_start, double sampling_grid_stop, int64_t sampling_grid_length,
+                            const char* model_filepath) {
     
     double* gamma_params = (double*) malloc(sizeof(double) * 2);
     gamma_params[0] = base_gamma;
@@ -479,7 +480,8 @@ NanoporeHDP* flat_hdp_model(const char* alphabet, int64_t alphabet_size, int64_t
 
 NanoporeHDP* flat_hdp_model_2(const char* alphabet, int64_t alphabet_size, int64_t kmer_length,
                               double base_gamma_alpha, double base_gamma_beta, double leaf_gamma_alpha,
-                              double leaf_gamma_beta, double sampling_grid_start, double sampling_grid_stop,
+                              double leaf_gamma_beta,
+                              double sampling_grid_start, double sampling_grid_stop,
                               int64_t sampling_grid_length, const char* model_filepath) {
     
     double* gamma_alpha = (double*) malloc(sizeof(double) * 2);
@@ -549,7 +551,6 @@ NanoporeHDP* multiset_hdp_model(const char* alphabet, int64_t alphabet_size, int
     
     finalize_hdp_structure(hdp);
 
-    
     NanoporeHDP* nhdp = package_nanopore_hdp(hdp, alphabet, alphabet_size, kmer_length);
     
     return nhdp;
@@ -560,7 +561,7 @@ NanoporeHDP* multiset_hdp_model_2(const char* alphabet, int64_t alphabet_size, i
                                   double middle_gamma_beta, double leaf_gamma_alpha, double leaf_gamma_beta,
                                   double sampling_grid_start, double sampling_grid_stop, int64_t sampling_grid_length,
                                   const char* model_filepath) {
-    
+
     double* gamma_alpha = (double*) malloc(sizeof(double) * 3);
     gamma_alpha[0] = base_gamma_alpha;
     gamma_alpha[1] = middle_gamma_alpha;

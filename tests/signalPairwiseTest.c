@@ -632,6 +632,7 @@ static void test_strawMan_diagonalDPCalculations(CuTest *testCase) {
             dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY), sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(
             dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
+    CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);
     st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
 
     // Test the posterior probabilities along the diagonals of the matrix.
@@ -739,6 +740,7 @@ static void test_stateMachine4_diagonalDPCalculations(CuTest *testCase) {
             dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY), sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(
             dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
+    CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);
     st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
 
     // Test the posterior probabilities along the diagonals of the matrix.
@@ -845,6 +847,7 @@ static void test_vanilla_diagonalDPCalculations(CuTest *testCase) {
             dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY), sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(
             dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
+    CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);
     st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
 
     // Test the posterior probabilities along the diagonals of the matrix.
@@ -948,6 +951,7 @@ static void test_echelon_diagonalDPCalculations(CuTest *testCase) {
             dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixForward, lX + lY), lX - lY), sM, sM->endStateProb);
     double totalProbBackward = cell_dotProduct2(
             dpDiagonal_getCell(dpMatrix_getDiagonal(dpMatrixBackward, 0), 0), sM, sM->startStateProb);
+    CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.001);
     st_logInfo("Total forward and backward prob %f %f\n", (float) totalProbForward, (float) totalProbBackward);
 
     // Test the posterior probabilities along the diagonals of the matrix.
@@ -1849,7 +1853,6 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithBanding);
     SUITE_ADD_TEST(suite, test_vanilla_getAlignedPairsWithoutScaling);
     SUITE_ADD_TEST(suite, test_echelon_getAlignedPairsWithBanding);
-
     SUITE_ADD_TEST(suite, test_continuousPairHmm);
     SUITE_ADD_TEST(suite, test_vanillaHmm);
     SUITE_ADD_TEST(suite, test_continuousPairHmm_em);

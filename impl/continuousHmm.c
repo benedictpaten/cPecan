@@ -830,23 +830,36 @@ Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *nHdp) {
     free(string);
     stList_destruct(tokens);
 
-    // load the assignments into the Nanopore Hdp
+    // load the assignments into the Nanopore Hdp [this is basically the same as Jordan's code for updating from
+    // an alignment]
     if (hdpHmm->nhdp != NULL) {
+        // make stLists to hold things temporarily
+        stList *signalList = stList_construct3(0, &free);
 
-        // get the line of events
+        // parse the events (current means)
         string = stFile_getLineFromFile(fH);
-        // parse the events
         tokens = stString_split(string);
+
+        // check to make sure everything is there
         if (stList_length(tokens) != hdpHmm->numberOfAssignments) {
             st_errAbort("Incorrect number of events got %lld, should be %lld\n",
                         stList_length(tokens), hdpHmm->numberOfAssignments);
         }
-        int64_t dataLength;
-        double *signal = stList_toDoublePtr(tokens, &dataLength); // there is a malloc here...
-        // cleanup event parsing
+
+        // parse the events into a list
+        char *signal_str;
+        for (int64_t i = 0; i < hdpHmm->numberOfAssignments; i++) {
+            signal_str = (char *)stList_get(tokens, i);
+            double *signal_ptr = (double *)st_malloc(sizeof(double));
+            sscanf(signal_str, "%lf", signal_ptr);
+            stList_append(signalList, signal_ptr);
+        }
+
+        // cleanup event line
         free(string);
         stList_destruct(tokens);
-        // get the line for kmer assignments
+
+        // parse the kmer assignment line
         string = stFile_getLineFromFile(fH);
         tokens = stString_split(string);
         if (stList_length(tokens) != hdpHmm->numberOfAssignments) {
@@ -866,9 +879,12 @@ Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *nHdp) {
         free(string);
         stList_destruct(tokens);
 
+        // convert to arrays
+        int64_t dataLength;
+        double *signal = stList_toDoublePtr(signalList, &dataLength);
+        stList_destruct(signalList);
         reset_hdp_data(hdpHmm->nhdp->hdp);
         pass_data_to_hdp(hdpHmm->nhdp->hdp, signal, dp_ids, dataLength);
-        //pass_data_to_hdp(hdpHmm->nhdp->hdp, signal, dp_ids, hdpHmm->numberOfAssignments;
     }
     // close file
     fclose(fH);
