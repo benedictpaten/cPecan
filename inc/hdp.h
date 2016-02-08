@@ -85,6 +85,20 @@ DistributionMetricMemo* new_shannon_jensen_distance_memo(HierarchicalDirichletPr
 // note: the lifetime of a DistributionMetricMemo is tied to the lifetime of the
 // HierarchicalDirichletProcess that generated it
 
+// computing distances between HDPs
+
+double compare_hdp_distrs_kl_divergence(HierarchicalDirichletProcess* hdp_1, int64_t dp_id_1,
+                                        HierarchicalDirichletProcess* hdp_2, int64_t dp_id_2);
+
+double compare_hdp_distrs_l2_distance(HierarchicalDirichletProcess* hdp_1, int64_t dp_id_1,
+                                      HierarchicalDirichletProcess* hdp_2, int64_t dp_id_2);
+
+double compare_hdp_distrs_shannon_jensen_distance(HierarchicalDirichletProcess* hdp_1, int64_t dp_id_1,
+                                                  HierarchicalDirichletProcess* hdp_2, int64_t dp_id_2);
+
+double compare_hdp_distrs_hellinger_distance(HierarchicalDirichletProcess* hdp_1, int64_t dp_id_1,
+                                             HierarchicalDirichletProcess* hdp_2, int64_t dp_id_2);
+
 // serialization
 
 // note: only allowed for HDPs with finalized structure

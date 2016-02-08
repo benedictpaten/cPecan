@@ -942,7 +942,7 @@ static void test_hmmDiscrete_EM_5State_symbols(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-    /*
+
     SUITE_ADD_TEST(suite, test_diagonal);
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_logAdd);
@@ -961,6 +961,6 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_hmmDiscrete_5State_symbols);
     SUITE_ADD_TEST(suite, test_hmmDiscrete_5StateAsymmetric_symbols);
     SUITE_ADD_TEST(suite, test_hmmDiscrete_EM_5State_symbols);
-    */
+    
     return suite;
 }

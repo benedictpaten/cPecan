@@ -986,7 +986,7 @@ static void test_HdpHmmWithAssignments3(CuTest *testCase) {
     finalize_nhdp_distributions(hdpHmm->nhdp);
 
     // test against model updated with simple alignment
-    test_checkHDPs(testCase, hdpHmm->nhdp, nHdp1, 0.000001);
+    test_checkHDPs(testCase, hdpHmm->nhdp, nHdp1, 0.00001);
 }
 
 static void test_hdpHmm_em(CuTest *testCase) {
@@ -1105,22 +1105,22 @@ static void test_hdpHmm_em(CuTest *testCase) {
 
 CuSuite *NanoporeHdpTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-    //SUITE_ADD_TEST(suite, test_first_kmer_index);
-    //SUITE_ADD_TEST(suite, test_second_kmer_index);
-    //SUITE_ADD_TEST(suite, test_sixth_kmer_index);
-    //SUITE_ADD_TEST(suite, test_multiset_creation);
-    //SUITE_ADD_TEST(suite, test_word_id_to_multiset_id);
-    //SUITE_ADD_TEST(suite, test_kmer_id);
-    //SUITE_ADD_TEST(suite, test_serialization);
-    //SUITE_ADD_TEST(suite, test_nhdp_serialization);
-    //SUITE_ADD_TEST(suite, test_sm3hdp_cell);
-    //SUITE_ADD_TEST(suite, test_sm3Hdp_dpDiagonal);
-    //SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
-    //SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
-    //SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
+    SUITE_ADD_TEST(suite, test_first_kmer_index);
+    SUITE_ADD_TEST(suite, test_second_kmer_index);
+    SUITE_ADD_TEST(suite, test_sixth_kmer_index);
+    SUITE_ADD_TEST(suite, test_multiset_creation);
+    SUITE_ADD_TEST(suite, test_word_id_to_multiset_id);
+    SUITE_ADD_TEST(suite, test_kmer_id);
+    SUITE_ADD_TEST(suite, test_serialization);
+    SUITE_ADD_TEST(suite, test_nhdp_serialization);
+    SUITE_ADD_TEST(suite, test_sm3hdp_cell);
+    SUITE_ADD_TEST(suite, test_sm3Hdp_dpDiagonal);
+    SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
+    SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
     SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments);
     SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments2);
-    //SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments3);
+    SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments3);
     //SUITE_ADD_TEST(suite, test_continuousPairHDPHmm_em);
     return suite;
 }

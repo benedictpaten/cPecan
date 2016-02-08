@@ -59,6 +59,19 @@ NanoporeDistributionMetricMemo* new_nhdp_shannon_jensen_distance_memo(NanoporeHD
 // note: the lifetime of a NanoporeDistributionMetricMemo is tied to the lifetime of the
 // NanoporeHDP that generated it
 
+double compare_nhdp_distrs_kl_divergence(NanoporeHDP* nhdp_1, char* kmer_1,
+                                         NanoporeHDP* nhdp_2, char* kmer_2);
+
+double compare_nhdp_distrs_l2_distance(NanoporeHDP* nhdp_1, char* kmer_1,
+                                       NanoporeHDP* nhdp_2, char* kmer_2) ;
+
+double compare_nhdp_distrs_shannon_jensen_distance(NanoporeHDP* nhdp_1, char* kmer_1,
+                                                   NanoporeHDP* nhdp_2, char* kmer_2);
+
+double compare_nhdp_distrs_hellinger_distance(NanoporeHDP* nhdp_1, char* kmer_1,
+                                              NanoporeHDP* nhdp_2, char* kmer_2);
+
+
 // single level HDP
 NanoporeHDP* flat_hdp_model(const char* alphabet, int64_t alphabet_size, int64_t kmer_length, double base_gamma,
                             double leaf_gamma, double sampling_grid_start, double sampling_grid_stop,
