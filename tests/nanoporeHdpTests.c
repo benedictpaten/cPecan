@@ -478,6 +478,19 @@ void test_nhdp_serialization(CuTest* ct) {
     remove("../../cPecan/tests/test_hdp/test.nhdp");
 }
 
+void test_nhdp_buildFromAlignment(CuTest *testCase) {
+    char *templateModelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    char *complementModelFile = stString_print("../../cPecan/models/complement_median68pA_pop2.model");
+    char *templateHdp = stString_print("../../cPecan/tests/test_hdp/testTemplate.nhdp");
+    char *complementHdp = stString_print("../../cPecan/tests/test_hdp/testComplement.nhdp");
+
+    nanoporeHdp_buildNanoporeHdpFromAlignment(singleLevelFixed,
+                                              templateModelFile, complementModelFile,
+                                              "../../cPecan/tests/test_alignments/simple_alignment.tsv",
+                                              templateHdp, complementHdp);
+
+
+}
 
 static void test_sm3hdp_cell(CuTest *testCase) {
     // load model and make stateMachine
@@ -697,9 +710,13 @@ static void test_sm3Hdp_diagonalDPCalculations(CuTest *testCase) {
 
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(0, 0));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(1, 1));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 1));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(2, 2));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 2));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(3, 3));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(4, 3));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(4, 4));
+    stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(5, 5));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(5, 4));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(6, 5));
     stSortedSet_insert(alignedPairsSet, stIntTuple_construct2(7, 6));
@@ -709,7 +726,7 @@ static void test_sm3Hdp_diagonalDPCalculations(CuTest *testCase) {
         stIntTuple *pair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(pair, 1), y = stIntTuple_get(pair, 2);
         //st_uglyf("Pair %f %" PRIi64 " %" PRIi64 "\n", (float) stIntTuple_get(pair, 0) / PAIR_ALIGNMENT_PROB_1, x, y);
-        //CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
+        CuAssertTrue(testCase, stSortedSet_search(alignedPairsSet, stIntTuple_construct2(x, y)) != NULL);
     }
     CuAssertIntEquals(testCase, 12, (int) stList_length(alignedPairs));
 
@@ -755,9 +772,7 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     char *npReadFile = stString_print("../../cPecan/tests/test_npReads/ZymoC_ch_1_file1.npRead");
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
 
-    nanopore_descaleEvents(npRead->nbTemplateEvents, npRead->templateEvents,
-                           npRead->templateParams.scale,
-                           npRead->templateParams.shift);
+    nanopore_descaleNanoporeRead(npRead);
 
     // get sequence lengths
     int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
@@ -766,9 +781,8 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
     char *strand = "t";
+
     // make nanopore HDP
-    char *canonicalAlphabet = "ACGT";
-    // todo try other hdp models
     NanoporeHDP *nHdp = flat_hdp_model_2("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
                                          5.0, 0.5, 5.0, 0.5,
                                          0.0, 100, 1000,
@@ -777,7 +791,6 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     execute_nhdp_gibbs_sampling(nHdp, 1000, 10000, 100, FALSE);
     finalize_nhdp_distributions(nHdp);
     StateMachine *sMt = getHdpStateMachine3(nHdp);
-
 
     // parameters for pairwise alignment using defaults
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -803,8 +816,83 @@ static void test_sm3Hdp_getAlignedPairsWithBanding(CuTest *testCase) {
     checkAlignedPairs(testCase, alignedPairs, lX, lY);
 
     // for ch1_file1 template there should be this many aligned pairs with banding
-    st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
-    //CuAssertTrue(testCase, stList_length(alignedPairs) == 2887);
+    //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs));
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 2887);
+
+    // clean
+    pairwiseAlignmentBandingParameters_destruct(p);
+    nanopore_nanoporeReadDestruct(npRead);
+    sequence_sequenceDestroy(refSeq);
+    sequence_sequenceDestroy(templateSeq);
+    stList_destruct(alignedPairs);
+    stateMachine_destruct(sMt);
+}
+
+static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testCase) {
+    // load the reference sequence and the nanopore read
+    char *ZymoReference = stString_print("../../cPecan/tests/test_npReads/ZymoRef.txt");
+    FILE *fH = fopen(ZymoReference, "r");
+    char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
+    char *CtoM_referenceSeq = stString_replace(ZymoReferenceSeq, "C", "M");
+    // npRead
+    char *npReadFile = stString_print("../../cPecan/tests/test_npReads/ZymoC_ch_1_file1.npRead");
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+    nanopore_descaleNanoporeRead(npRead);
+
+    // get sequence lengths
+    int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
+    int64_t lY = npRead->nbTemplateEvents;
+
+    // NanoporeHDP
+    char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
+    char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
+    char *strand = "t";
+    NanoporeHDP *nHdp = flat_hdp_model_2("ACGHMT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
+                                         5.0, 0.5, 5.0, 0.5,
+                                         0.0, 100, 1000,
+                                         modelFile);
+    update_nhdp_from_alignment_with_filter(nHdp, alignmentFile, FALSE, strand);
+    execute_nhdp_gibbs_sampling(nHdp, 1000, 10000, 100, FALSE);
+    finalize_nhdp_distributions(nHdp);
+
+    // stateMachine
+    StateMachine *sMt = getHdpStateMachine3(nHdp);
+
+    // parameters for pairwise alignment using defaults
+    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+    p->threshold = 0.1;
+
+    // get anchors using lastz
+    stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
+
+    // remap and filter
+    stList *remappedAnchors = nanopore_remapAnchorPairs(anchorPairs, npRead->templateEventMap);
+    stList *filteredRemappedAnchors = filterToRemoveOverlap(remappedAnchors);
+
+    // make Sequences for reference and template events
+    Sequence *refSeq = sequence_construct2(lX, ZymoReferenceSeq, sequence_getKmer3,
+                                           sequence_sliceNucleotideSequence2);
+    Sequence *CtoM_refSeq = sequence_construct2(lX, CtoM_referenceSeq, sequence_getKmer3,
+                                           sequence_sliceNucleotideSequence2);
+    Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
+                                                sequence_sliceEventSequence2);
+
+    // do alignment of template events
+    stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
+                                                       diagonalCalculationPosteriorMatchProbs,
+                                                       0, 0);
+
+    stList *alignedPairs2 = getAlignedPairsUsingAnchors(sMt, CtoM_refSeq, templateSeq, filteredRemappedAnchors, p,
+                                                        diagonalCalculationPosteriorMatchProbs,
+                                                        0, 0);
+
+
+    checkAlignedPairs(testCase, alignedPairs, lX, lY);
+
+    // for ch1_file1 template there should be this many aligned pairs with banding
+    //st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs2));
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 2887);
+    CuAssertTrue(testCase, stList_length(alignedPairs2) == 3206);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
@@ -910,7 +998,7 @@ static void test_hdpHmmWithoutAssignments(CuTest *testCase) {
     continuousPairHmm_destruct((Hmm *) hdpHmm);
 }
 
-static void test_HdpHmmWithAssignments(CuTest *testCase) {
+static void test_HdpHmmWithAssignments_flat_model(CuTest *testCase) {
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
     char *templateModelFile = "../../cPecan/models/template_median68pA.model";
     // make NanoporeHDP to compare to
@@ -923,24 +1011,24 @@ static void test_HdpHmmWithAssignments(CuTest *testCase) {
 
     // make NanoporeHDP from Hmm
     NanoporeHDP *nHdp2 = flat_hdp_model("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
-                                        5.0, 0.5,
+                                        5.0, 0.5, // base_gamma, leaf_gamma
                                         0.0, 100.0, 100, templateModelFile);
     // load Hmm from disk and update the NanoporeHDP
     Hmm *hmm = hdpHmm_loadFromFile("../../cPecan/tests/test_hdp/test_expectations.expectations", nHdp2);
-    HdpHmm *hdpHmm = (HdpHmm *)hmm;
-    execute_nhdp_gibbs_sampling(hdpHmm->nhdp, 100, 0, 1, FALSE);
-    finalize_nhdp_distributions(hdpHmm->nhdp);
+    (void) hmm;
+    execute_nhdp_gibbs_sampling(nHdp2, 100, 0, 1, FALSE);
+    finalize_nhdp_distributions(nHdp2);
 
     // test against model updated with simple alignment
-    test_checkHDPs(testCase, hdpHmm->nhdp, nHdp1, 0.000001);
+    test_checkHDPs(testCase, nHdp2, nHdp1, 0.000001);
 }
 
-static void test_HdpHmmWithAssignments2(CuTest *testCase) {
+static void test_HdpHmmWithAssignments_flat_model2(CuTest *testCase) {
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
     char *templateModelFile = "../../cPecan/models/template_median68pA.model";
     // make NanoporeHDP to compare to
     NanoporeHDP *nHdp1 = flat_hdp_model_2("ACGMT", (SYMBOL_NUMBER_NO_N + 1), KMER_LENGTH,
-                                          5.0, 0.5, 5.0, 0.5,
+                                          5.0, 0.5, 5.0, 0.5, // base_alpha, base_beta, leaf_alpha, leaf_beta
                                           0.0, 100, 100,
                                           templateModelFile);
     update_nhdp_from_alignment_with_filter(nHdp1, alignmentFile, FALSE, "t");
@@ -954,22 +1042,22 @@ static void test_HdpHmmWithAssignments2(CuTest *testCase) {
                                           templateModelFile);
     // load Hmm from disk and update the NanoporeHDP
     Hmm *hmm = hdpHmm_loadFromFile("../../cPecan/tests/test_hdp/test_expectations.expectations", nHdp2);
-    HdpHmm *hdpHmm = (HdpHmm *)hmm;
-    execute_nhdp_gibbs_sampling(hdpHmm->nhdp, 1000, 10000, 100, FALSE);
-    finalize_nhdp_distributions(hdpHmm->nhdp);
+    (void) hmm;
+    execute_nhdp_gibbs_sampling(nHdp2, 1000, 10000, 100, FALSE);
+    finalize_nhdp_distributions(nHdp2);
 
     // test against model updated with simple alignment
-    test_checkHDPs(testCase, hdpHmm->nhdp, nHdp1, 0.00001);
+    test_checkHDPs(testCase, nHdp2, nHdp1, 0.0001);
 }
 
-static void test_HdpHmmWithAssignments3(CuTest *testCase) {
+static void test_HdpHmmWithAssignments_multiset_model(CuTest *testCase) {
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
     char *templateModelFile = "../../cPecan/models/template_median68pA.model";
     // make NanoporeHDP to compare to
     NanoporeHDP *nHdp1 = multiset_hdp_model("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
-                                          1.0, 1.0, 1.0,
-                                          0.0, 100, 100,
-                                          templateModelFile);
+                                            1.0, 1.0, 1.0,
+                                            0.0, 100, 100,
+                                            templateModelFile);
     update_nhdp_from_alignment_with_filter(nHdp1, alignmentFile, FALSE, "t");
     execute_nhdp_gibbs_sampling(nHdp1, 100, 0, 1, FALSE);
     finalize_nhdp_distributions(nHdp1);
@@ -981,12 +1069,43 @@ static void test_HdpHmmWithAssignments3(CuTest *testCase) {
                                             templateModelFile);
     // load Hmm from disk and update the NanoporeHDP
     Hmm *hmm = hdpHmm_loadFromFile("../../cPecan/tests/test_hdp/test_expectations.expectations", nHdp2);
-    HdpHmm *hdpHmm = (HdpHmm *)hmm;
-    execute_nhdp_gibbs_sampling(hdpHmm->nhdp, 100, 0, 1, FALSE);
-    finalize_nhdp_distributions(hdpHmm->nhdp);
+    (void) hmm;
+    execute_nhdp_gibbs_sampling(nHdp2, 100, 0, 1, FALSE);
+    finalize_nhdp_distributions(nHdp2);
 
     // test against model updated with simple alignment
-    test_checkHDPs(testCase, hdpHmm->nhdp, nHdp1, 0.00001);
+    test_checkHDPs(testCase, nHdp2, nHdp1, 0.00001);
+}
+
+static void test_HdpHmmWithAssignments_multiset_model2(CuTest *testCase) {
+    char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
+    char *templateModelFile = "../../cPecan/models/template_median68pA.model";
+    // make NanoporeHDP to compare to
+    NanoporeHDP *nHdp1 = multiset_hdp_model_2("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
+                                              5.0, 0.5,
+                                              5.0, 0.5,
+                                              5.0, 0.5,
+                                              0.0, 100, 100,
+                                              templateModelFile);
+    update_nhdp_from_alignment_with_filter(nHdp1, alignmentFile, FALSE, "t");
+    execute_nhdp_gibbs_sampling(nHdp1, 1000, 10000, 100, FALSE);
+    finalize_nhdp_distributions(nHdp1);
+
+    // make NanoporeHDP from Hmm
+    NanoporeHDP *nHdp2 = multiset_hdp_model_2("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
+                                              5.0, 0.5,
+                                              5.0, 0.5,
+                                              5.0, 0.5,
+                                              0.0, 100, 100,
+                                              templateModelFile);
+    // load Hmm from disk and update the NanoporeHDP
+    Hmm *hmm = hdpHmm_loadFromFile("../../cPecan/tests/test_hdp/test_expectations.expectations", nHdp2);
+    (void) hmm;
+    execute_nhdp_gibbs_sampling(nHdp2, 1000, 10000, 100, FALSE);
+    finalize_nhdp_distributions(nHdp2);
+
+    // test against model updated with simple alignment
+    test_checkHDPs(testCase, nHdp2, nHdp1, 0.001);
 }
 
 static void test_hdpHmm_em(CuTest *testCase) {
@@ -994,22 +1113,21 @@ static void test_hdpHmm_em(CuTest *testCase) {
     char *referencePath = stString_print("../../cPecan/tests/test_npReads/ZymoRef.txt");
     FILE *fH = fopen(referencePath, "r");
     char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
+
     // parameters for pairwise alignment using defaults
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+
     // load the npRead
     char *npReadFile = stString_print("../../cPecan/tests/test_npReads/ZymoC_ch_1_file1.npRead");
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
-
-    nanopore_descaleEvents(npRead->nbTemplateEvents, npRead->templateEvents,
-                           npRead->templateParams.scale,
-                           npRead->templateParams.shift);
+    nanopore_descaleNanoporeRead(npRead);
 
     // get sequence lengths
     int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event);
     int64_t lY = npRead->nbTemplateEvents;
 
-    // start with random model
     double pLikelihood = -INFINITY;
+
     Hmm *hdpHmm = hdpHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState_hdp, p->threshold,
                                         continuousPairHmm_addToTransitionsExpectation,
                                         continuousPairHmm_setTransitionExpectation,
@@ -1020,33 +1138,34 @@ static void test_hdpHmm_em(CuTest *testCase) {
                                         emissions_discrete_getKmerIndexFromKmer);
     continuousPairHmm_randomize(hdpHmm);
 
+    // make initial NanoporeHdp from alignment
+
     char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
     char *strand = "t";
-
-    // make nanopore HDP
-    char *canonicalAlphabet = "ACGT\0";
-    NanoporeHDP *nHdp = flat_hdp_model(canonicalAlphabet, 4, KMER_LENGTH, 1.0, 1.0, 40.0, 100.0, 100, modelFile);
+    NanoporeHDP *nHdp = flat_hdp_model("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
+                                       5.0, 0.5, // base_gamma, leaf_gamma
+                                       0.0, 100.0, 100, modelFile);
     update_nhdp_from_alignment_with_filter(nHdp, alignmentFile, FALSE, strand);
-    execute_nhdp_gibbs_sampling(nHdp, 200, 10000, 50, FALSE);
-    finalize_nhdp_distributions(nHdp);
+
+    // make statemachine
     StateMachine *sMt = getHdpStateMachine3(nHdp);
 
     // load (random) transitions into stateMachine
     continuousPairHmm_loadTransitionsAndKmerGapProbs(sMt, hdpHmm);
 
     // close hmm
-    continuousPairHmm_destruct(hdpHmm);
+    hdpHmm_destruct(hdpHmm);
 
     for (int64_t iter = 0; iter < 10; iter++) {
-        hdpHmm = continuousPairHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState,
-                                                  continuousPairHmm_addToTransitionsExpectation,
-                                                  continuousPairHmm_setTransitionExpectation,
-                                                  continuousPairHmm_getTransitionExpectation,
-                                                  continuousPairHmm_addToKmerGapExpectation,
-                                                  continuousPairHmm_setKmerGapExpectation,
-                                                  continuousPairHmm_getKmerGapExpectation,
-                                                  emissions_discrete_getKmerIndexFromKmer);
+        Hmm *hmmExpectations = hdpHmm_constructEmpty(0.0001, 3, NUM_OF_KMERS, threeState_hdp, p->threshold,
+                                                     continuousPairHmm_addToTransitionsExpectation,
+                                                     continuousPairHmm_setTransitionExpectation,
+                                                     continuousPairHmm_getTransitionExpectation,
+                                                     continuousPairHmm_addToKmerGapExpectation,
+                                                     continuousPairHmm_setKmerGapExpectation,
+                                                     continuousPairHmm_getKmerGapExpectation,
+                                                     emissions_discrete_getKmerIndexFromKmer);
         // E step
         // get anchors using lastz
         stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
@@ -1060,39 +1179,54 @@ static void test_hdpHmm_em(CuTest *testCase) {
                                                sequence_sliceNucleotideSequence2);
         Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
                                                     sequence_sliceEventSequence2);
+        execute_nhdp_gibbs_sampling(nHdp, 1000, 10000, 100, FALSE);
+        finalize_nhdp_distributions(nHdp);
 
-        getExpectationsUsingAnchors(sMt, hdpHmm, refSeq, templateSeq, filteredRemappedAnchors,
+        getExpectationsUsingAnchors(sMt, hmmExpectations, refSeq, templateSeq, filteredRemappedAnchors,
                                     p, diagonalCalculation_signal_Expectations, 0, 0);
 
-        continuousPairHmm_normalize(hdpHmm);
+        // norm
+        continuousPairHmm_normalize(hmmExpectations);
 
-        //Log stuff
+        // Log stuff
+        /*
         for (int64_t from = 0; from < sMt->stateNumber; from++) {
             for (int64_t to = 0; to < sMt->stateNumber; to++) {
-                st_logInfo("Transition from %" PRIi64 " to %" PRIi64 " has expectation %f\n", from, to,
-                           hdpHmm->getTransitionsExpFcn(hdpHmm, from, to));
+                //st_logInfo("Transition from %" PRIi64 " to %" PRIi64 " has expectation %f\n", from, to,
+                //           hmmExpectations->getTransitionsExpFcn(hmmExpectations, from, to));
+                st_uglyf("Transition from %" PRIi64 " to %" PRIi64 " has expectation %f\n", from, to,
+                           hmmExpectations->getTransitionsExpFcn(hmmExpectations, from, to));
             }
         }
         for (int64_t x = 0; x < hdpHmm->symbolSetSize; x++) {
-            st_logInfo("Emission x %" PRIi64 " has expectation %f\n", x, hdpHmm->getEmissionExpFcn(hdpHmm, 0, x, 0));
-
+            st_logInfo("Emission x %" PRIi64 " has expectation %f\n", x,
+                       hmmExpectations->getEmissionExpFcn(hmmExpectations, 0, x, 0));
         }
-        //st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", hdpHmm->likelihood, iter);
+        */
+        //st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", hmmExpectations->likelihood, iter);
 
         // M step
-        // make new HDP here
+        // dump hmm (expectations) to disk
+        char *tempHdpHmmFile = stString_print("../../cPecan/tests/test_hdp/tempHdpHmm.hmm");
+        FILE *fH = fopen(tempHdpHmmFile, "w");
+        hdpHmm_writeToFile(hmmExpectations, fH);
+        fclose(fH);
 
-        // then load transitions
-        continuousPairHmm_loadTransitionsAndKmerGapProbs(sMt, hdpHmm);
+        // load into nHdp
+        hdpHmm_updateStateMachineHDP(tempHdpHmmFile, sMt);
+        remove(tempHdpHmmFile);
 
         // Tests
-        assert(pLikelihood <= hdpHmm->likelihood * 0.95);
-        CuAssertTrue(testCase, pLikelihood <= hdpHmm->likelihood * 0.95);
+        assert(pLikelihood <= hmmExpectations->likelihood * 0.95);
+        if (iter > 1) {
+            CuAssertTrue(testCase, pLikelihood <= hmmExpectations->likelihood * 0.95);
+        }
         // update
-        pLikelihood = hdpHmm->likelihood;
+        pLikelihood = hmmExpectations->likelihood;
 
         // per iteration clean up
-        continuousPairHmm_destruct(hdpHmm);
+        //continuousPairHmm_destruct(hmmExpectations);
+        hdpHmm_destruct(hmmExpectations);
         sequence_sequenceDestroy(refSeq);
         sequence_sequenceDestroy(templateSeq);
         stList_destruct(filteredRemappedAnchors);
@@ -1102,9 +1236,9 @@ static void test_hdpHmm_em(CuTest *testCase) {
     stateMachine_destruct(sMt);
 }
 
-
 CuSuite *NanoporeHdpTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
+
     SUITE_ADD_TEST(suite, test_first_kmer_index);
     SUITE_ADD_TEST(suite, test_second_kmer_index);
     SUITE_ADD_TEST(suite, test_sixth_kmer_index);
@@ -1117,10 +1251,14 @@ CuSuite *NanoporeHdpTestSuite(void) {
     SUITE_ADD_TEST(suite, test_sm3Hdp_dpDiagonal);
     SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding_withReplacement);
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
-    SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments);
-    SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments2);
-    SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments3);
-    //SUITE_ADD_TEST(suite, test_continuousPairHDPHmm_em);
+    SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_flat_model);
+    SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_flat_model2);
+    SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_multiset_model);
+    SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_multiset_model2);
+    //SUITE_ADD_TEST(suite, test_nhdp_buildFromAlignment);  // use to make test NanoporeHDPs
+    SUITE_ADD_TEST(suite, test_hdpHmm_em);
+
     return suite;
 }

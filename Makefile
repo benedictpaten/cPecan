@@ -10,7 +10,7 @@ cPecanLibs = ${basicLibs}
 
 all : ${libPath}/cPecanLib.a ${binPath}/cPecanLibTests ${binPath}/vanillaAlign ${binPath}/trainModels ${binPath}/signalAlign ${sonLibrootPath}/nanoporelib.py
 	# disabled right now so that we don't build Lastz every time I do an update
-	#cd externalTools && make all
+	cd externalTools && make all
 	
 clean : 
 	rm -f ${binPath}/cPecanRealign ${binPath}/cPecanEm ${binPath}/cPecanLibTests  ${libPath}/cPecanLib.a
@@ -44,7 +44,8 @@ ${binPath}/cPecanLibTests : ${libTests} tests/*.h ${libPath}/cPecanLib.a ${cPeca
 	${cxx} ${cflags} -I inc -I${libPath} -Wno-error -o ${binPath}/cPecanLibTests ${libTests} ${libPath}/cPecanLib.a ${cPecanLibs}
 	
 ${libPath}/cPecanLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
-	${cxx} ${cflags} -I inc -I ${libPath}/ -c ${libSources} 
+	#${cxx} ${cflags} -I inc -I ${libPath}/ -c ${libSources} 
+	gcc-5 ${cflags} -I inc -I ${libPath}/ -c ${libSources} 
 	ar rc cPecanLib.a *.o
 	ranlib cPecanLib.a 
 	rm *.o

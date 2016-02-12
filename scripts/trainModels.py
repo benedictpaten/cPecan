@@ -14,26 +14,26 @@ from random import shuffle
 def parse_args():
     parser = ArgumentParser (description=__doc__)
 
-    parser.add_argument('--file_directory', '-d', action='append',
-                        dest='files_dir', required=True, type=str,
+    parser.add_argument('--file_directory', '-d', action='append', default=None,
+                        dest='files_dir', required=False, type=str,
                         help="directories with fast5 files to train on")
-    parser.add_argument('--ref', '-r', action='store',
-                        dest='ref', required=True, type=str,
+    parser.add_argument('--ref', '-r', action='store', default=None,
+                        dest='ref', required=False, type=str,
                         help="location of refrerence sequence in FASTA")
-    parser.add_argument('--output_location', '-o', action='store', dest='out',
-                        required=True, type=str, default=None,
+    parser.add_argument('--output_location', '-o', action='store', dest='out', default=None,
+                        required=False, type=str,
                         help="directory to put the trained model, and use for working directory.")
-    parser.add_argument('--iterations', '-i', action='store', dest='iter',
-                        required=True, type=int)
-    parser.add_argument('--train_amount', '-a', action='store', dest='amount',
-                        required=True, type=int,
+    parser.add_argument('--iterations', '-i', action='store', dest='iter', default=10,
+                        required=False, type=int)
+    parser.add_argument('--train_amount', '-a', action='store', dest='amount', default=15,
+                        required=False, type=int,
                         help="limit the total length of sequence to use in training.")
     parser.add_argument('--diagonalExpansion', '-e', action='store', dest='diag_expansion', type=int,
                         required=False, default=None, help="number of diagonals to expand around each anchor")
     parser.add_argument('--constraintTrim', '-m', action='store', dest='constraint_trim', type=int,
                         required=False, default=None, help='amount to remove from an anchor constraint')
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
-                        default=None, help="posterior match probability threshold")
+                        default=0.01, help="posterior match probability threshold")
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
@@ -42,10 +42,18 @@ def parse_args():
                         help="input HMM for complement events, if you don't want the default")
     parser.add_argument('--un-banded', '-ub', action='store_true', dest='banded',
                         default=False, help='flag, use banded alignment heuristic')
-    parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=True,
+    parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False, default=4,
                         type=int, help="number of jobs to run concurrently")
     parser.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
-                        required=True, help="decide which model to use, vanilla by default")
+                        default="threeState", required=False,
+                        help="StateMachine options: threeState, threeStateHdp, vanilla")
+
+    parser.add_argument('--buildHdp', action='store', dest='buildHDP', default=None,
+                        help="Build Hdp, specify type, options: "
+                             "singleLevelFixed, singleLevelPrior, multisetFixed, multisetPrior")
+    parser.add_argument('--buildAlignments', '-al', action='store', dest='buildAlignments', default=None)
+    parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None)
+    parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None)
 
     args = parser.parse_args()
     return args
@@ -98,11 +106,14 @@ def get_expectations(work_queue, done_queue):
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
-def get_model(type, symbol_set_size):
+def get_model(type, symbol_set_size, threshold):
+    assert (type in ["threeState", "vanilla", "threeStateHdp"]), "Unsupported StateMachine type"
     if type == "threeState":
         return ContinuousPairHmm(model_type=type, symbol_set_size=symbol_set_size)
     if type == "vanilla":
         return ConditionalSignalHmm(model_type=type, symbol_set_size=symbol_set_size)
+    if type == "threeStateHdp":
+        return HdpSignalHmm(model_type=type, symbol_set_size=symbol_set_size, threshold=threshold)
 
 
 def add_and_norm_expectations(path, files, model, hmm_file):
@@ -113,11 +124,61 @@ def add_and_norm_expectations(path, files, model, hmm_file):
     model.normalize()
     model.write(hmm_file)
     model.running_likelihoods.append(model.likelihood)
+    if type(model) is HdpSignalHmm:
+        model.reset_assignments()
+
+
+def build_hdp(hdp_type, template_hdp_path, complement_hdp_path, alignments,
+              template_assignments=None, complement_assignments=None):
+    def get_hdp_type(requested_type):
+        hdp_types = {
+            "singleLevelFixed": 0,
+            "singleLevelPrior": 1,
+            "multisetFixed": 2,
+            "multisetPrior": 3,
+        }
+        assert (requested_type in hdp_types.keys()), "Requested HDP type is invalid, got {}".format(requested_type)
+        return hdp_types[requested_type]
+
+    if alignments is not None:
+        assert (hdp_type is not None), "Need to specify HDP type"
+        start_message = """\n
+    Building Nanopore HDP
+    Using Alignments from {alignments}
+    Putting template HDP here: {tHdp}
+    Putting complement HDP here: {cHdp}
+    Making Type: {type}
+    """.format(alignments=alignments, tHdp=template_hdp_path, cHdp=complement_hdp_path, type=hdp_type)
+        print(start_message)
+        command = "./vanillaAlign --buildHDP -p {type} -v {tHdpP} -w {cHdpP} -a {al}".format(
+            type=get_hdp_type(hdp_type), tHdpP=template_hdp_path, cHdpP=complement_hdp_path, al=alignments
+        )
+        os.system(command)
+        print("\ntrainModels - Finished Building HDP\n")
+        sys.exit(0)
+    elif (template_assignments is not None) and (complement_assignments is not None):
+        command = "./vanillaAlign --buildHDP -v {tHdpP} -w {cHdpP}" \
+                  " -t {tExpectations} -c {cExpectations}".format(tHdpP=template_hdp_path,
+                                                                  cHdpP=complement_hdp_path,
+                                                                  tExpectations=template_assignments,
+                                                                  cExpectations=complement_assignments)
+        os.system(command)
+        print("trainModels - built HDP.", file=sys.stderr)
+        return
+    else:
+        print("trainModels - illegal BuildHDP options\n", file=sys.stderr)
+        sys.exit(1)
 
 
 def main(argv):
     # parse command line arguments
     args = parse_args()
+
+    # build the HDP if that's what we're doing
+    if args.buildHDP is not None:
+        assert (None not in [args.buildHDP, args.templateHDP, args.complementHDP, args.buildAlignments])
+        build_hdp(hdp_type=args.buildHDP, template_hdp_path=args.templateHDP, complement_hdp_path=args.complementHDP,
+                  alignments=args.buildAlignments)
 
     start_message = """\n
     Starting Baum-Welch training.
@@ -132,6 +193,11 @@ def main(argv):
     """.format(files_dir=args.files_dir, amount=args.amount, ref=args.ref,
                inTHmm=args.in_T_Hmm, inCHmm=args.in_C_Hmm, outLoc=args.out,
                iterations=args.iter, model=args.stateMachineType)
+
+    assert (args.files_dir is not None), "Need to specify which files to train on"
+    assert (args.ref is not None), "Need to provide a reference file"
+    assert (args.out is not None), "Need to know the working directory for training"
+
     print(start_message, file=sys.stdout)
 
     if not os.path.isfile(args.ref):  # TODO make this is_fasta(args.ref)
@@ -150,8 +216,15 @@ def main(argv):
     print("signalAlign - indexing reference, done", file=sys.stderr)
 
     # make model objects, these handle normalizing, loading, and writing
-    template_model = get_model(type=args.stateMachineType, symbol_set_size=4096)
-    complement_model = get_model(type=args.stateMachineType, symbol_set_size=4096)
+    template_model = get_model(type=args.stateMachineType, symbol_set_size=4096, threshold=args.threshold)
+    complement_model = get_model(type=args.stateMachineType, symbol_set_size=4096, threshold=args.threshold)
+
+    # get the input HDP, if we're using it
+    if args.stateMachineType == "threeStateHdp":
+        assert (args.templateHDP is not None) and (args.complementHDP is not None), "Need to provide serialized HDP " \
+                                                                                    "files for this stateMachineType"
+        assert (os.path.isfile(args.templateHDP)) and (os.path.isfile(args.complementHDP)), "Could not find the HDP" \
+                                                                                            "files"
 
     # make some paths to files to hold the HMMs
     template_hmm = working_folder.add_file_path("template_trained.hmm")
@@ -189,13 +262,15 @@ def main(argv):
                 "bwa_index": bwa_ref_index,
                 "in_templateHmm": in_template_hmm,
                 "in_complementHmm": in_complement_hmm,
+                "in_templateHdp": args.templateHDP,
+                "in_complementHdp": args.complementHDP,
                 "threshold": args.threshold,
                 "diagonal_expansion": args.diag_expansion,
                 "constraint_trim": args.constraint_trim,
             }
-            #alignment = SignalAlignment(**alignment_args)
-            #alignment.run(get_expectations=True)
-            work_queue.put(alignment_args)
+            alignment = SignalAlignment(**alignment_args)
+            alignment.run(get_expectations=True)
+            #work_queue.put(alignment_args)
 
         for w in xrange(workers):
             p = Process(target=get_expectations, args=(work_queue, done_queue))
@@ -226,11 +301,17 @@ def main(argv):
                                       files=complement_expectations_files,
                                       model=complement_model,
                                       hmm_file=complement_hmm)
+        # Build HDP from last round of assignments
+        if args.stateMachineType == "threeStateHdp":
+            build_hdp(hdp_type=None, template_hdp_path=args.templateHDP, complement_hdp_path=args.complementHDP,
+                      alignments=None, template_assignments=template_hmm, complement_assignments=complement_hmm)
 
         if len(template_model.running_likelihoods) > 0 and len(complement_model.running_likelihoods) > 0:
             print("{i}| {t_likelihood}\t{c_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1],
-                                                              c_likelihood=complement_model.running_likelihoods[-1],
-                                                              i=i))
+                                                               c_likelihood=complement_model.running_likelihoods[-1],
+                                                               i=i))
+
+    # if we're using HDP, trim the final Hmm (remove assignments)
 
     print("trainModels - finished training routine", file=sys.stdout)
     print("trainModels - finished training routine", file=sys.stderr)

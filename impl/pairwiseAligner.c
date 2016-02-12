@@ -486,7 +486,6 @@ void cell_signal_updateTransAndKmerSkipExpectations2(double *fromCells, double *
     if ((to == match) & (p >= hmmExpectations->threshold)) {
         // add to emissions expectations function here
         hmmExpectations->addToAssignments((Hmm *)hmmExpectations, kmer, event);
-        //stList_append(hmmExpectations->assignments, stDoubleTuple_construct(2, event, (double) x));
     }
 }
 

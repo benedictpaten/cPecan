@@ -69,8 +69,25 @@ static bool hmmContinuous_checkTransitions(double *transitions, int64_t nbTransi
     }
     return TRUE;
 }
-///////////////////////////////////////////// Continuous Pair HMM /////////////////////////////////////////////////////
 
+static Hmm *hmmContinuous_loadSignalHmm(const char *fileName, StateMachineType type) {
+    assert((type == vanilla) || (type == threeState) || (type == threeState_hdp));
+    if (type == vanilla) {
+        Hmm *hmm = vanillaHmm_loadFromFile(fileName);
+        return hmm;
+    }
+    if (type == threeState) {
+        Hmm *hmm = continuousPairHmm_loadFromFile(fileName);
+        return hmm;
+    }
+    if (type == threeState_hdp) {
+        Hmm *hmm = hdpHmm_loadFromFile2(fileName, NULL);
+        return hmm;
+    }
+    return 0;
+}
+
+///////////////////////////////////////////// Continuous Pair HMM /////////////////////////////////////////////////////
 Hmm *continuousPairHmm_constructEmpty(
         double pseudocount, int64_t stateNumber, int64_t symbolSetSize, StateMachineType type,
         void (*addToTransitionExpFcn)(Hmm *hmm, int64_t from, int64_t to, double p),
@@ -80,7 +97,6 @@ Hmm *continuousPairHmm_constructEmpty(
         void (*setKmerGapExpFcn)(Hmm *hmm, int64_t state, int64_t ki, int64_t ignore, double p),
         double (*getKmerGapExpFcn)(Hmm *hmm, int64_t state, int64_t ki, int64_t ignore),
         int64_t (*getElementIndexFcn)(void *)) {
-    // malloc
     if (type != threeState && type != threeState_hdp) {
         st_errAbort("ContinuousPair HMM construct: Wrong HMM type for this function got: %i", type);
     }
@@ -208,13 +224,11 @@ void continuousPairHmm_loadTransitionsAndKmerGapProbs(StateMachine *sM, Hmm *hmm
 
     /// / load kmer gap probs
     for (int64_t i = 0; i < hmm->symbolSetSize; i++) {
-        //sM3->model.EMISSION_GAP_X_PROBS[i] = hmm->getEmissionExpFcn(hmm, 0, i, 0);
         sM3->model.EMISSION_GAP_X_PROBS[i] = log(hmm->getEmissionExpFcn(hmm, 0, i, 0));
     }
 }
 
-// TODO pass in sequence also to get kmers
-void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle, double scale, double shift) {
+void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
     /*
      * Format:
      * type \t stateNumber \t symbolSetSize \n
@@ -250,20 +264,6 @@ void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle, double scale, dou
             fprintf(fileHandle, "%f\t", cpHmm->individualKmerGapProbs[i]); // indiv kmer skip probs 2:(0-4096)
         }
         fprintf(fileHandle, "\n"); // newLine
-
-        // write out assignments in format: event(observed current) \t assignment
-        //int64_t nb_assignments = stList_length(cpHmm->baseContinuousHmm.assignments);
-        /*
-        for (int64_t i = 0; i < nb_assignments; i++) {
-            stDoubleTuple *assignment = stList_get(cpHmm->baseContinuousHmm.assignments, i);
-
-            // get the assignment
-            int64_t kmerIdx = (int64_t )stDoubleTuple_getPosition(assignment, 1);
-
-            // descale the event
-            double meanCurrent = (stDoubleTuple_getPosition(assignment, 0) - shift) / scale;
-            fprintf(fileHandle, "%lf\t%lld\n", meanCurrent, kmerIdx);
-        }*/
     }
 }
 
@@ -292,14 +292,6 @@ Hmm *continuousPairHmm_loadFromFile(const char *fileName) {
     if (n != 1) {
         st_errAbort("Failed to parse symbol set size (int) from string: %s\n", string);
     }
-    //int64_t m = sscanf(stList_get(tokens, 3), "%lf", &threshold);
-    //if (m != 1) {
-    //    st_errAbort("Failed to parse threshold (double) from string: %s\n", string);
-    //}
-    //j = sscanf(stList_get(tokens, 4), "%lld", &numberOfAssignments); // number of assignments
-    //if (j != 1) {
-    //    st_errAbort("Failed to parse number of assignments (int) from string: %s\n", string);
-    //}
 
     // make empty cpHMM
     Hmm *hmm = continuousPairHmm_constructEmpty(0.0,
@@ -676,6 +668,45 @@ Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symb
     return (Hmm *)hmm;
 }
 
+void hdpHmm_loadTransitionsAndKmerGapProbs(StateMachine *sM, Hmm *hmm) {
+    StateMachine3_HDP *sM3 = (StateMachine3_HDP *)sM;
+    // load transitions
+    // from match
+    sM3->TRANSITION_MATCH_CONTINUE = log(hmm->getTransitionsExpFcn(hmm, match, match));
+    sM3->TRANSITION_GAP_OPEN_X = log(hmm->getTransitionsExpFcn(hmm, match, shortGapX));
+    sM3->TRANSITION_GAP_OPEN_Y = log(hmm->getTransitionsExpFcn(hmm, match, shortGapY));
+
+    // from shortGapX (kmer skip)
+    sM3->TRANSITION_MATCH_FROM_GAP_X = log(hmm->getTransitionsExpFcn(hmm, shortGapX, match));
+    //sM3->TRANSITION_GAP_EXTEND_X = log(hmm->getTransitionsExpFcn(hmm, shortGapX, shortGapX));
+    sM3->TRANSITION_GAP_EXTEND_X = log(1 - hmm->getTransitionsExpFcn(hmm, shortGapX, match));
+    sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;
+
+    // from shortGapY (extra event)
+    sM3->TRANSITION_MATCH_FROM_GAP_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapY, match));
+    sM3->TRANSITION_GAP_EXTEND_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapY, shortGapY));
+    sM3->TRANSITION_GAP_SWITCH_TO_X = log(hmm->getTransitionsExpFcn(hmm, shortGapY, shortGapX));
+
+    //sM3->TRANSITION_GAP_SWITCH_TO_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapX, shortGapY));
+    //sM3->TRANSITION_GAP_SWITCH_TO_X = LOG_ZERO;
+
+    // load kmer gap probs
+    if (hmm->symbolSetSize != sM3->model.parameterSetSize) {
+        st_errAbort("hdpHmm_loadTransitionsAndKmerGapProbs: hmm symbol set size needs to be equal to the "
+                            "stateMachine parameter set size");
+    }
+    for (int64_t i = 0; i < hmm->symbolSetSize; i++) {
+        sM3->model.EMISSION_GAP_X_PROBS[i] = log(hmm->getEmissionExpFcn(hmm, 0, i, 0));
+    }
+}
+
+void hdpHmm_updateStateMachineHDP(const char *expectationsFile, StateMachine *sM) {
+    StateMachine3_HDP *sM3Hdp = (StateMachine3_HDP *)sM;
+    Hmm *transitionsExpectations = hdpHmm_loadFromFile2(expectationsFile, sM3Hdp->hdpModel);
+    hdpHmm_loadTransitionsAndKmerGapProbs((StateMachine *)sM3Hdp, transitionsExpectations);
+    hdpHmm_destruct(transitionsExpectations);
+}
+
 void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
     /*
      * Format:
@@ -765,7 +796,7 @@ Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *nHdp) {
         st_errAbort("Failed to parse number of assignments (int) from string: %s\n", string);
     }
 
-    Hmm *hmm = hdpHmm_constructEmpty(0.0, stateNumber, NUM_OF_KMERS, type, threshold,
+    Hmm *hmm = hdpHmm_constructEmpty(0.0, stateNumber, symbolSetSize, type, threshold,
                                      continuousPairHmm_addToTransitionsExpectation,
                                      continuousPairHmm_setTransitionExpectation,
                                      continuousPairHmm_getTransitionExpectation,
@@ -891,6 +922,166 @@ Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *nHdp) {
     return (Hmm *)hdpHmm;
 }
 
+Hmm *hdpHmm_loadFromFile2(const char *fileName, NanoporeHDP *nHdp) {
+    // open file
+    FILE *fH = fopen(fileName, "r");
+
+    // line 0
+    char *string = stFile_getLineFromFile(fH);
+    stList *tokens = stString_split(string);
+
+    int type;
+    int64_t stateNumber, symbolSetSize, numberOfAssignments;
+    double threshold;
+
+    int64_t j = sscanf(stList_get(tokens, 0), "%i", &type); // type
+    if (j != 1) {
+        st_errAbort("Failed to parse type (int) from string: %s\n", string);
+    }
+    j = sscanf(stList_get(tokens, 1), "%lld", &stateNumber); // stateNumber
+    if (j != 1) {
+        st_errAbort("Failed to parse state number (int) from string: %s\n", string);
+    }
+    j = sscanf(stList_get(tokens, 2), "%lld", &symbolSetSize); // symbolSetSize
+    if (j != 1) {
+        st_errAbort("Failed to parse symbol set size (int) from string: %s\n", string);
+    }
+    j = sscanf(stList_get(tokens, 3), "%lf", &threshold);
+    if (j != 1) {
+        st_errAbort("Failed to parse threshold (double) from string: %s\n", string);
+    }
+    j = sscanf(stList_get(tokens, 4), "%lld", &numberOfAssignments); // number of assignments
+    if (j != 1) {
+        st_errAbort("Failed to parse number of assignments (int) from string: %s\n", string);
+    }
+
+    Hmm *hmm = hdpHmm_constructEmpty(0.0, stateNumber, NUM_OF_KMERS, type, threshold,
+                                     continuousPairHmm_addToTransitionsExpectation,
+                                     continuousPairHmm_setTransitionExpectation,
+                                     continuousPairHmm_getTransitionExpectation,
+                                     continuousPairHmm_addToKmerGapExpectation,
+                                     continuousPairHmm_setKmerGapExpectation,
+                                     continuousPairHmm_getKmerGapExpectation,
+                                     emissions_discrete_getKmerIndexFromKmer);
+    HdpHmm *hdpHmm = (HdpHmm *) hmm;
+    hdpHmm->numberOfAssignments = numberOfAssignments;
+    //hdpHmm->nhdp = nHdp;
+    // cleanup
+    free(string);
+    stList_destruct(tokens);
+
+    // Transitions
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+
+    int64_t nb_transitions = (hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.stateNumber
+                              * hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.stateNumber);
+
+    // check for the correct number of transitions
+    if (stList_length(tokens) != nb_transitions + 1) { // + 1 bc. likelihood is also on that line
+        st_errAbort(
+                "Incorrect number of transitions in the input HMM file %s, got %" PRIi64 " instead of %" PRIi64 "\n",
+                fileName, stList_length(tokens), nb_transitions + 1);
+    }
+    // load them
+    for (int64_t i = 0; i < nb_transitions; i++) {
+        j = sscanf(stList_get(tokens, i), "%lf", &(hdpHmm->baseContinuousPairHmm.transitions[i]));
+        if (j != 1) {
+            st_errAbort("Failed to parse transition prob (float) from string: %s\n", string);
+        }
+    }
+    // load likelihood
+    j = sscanf(stList_get(tokens, stList_length(tokens) - 1), "%lf",
+               &(hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.likelihood));
+    if (j != 1) {
+        st_errAbort("Failed to parse likelihood (float) from string: %s\n", string);
+    }
+    // Cleanup transitions line
+    free(string);
+    stList_destruct(tokens);
+
+    // Emissions (Kmer skip probabilities)
+    string = stFile_getLineFromFile(fH);
+    tokens = stString_split(string);
+    // check
+    if (stList_length(tokens) != hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.symbolSetSize) {
+        st_errAbort(
+                "Incorrect number of emissions in the input HMM file %s, got %" PRIi64 " instead of %" PRIi64 "\n",
+                fileName, stList_length(tokens), hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.symbolSetSize);
+    }
+    // load them
+    for (int64_t i = 0; i < hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.symbolSetSize; i++) {
+        j = sscanf(stList_get(tokens, i), "%lf", &(hdpHmm->baseContinuousPairHmm.individualKmerGapProbs[i]));
+        if (j != 1) {
+            st_errAbort("Failed to parse the individual kmer skip probs from string %s\n", string);
+        }
+    }
+    // Cleanup emissions line
+    free(string);
+    stList_destruct(tokens);
+
+    // load the assignments into the Nanopore Hdp [this is basically the same as Jordan's code for updating from
+    // an alignment]
+    if (nHdp != NULL) {
+        fprintf(stderr, "vanillaAlign - loading NanoporeHdp\n");
+        // make stLists to hold things temporarily
+        stList *signalList = stList_construct3(0, &free);
+
+        // parse the events (current means)
+        string = stFile_getLineFromFile(fH);
+        tokens = stString_split(string);
+
+        // check to make sure everything is there
+        if (stList_length(tokens) != hdpHmm->numberOfAssignments) {
+            st_errAbort("Incorrect number of events got %lld, should be %lld\n",
+                        stList_length(tokens), hdpHmm->numberOfAssignments);
+        }
+
+        // parse the events into a list
+        char *signal_str;
+        for (int64_t i = 0; i < hdpHmm->numberOfAssignments; i++) {
+            signal_str = (char *)stList_get(tokens, i);
+            double *signal_ptr = (double *)st_malloc(sizeof(double));
+            sscanf(signal_str, "%lf", signal_ptr);
+            stList_append(signalList, signal_ptr);
+        }
+
+        // cleanup event line
+        free(string);
+        stList_destruct(tokens);
+
+        // parse the kmer assignment line
+        string = stFile_getLineFromFile(fH);
+        tokens = stString_split(string);
+        if (stList_length(tokens) != hdpHmm->numberOfAssignments) {
+            st_errAbort("Incorrect number of events got %lld, should be %lld\n",
+                        stList_length(tokens), hdpHmm->numberOfAssignments);
+        }
+        char *assignedKmer;
+        int64_t *dp_ids = st_malloc(sizeof(int64_t) * hdpHmm->numberOfAssignments);
+        for (int64_t i = 0; i < hdpHmm->numberOfAssignments; i++) {
+            assignedKmer = (char *)stList_get(tokens, i);
+            dp_ids[i] = kmer_id(assignedKmer,
+                                nHdp->alphabet,
+                                nHdp->alphabet_size,
+                                nHdp->kmer_length);
+        }
+        // cleanup
+        free(string);
+        stList_destruct(tokens);
+
+        // convert to arrays
+        int64_t dataLength;
+        double *signal = stList_toDoublePtr(signalList, &dataLength);
+        stList_destruct(signalList);
+        reset_hdp_data(nHdp->hdp);
+        pass_data_to_hdp(nHdp->hdp, signal, dp_ids, dataLength);
+    }
+    // close file
+    fclose(fH);
+    return (Hmm *)hdpHmm;
+}
+
 void hdpHmm_destruct(Hmm *hmm) {
     HdpHmm *hdpHmm = (HdpHmm *)hmm;
     free(hdpHmm->kmerAssignments);
@@ -901,17 +1092,10 @@ void hdpHmm_destruct(Hmm *hmm) {
 }
 
 ///////////////////////////////////////////////// CORE FUNCTIONS //////////////////////////////////////////////////////
-Hmm *hmmContinuous_loadSignalHmm(const char *fileName, StateMachineType type) {
-    assert((type == vanilla) || (type == threeState));
-    if (type == vanilla) {
-        Hmm *hmm = vanillaHmm_loadFromFile(fileName);
-        return hmm;
-    }
-    if (type == threeState) {
-        Hmm *hmm = continuousPairHmm_loadFromFile(fileName);
-        return hmm;
-    }
-    return 0;
+void hmmContinuous_loadSignalHmm2(const char *hmmFile, StateMachine *sM, StateMachineType type) {
+    Hmm *hmm = hmmContinuous_loadSignalHmm(hmmFile, type);
+    hmmContinuous_loadExpectations(sM, hmm, type);
+    hmmContinuous_destruct(hmm, type);
 }
 
 void hmmContinuous_loadExpectations(StateMachine *sM, Hmm *hmm, StateMachineType type) { // todo rename this function
@@ -922,20 +1106,26 @@ void hmmContinuous_loadExpectations(StateMachine *sM, Hmm *hmm, StateMachineType
     if (type == threeState) {
         continuousPairHmm_loadTransitionsAndKmerGapProbs(sM, hmm);
     }
+    if (type == threeState_hdp) {
+        hdpHmm_loadTransitionsAndKmerGapProbs(sM, hmm);
+    }
 }
 
 void hmmContinuous_destruct(Hmm *hmm, StateMachineType type) {
-    assert((type == vanilla) || (type == threeState));
+    assert((type == vanilla) || (type == threeState) || (type == threeState_hdp));
     if (type == vanilla) {
         vanillaHmm_destruct(hmm);
     }
     if (type == threeState) {
         continuousPairHmm_destruct(hmm);
     }
+    if (type == threeState_hdp) {
+        hdpHmm_destruct(hmm);
+    }
 }
 
-Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount) {
-    assert((type == vanilla) || (type == threeState));
+Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount, double threshold) {
+    assert((type == vanilla) || (type == threeState) || (type == threeState_hdp));
     if (type == vanilla) {
         Hmm *hmm = vanillaHmm_constructEmpty(pseudocount, 3, NUM_OF_KMERS, vanilla,
                                              vanillaHmm_addToKmerSkipBinExpectation,
@@ -954,6 +1144,17 @@ Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount) {
                                                     emissions_discrete_getKmerIndexFromKmer);
         return hmm;
     }
+    if (type == threeState_hdp) {
+        Hmm *hmm = hdpHmm_constructEmpty(pseudocount, 3, NUM_OF_KMERS, threeState_hdp, threshold,
+                                            continuousPairHmm_addToTransitionsExpectation,
+                                            continuousPairHmm_setTransitionExpectation,
+                                            continuousPairHmm_getTransitionExpectation,
+                                            continuousPairHmm_addToKmerGapExpectation,
+                                            continuousPairHmm_setKmerGapExpectation,
+                                            continuousPairHmm_getKmerGapExpectation,
+                                            emissions_discrete_getKmerIndexFromKmer);
+        return hmm;
+    }
     return 0;
 }
 
@@ -968,14 +1169,16 @@ void hmmContinuous_normalize(Hmm *hmm, StateMachineType type) {
 }
 
 void hmmContinuous_writeToFile(const char *outFile, Hmm *hmm, StateMachineType type) {
-    assert((type == vanilla) || (type == threeState));
+    assert((type == vanilla) || (type == threeState) || (type == threeState_hdp));
     FILE *fH = fopen(outFile, "w");
     if (type == vanilla) {
         vanillaHmm_writeToFile(hmm, fH);
     }
     if (type == threeState) {
-        // todo implant scale and shift
-        continuousPairHmm_writeToFile(hmm, fH, 0.0, 0.0);
+        continuousPairHmm_writeToFile(hmm, fH);
+    }
+    if (type == threeState_hdp) {
+        hdpHmm_writeToFile(hmm, fH);
     }
     fclose(fH);
 }

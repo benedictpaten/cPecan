@@ -21,6 +21,13 @@ typedef struct _nanoporeHDP {
     stSet* distr_metric_memos;
 } NanoporeHDP;
 
+typedef enum _nanoporeHdpType {
+    singleLevelFixed = 0,
+    singleLevelPrior = 1,
+    multisetFixed = 2,
+    multisetPrior = 3,
+} NanoporeHdpType;
+
 typedef struct _nanoporeDistributionMetricMemo {
     NanoporeHDP* nhdp;
     DistributionMetricMemo* memo;
@@ -121,7 +128,10 @@ NanoporeHDP* middle_2_nts_hdp_model_2(const char* alphabet, int64_t alphabet_siz
 void serialize_nhdp(NanoporeHDP* nhdp, const char* filepath);
 NanoporeHDP* deserialize_nhdp(const char* filepath);
 
-
+void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
+                                               const char *templateModelFile, const char* complementModelFile,
+                                               const char *alignments,
+                                               const char *templateHDP, const char *complementHDP);
 
 // n^k
 int64_t power(int64_t n, int64_t k);

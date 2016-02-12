@@ -1571,7 +1571,7 @@ StateMachine *stateMachine3Hdp_construct(StateMachineType type, int64_t paramete
                                                                       int64_t from, int64_t to,
                                                                       double eP, double tP, void *extraArgs)) {
     StateMachine3_HDP *sM3 = st_malloc(sizeof(StateMachine3_HDP));
-    if (type != threeState && type != threeStateAsymmetric) {
+    if (type != threeState_hdp) {
         st_errAbort("Tried to create a three state state-machine with the wrong type");
     }
 
@@ -1786,7 +1786,7 @@ StateMachine *getStrawManStateMachine3(const char *modelFile) {
 
 
 StateMachine *getHdpStateMachine3(NanoporeHDP *hdp) {
-    StateMachine *sM3 = stateMachine3Hdp_construct(threeState, NUM_OF_KMERS,
+    StateMachine *sM3 = stateMachine3Hdp_construct(threeState_hdp, NUM_OF_KMERS,
                                                    stateMachine3_setTransitionsToNanoporeDefaults,
                                                    emissions_signal_initEmissionsToZero,
                                                    hdp,

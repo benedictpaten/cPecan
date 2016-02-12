@@ -63,35 +63,35 @@ struct HierarchicalDirichletProcess {
     double* data;
     int64_t* data_pt_dp_id;
     int64_t data_length;
-    
+
     struct DirichletProcess* base_dp;
     struct DirichletProcess** dps;
     int64_t num_dps;
-    
+
     // normal-inverse gamma parameters
     double mu;
     double nu;
     double two_alpha;
     double beta;
-    
+
     double* sampling_grid;
     int64_t grid_length;
-    
+
     int64_t samples_taken;
     bool splines_finalized;
-    
+
     // TODO: replace this with my new offset log gamma memo
     //struct SumOfLogsMemo* log_sum_memo;
-    
+
     int64_t depth;
     bool sample_gamma;
     double* gamma;
-    
+
     double* gamma_alpha;
     double* gamma_beta;
     double* w_aux_vector;
     bool* s_aux_vector;
-    
+
     stSet* distr_metric_memos;
 };
 

@@ -763,7 +763,8 @@ class ComplementModel(NanoporeModel):
 
 class SignalAlignment(object):
     def __init__(self, in_fast5, reference, destination, stateMachineType, banded, bwa_index,
-                 in_templateHmm, in_complementHmm, threshold, diagonal_expansion,
+                 in_templateHmm, in_complementHmm, in_templateHdp, in_complementHdp,
+                 threshold, diagonal_expansion,
                  constraint_trim, target_regions=None):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.reference = reference  # reference sequence
@@ -787,6 +788,16 @@ class SignalAlignment(object):
             self.in_complementHmm = in_complementHmm
         else:
             self.in_complementHmm = None
+
+        # similarly for HDPs
+        if (in_templateHdp is not None) and os.path.isfile(in_templateHdp):
+            self.in_templateHdp = in_templateHdp
+        else:
+            self.in_templateHdp = None
+        if (in_complementHdp is not None) and os.path.isfile(in_complementHdp):
+            self.in_complementHdp = in_complementHdp
+        else:
+            self.in_complementHdp = None
 
     def run(self, get_expectations=False):
         # file checks
@@ -830,6 +841,10 @@ class SignalAlignment(object):
         elif self.stateMachineType == "echelon":
             model_label = ".e"
             stateMachineType_flag = "--e "
+        elif self.stateMachineType == "threeStateHdp":
+            model_label = ".sm3Hdp"
+            stateMachineType_flag = "-d "
+            assert (self.in_templateHdp is not None) and (self.in_complementHdp is not None), "Need to provide HDPs"
         else:
             model_label = ".vl"
             stateMachineType_flag = ""
@@ -857,17 +872,12 @@ class SignalAlignment(object):
             temp_folder.remove_folder()
             return False
 
-        # Alignment routine
+        # Alignment/Expectations routine
 
         # containers and defaults
-        #temp_ref_seq = temp_folder.add_file_path("temp_ref_seq.txt")
         path_to_vanillaAlign = "./vanillaAlign"  # todo could require this in path
 
-        # make sequence for vanillaAlign, we orient the sequence so that the template events align to the
-        # reference and the complement events align to the reverse complement of the reference
-        #make_temp_sequence(self.reference, forward, temp_ref_seq)
-
-        # alignment flags
+        # flags
 
         # input (match) models
         if self.in_templateModel is not None:
@@ -893,9 +903,16 @@ class SignalAlignment(object):
         else:
             complement_hmm_flag = ""
 
+        # input HDPs
+        if (self.in_templateHdp is not None) or (self.in_complementHdp is not None):
+            hdp_flags = "-v {tHdp_loc} -w {cHdp_loc} ".format(tHdp_loc=self.in_templateHdp,
+                                                             cHdp_loc=self.in_complementHdp)
+        else:
+            hdp_flags = ""
+
         # threshold
         if self.threshold is not None:
-            threshold_flag = "-d {threshold} ".format(threshold=self.threshold)
+            threshold_flag = "-D {threshold} ".format(threshold=self.threshold)
         else:
             threshold_flag = ""
 
@@ -911,10 +928,9 @@ class SignalAlignment(object):
         else:
             trim_flag = ""
 
-
         # banded alignment
         if self.banded is True:
-            banded_flag = "--b "
+            banded_flag = "-b "
         else:
             banded_flag = ""
 
@@ -925,11 +941,11 @@ class SignalAlignment(object):
 
             command = \
                 "echo {cigar} | {vA} {banded}{model}-r {ref} -q {npRead} {t_model}{c_model}{t_hmm}{c_hmm}{thresh}" \
-                "{expansion}{trim} -L {readLabel} -t {templateExpectations} -c {complementExpectations}"\
+                "{expansion}{trim} {hdp}-L {readLabel} -t {templateExpectations} -c {complementExpectations}"\
                 .format(cigar=cigar_string, vA=path_to_vanillaAlign, model=stateMachineType_flag, banded=banded_flag,
                         ref=self.reference, readLabel=read_label, npRead=temp_np_read, t_model=template_model_flag,
                         c_model=complement_model_flag, t_hmm=template_hmm_flag, c_hmm=complement_hmm_flag,
-                        templateExpectations=template_expectations_file_path,
+                        templateExpectations=template_expectations_file_path, hdp=hdp_flags,
                         complementExpectations=complement_expectations_file_path,
                         thresh=threshold_flag, expansion=diag_expansion_flag, trim=trim_flag)
         else:
@@ -945,7 +961,7 @@ class SignalAlignment(object):
         # run
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)
         os.system(command)
-        temp_folder.remove_folder()
+        #temp_folder.remove_folder()
         return True
 
 
@@ -953,7 +969,7 @@ class SignalHmm(object):
     def __init__(self, model_type, symbol_set_size):
         self.match_model_params = 5
         self.model_type = model_type  # ID of model type
-        self.state_number = {"threeState": 3, "vanilla": 3}[model_type]
+        self.state_number = {"threeState": 3, "vanilla": 3, "threeStateHdp": 3}[model_type]
         self.symbol_set_size = symbol_set_size  # eg. number of kmers, 4096 for 6mers
         self.likelihood = 0.0
         self.running_likelihoods = []
@@ -983,7 +999,6 @@ class ContinuousPairHmm(SignalHmm):
             return
 
         self.likelihood += line[-1]
-        #print("incorperating", line[0:-1], (np.nan in line[0:-1]))
         self.transitions = map(lambda x: sum(x), zip(self.transitions, line[0:-1]))
 
         # line 2: kmer skip probs
@@ -1030,6 +1045,102 @@ class ContinuousPairHmm(SignalHmm):
         # final newline
         f.write("\n")
         f.close()
+
+
+class HdpSignalHmm(ContinuousPairHmm):
+    def __init__(self, model_type, symbol_set_size, threshold):
+        super(HdpSignalHmm, self).__init__(model_type=model_type, symbol_set_size=symbol_set_size)
+        self.transitions = np.zeros(self.state_number ** 2)
+        self.number_of_assignments = 0
+        self.threshold = threshold
+        self.kmer_skip_probs = np.zeros(self.symbol_set_size)
+        self.kmer_assignments = []
+        self.event_assignments = []
+
+    def add_expectations_file(self, expectations_file):
+        fH = open(expectations_file, 'r')
+
+        # line 0: smType stateNumber, symbolSetSize
+        line = map(float, fH.readline().split())
+        assert line[0] == 7
+        assert line[1] == self.state_number
+        assert line[2] == self.symbol_set_size
+        assert line[3] == self.threshold
+        self.number_of_assignments += line[4]
+
+        # line 1: transitions, likelihood
+        line = map(float, fH.readline().split())
+
+        # check if valid file
+        if len(line) != (len(self.transitions) + 1):
+            print("PYSENTINAL - problem with file {}".format(expectations_file), file=sys.stdout)
+            return
+
+        self.likelihood += line[-1]
+        self.transitions = map(lambda x: sum(x), zip(self.transitions, line[0:-1]))
+
+        # line 2: kmer skip probs
+        line = map(float, fH.readline().split())
+        self.kmer_skip_probs = map(lambda x: sum(x), zip(self.kmer_skip_probs, line))
+
+        # line 3: event assignments
+        line = map(float, fH.readline().split())
+        self.event_assignments += line
+
+        # line 4: kmer assignments
+        line = map(str, fH.readline().split())
+        self.kmer_assignments += line
+
+        fH.close()
+
+        assert (len(self.kmer_assignments) == self.number_of_assignments) and \
+               (len(self.event_assignments) == self.number_of_assignments), \
+            "trainModels - add_expectations_file: invalid number of assignments"
+
+    def write(self, out_file):
+        # format
+        # type \t statenumber \t symbolsetsize \t threshold \t numberofassignments \n
+        # [transitions,..., \t seperated] likelihood \n
+        # [kmer skip probs,..., \t sep] \n
+        # [event assignments,..., \t sep]
+        # [kmer assignments,..., \t sep]
+        f = open(out_file, 'w')
+
+        # line 0
+        f.write("7\t{stateNumber}\t{symbolSetSize}\t{threshold}\t{numOfAssignments}\n".format(
+            stateNumber=self.state_number, symbolSetSize=self.symbol_set_size, threshold=self.threshold,
+            numOfAssignments=self.number_of_assignments)
+        )
+
+        # line 1
+        # transitions
+        for i in xrange(self.state_number * self.state_number):
+            f.write("{transition}\t".format(transition=str(self.transitions[i])))
+        # likelihood
+        f.write("{}\n".format(str(self.likelihood)))
+
+        # line 2
+        # kmer skip probs
+        for kmer in xrange(self.symbol_set_size):
+            f.write("{}\t".format(str(self.kmer_skip_probs[kmer])))
+        # final newline
+        f.write("\n")
+
+        # line 3 event assignments
+        for event in self.event_assignments:
+            f.write("{}\t".format(str(event)))
+        f.write("\n")
+
+        # line 4 kmer assignments
+        for kmer in self.kmer_assignments:
+            f.write("{}\t".format(kmer))
+        f.write("\n")
+        f.close()
+
+    def reset_assignments(self):
+        self.event_assignments = []
+        self.kmer_assignments = []
+        self.number_of_assignments = 0
 
 
 class ConditionalSignalHmm(SignalHmm):

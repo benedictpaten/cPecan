@@ -1333,6 +1333,8 @@ static void test_vanilla_getAlignedPairsWithoutScaling(CuTest *testCase) {
                                          npRead->templateParams.var, npRead->templateParams.scale_sd,
                                          npRead->templateParams.var_sd); // clunky
 
+    // descale npRead
+    nanopore_descaleNanoporeRead(npRead);
 
     // parameters for pairwise alignment using defaults
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -1351,8 +1353,8 @@ static void test_vanilla_getAlignedPairsWithoutScaling(CuTest *testCase) {
     Sequence *templateSeq = sequence_construct2(lY, npRead->templateEvents, sequence_getEvent,
                                                 sequence_sliceEventSequence2);
     // de-scale events
-    nanopore_descaleEvents(templateSeq->length, templateSeq->elements, npRead->templateParams.scale,
-                           npRead->templateParams.shift);
+    //nanopore_descaleEvents(templateSeq->length, templateSeq->elements, npRead->templateParams.scale,
+    //                       npRead->templateParams.shift);
 
     // do alignment of template events
     stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
@@ -1487,19 +1489,11 @@ static void test_continuousPairHmm(CuTest *testCase) {
         dummyTotal += dummy;
     }
 
-    /// /int64_t nb_matches = st_randomInt64(50, 2000);
-    //double b = st_random(); // a random decimal to generate doubles as a proxy for current means
-    //for (int64_t a = 0; a < nb_matches; a++) {
-    //    double fakeMean = (a + 1) * b;
-    //    stList_append(cpHmm->baseContinuousHmm.assignments, stDoubleTuple_construct(2, fakeMean, (double) a));
-    //    cpHmm->baseContinuousHmm.numberOfAssignments += 1;
-    //}
-
     // dump the HMM to a file
     char *tempFile = stString_print("./temp%" PRIi64 ".hmm", st_randomInt(0, INT64_MAX));
     CuAssertTrue(testCase, !stFile_exists(tempFile)); //Quick check that we don't write over anything.
     FILE *fH = fopen(tempFile, "w");
-    continuousPairHmm_writeToFile((Hmm *)cpHmm, fH, 1, 0);
+    continuousPairHmm_writeToFile((Hmm *)cpHmm, fH);
     fclose(fH);
     continuousPairHmm_destruct((Hmm *)cpHmm);
 
@@ -1525,15 +1519,6 @@ static void test_continuousPairHmm(CuTest *testCase) {
         double correct = (nSymbols * nStates) + i;
         CuAssertDblEquals(testCase, received, correct, 0.0);
     }
-
-    // check the assignments
-    //for (int64_t a = 0; a < cpHmm->baseContinuousHmm.numberOfAssignments; a++) {
-    //    stDoubleTuple *assignment = stList_get(cpHmm->baseContinuousHmm.assignments, a);
-    //    double retrievedMean = stDoubleTuple_getPosition(assignment, 0);
-    //    int64_t retrievedKmerIdx = (int64_t )stDoubleTuple_getPosition(assignment, 1);
-    //    CuAssertDblEquals(testCase, retrievedMean, ((a + 1) * b), 0.001);
-    //    CuAssertTrue(testCase, retrievedKmerIdx == a);
-    //}
 
     // normalize
     continuousPairHmm_normalize((Hmm *)cpHmm);

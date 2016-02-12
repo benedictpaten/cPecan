@@ -17,14 +17,14 @@
 
 
 typedef enum {
-    fiveState=0,
-    fiveStateAsymmetric=1,
-    threeState=2,
-    threeStateAsymmetric=3,
-    vanilla=4,
-    echelon=5,
-    fourState=6,
-    threeState_hdp=7,
+    fiveState = 0,
+    fiveStateAsymmetric = 1,
+    threeState = 2,
+    threeStateAsymmetric = 3,
+    vanilla = 4,
+    echelon = 5,
+    fourState = 6,
+    threeState_hdp = 7,
 } StateMachineType;
 
 typedef enum {
@@ -33,7 +33,7 @@ typedef enum {
 
 typedef enum _strand {
     template = 0,
-    complement = 1
+    complement = 1,
 } Strand;
 
 typedef struct _stateMachine StateMachine;

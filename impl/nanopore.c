@@ -6,8 +6,9 @@
 #include "pairwiseAligner.h"
 
 
-
-NanoporeRead *nanopore_nanoporeReadConstruct(int64_t readLength, int64_t nbTemplateEvents, int64_t nbComplementEvents) {
+static NanoporeRead *nanopore_nanoporeReadConstruct(int64_t readLength,
+                                                    int64_t nbTemplateEvents,
+                                                    int64_t nbComplementEvents) {
     NanoporeRead *npRead = st_malloc(sizeof(NanoporeRead));
 
     npRead->readLength = readLength;
@@ -25,8 +26,15 @@ NanoporeRead *nanopore_nanoporeReadConstruct(int64_t readLength, int64_t nbTempl
     npRead->complementEventMap = st_malloc(npRead->readLength * sizeof(int64_t));
     npRead->complementEvents = st_malloc(npRead->nbComplementEvents * NB_EVENT_PARAMS * sizeof(double));
 
+    npRead->scaled = TRUE;
     // return
     return npRead;
+}
+
+static void nanopore_descaleEvents(int64_t nb_events, double *events, double scale, double shift) {
+    for (int64_t i = 0; i < nb_events; i += NB_EVENT_PARAMS) {
+        events[i] = (events[i] - shift) / scale;
+    }
 }
 
 NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
@@ -217,10 +225,14 @@ stList *nanopore_remapAnchorPairsWithOffset(stList *unmappedPairs, int64_t *even
     return mappedPairs;
 }
 
-void nanopore_descaleEvents(int64_t nb_events, double *events, double scale, double shift) {
-    for (int64_t i = 0; i < nb_events; i += NB_EVENT_PARAMS) {
-        events[i] = (events[i] - shift) / scale;
-    }
+void nanopore_descaleNanoporeRead(NanoporeRead *npRead) {
+    nanopore_descaleEvents(npRead->nbTemplateEvents, npRead->templateEvents,
+                           npRead->templateParams.scale,
+                           npRead->templateParams.shift);
+    nanopore_descaleEvents(npRead->nbComplementEvents, npRead->complementEvents,
+                           npRead->complementParams.scale,
+                           npRead->complementParams.shift);
+    npRead->scaled = FALSE;
 }
 
 void nanopore_nanoporeReadDestruct(NanoporeRead *npRead) {

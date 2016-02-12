@@ -64,7 +64,7 @@ void continuousPairHmm_randomize(Hmm *hmm);
 
 void continuousPairHmm_destruct(Hmm *hmm);
 
-void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle, double scale, double shift);
+void continuousPairHmm_writeToFile(Hmm *hmm, FILE *fileHandle);
 
 Hmm *continuousPairHmm_loadFromFile(const char *fileName);
 
@@ -104,20 +104,27 @@ Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, int64_t symb
                            double (*getKmerGapExpFcn)(Hmm *hmm, int64_t state, int64_t ki, int64_t ignore),
                            int64_t (*getElementIndexFcn)(void *));
 
+void hdpHmm_loadTransitionsAndKmerGapProbs(StateMachine *sM, Hmm *hmm);
+
+void hdpHmm_updateStateMachineHDP(const char *expectationsFile, StateMachine *sM);
+
 void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle);
 
 Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *ndhp);
+Hmm *hdpHmm_loadFromFile2(const char *fileName, NanoporeHDP *nHdp);
 
 void hdpHmm_destruct(Hmm *hmm);
 
 // CORE
-Hmm *hmmContinuous_loadSignalHmm(const char *fileName, StateMachineType type);
+void hmmContinuous_loadSignalHmm2(const char *hmmFile, StateMachine *sM, StateMachineType type);
+
+//Hmm *hmmContinuous_loadSignalHmm(const char *fileName, StateMachineType type);
 
 void hmmContinuous_loadExpectations(StateMachine *sM, Hmm *hmm, StateMachineType type);
 
 void hmmContinuous_destruct(Hmm *hmm, StateMachineType type);
 
-Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount);
+Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount, double threshold);
 
 void hmmContinuous_normalize(Hmm *hmm, StateMachineType type);
 

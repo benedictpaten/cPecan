@@ -22,9 +22,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include "pairwiseAligner.h"
+#include "emissionMatrix.h"
 #include "hdp.h"
 #include "hdp_math_utils.h"
 #include "nanopore_hdp.h"
+#include "fastCMaths.h"
 #include "sonLib.h"
 
 NanoporeHDP* package_nanopore_hdp(HierarchicalDirichletProcess* hdp, const char* alphabet, int64_t alphabet_size,
@@ -454,9 +457,10 @@ void flat_hdp_model_internal(HierarchicalDirichletProcess* hdp, int64_t alphabet
     }
 }
 
-NanoporeHDP* flat_hdp_model(const char* alphabet, int64_t alphabet_size, int64_t kmer_length, double base_gamma,
-                            double leaf_gamma, double sampling_grid_start, double sampling_grid_stop,
-                            int64_t sampling_grid_length, const char* model_filepath) {
+NanoporeHDP* flat_hdp_model(const char* alphabet, int64_t alphabet_size, int64_t kmer_length,
+                            double base_gamma, double leaf_gamma,
+                            double sampling_grid_start, double sampling_grid_stop, int64_t sampling_grid_length,
+                            const char* model_filepath) {
     
     double* gamma_params = (double*) malloc(sizeof(double) * 2);
     gamma_params[0] = base_gamma;
@@ -556,8 +560,9 @@ NanoporeHDP* multiset_hdp_model(const char* alphabet, int64_t alphabet_size, int
 }
 
 NanoporeHDP* multiset_hdp_model_2(const char* alphabet, int64_t alphabet_size, int64_t kmer_length,
-                                  double base_gamma_alpha, double base_gamma_beta, double middle_gamma_alpha,
-                                  double middle_gamma_beta, double leaf_gamma_alpha, double leaf_gamma_beta,
+                                  double base_gamma_alpha, double base_gamma_beta,
+                                  double middle_gamma_alpha, double middle_gamma_beta,
+                                  double leaf_gamma_alpha, double leaf_gamma_beta,
                                   double sampling_grid_start, double sampling_grid_stop, int64_t sampling_grid_length,
                                   const char* model_filepath) {
     
@@ -837,6 +842,7 @@ void serialize_nhdp(NanoporeHDP* nhdp, const char* filepath) {
 }
 
 NanoporeHDP* deserialize_nhdp(const char* filepath) {
+    //st_uglyf("SENTINAL - deserializing HDP from %s\n", filepath);
     FILE* in = fopen(filepath, "r");
     
     char* line = stFile_getLineFromFile(in);
@@ -865,4 +871,73 @@ NanoporeHDP* deserialize_nhdp(const char* filepath) {
     return nhdp;
 }
 
+static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const char *modelFile) {
+    if (nHdpType == singleLevelFixed) {
+        NanoporeHDP *nHdp = flat_hdp_model("ACGHMT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
+                                           5.0, 0.5,
+                                           0.0, 100.0, 100, modelFile);
+        return nHdp;
+    }
+    if (nHdpType == singleLevelPrior) {
+        NanoporeHDP *nHdp = flat_hdp_model_2("ACGHMT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
+                                             5.0, 0.5, 5.0, 0.5, // base_alpha, base_beta, leaf_alpha, leaf_beta
+                                             0.0, 100, 100,
+                                             modelFile);
+        return nHdp;
+    }
+    if (nHdpType == multisetFixed) {
+        NanoporeHDP *nHdp = multiset_hdp_model("ACGHMT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
+                                               1.0, 1.0, 1.0,
+                                               0.0, 100, 100,
+                                               modelFile);
+        return nHdp;
+    }
+    if (nHdpType == multisetPrior) {
+        NanoporeHDP *nHdp = multiset_hdp_model_2("ACGHMT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
+                                                 5.0, 0.5,
+                                                 5.0, 0.5,
+                                                 5.0, 0.5,
+                                                 0.0, 100, 100,
+                                                 modelFile);
+        return nHdp;
+    } else {
+        fprintf(stderr, "vanillaAlign - error making HDP from scratch\n");
+        exit(EXIT_FAILURE);
+    }
+}
 
+void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
+                                               const char *templateModelFile, const char* complementModelFile,
+                                               const char *alignments,
+                                               const char *templateHDP, const char *complementHDP) {
+    fprintf(stderr, "vanillaAlign - Building Nanopore HDP\n");
+    fprintf(stderr, "vanillaAlign - Updating Template HDP from alignments...");
+    NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile);
+    update_nhdp_from_alignment_with_filter(nHdpT, alignments, FALSE, "t");
+    fprintf(stderr, "done\n");
+
+    fprintf(stderr, "vanillaAlign - Running Gibbs for template...");
+    execute_nhdp_gibbs_sampling(nHdpT, 10000, 100000, 100, FALSE);
+    finalize_nhdp_distributions(nHdpT);
+    fprintf(stderr, "done\n");
+
+    fprintf(stderr, "vanillaAlign - Serializing template to %s...", templateHDP);
+    serialize_nhdp(nHdpT, templateHDP);
+    fprintf(stderr, "done\n");
+    destroy_nanopore_hdp(nHdpT);
+
+    fprintf(stderr, "vanillaAlign - Updating Complement HDP from alignments...");
+    NanoporeHDP *nHdpC = loadNanoporeHdpFromScratch(type, complementModelFile);
+    update_nhdp_from_alignment_with_filter(nHdpC, alignments, FALSE, "c");
+    fprintf(stderr, "done\n");
+
+    fprintf(stderr, "vanillaAlign - Running Gibbs for complement...");
+    execute_nhdp_gibbs_sampling(nHdpC, 10000, 100000, 100, FALSE);
+    finalize_nhdp_distributions(nHdpC);
+    fprintf(stderr, "done\n");
+
+    fprintf(stderr, "vanillaAlign - Serializing complement to %s...", complementHDP);
+    serialize_nhdp(nHdpC, complementHDP);
+    fprintf(stderr, "done\n");
+    destroy_nanopore_hdp(nHdpC);
+}
