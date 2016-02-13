@@ -805,6 +805,7 @@ class SignalAlignment(object):
             print("signalAlign - problem with file path {file}".format(file=self.in_fast5))
             return False
 
+        print("PYSENTINAL - using reference sequence {}".format(self.reference), file=sys.stderr)
         # Preamble set up before doing the alignment
 
         # containers and defaults

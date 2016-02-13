@@ -56,7 +56,7 @@ def parse_args():
     parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None)
     parser.add_argument('--mutated_reference', '-mr', action='append', default=None,
                         dest='mut_ref', required=False, type=str,
-                        help="mutated reference sequence to train on")
+                        help="mutated reference sequence to train on as fasta")
     args = parser.parse_args()
     return args
 
@@ -75,19 +75,23 @@ def get_2d_length(fast5):
         return read_length
 
 
-def cull_training_files(directories, training_amount):
+def cull_training_files(directories, reference_files, training_amount):
     print("trainModels - culling training files.\n", end="", file=sys.stderr)
 
     training_files = []
+    add_to_training_files = training_files.append
+    references = []
+    add_to_references = references.append
 
-    for directory in directories:
+    for j, directory in enumerate(directories):
         fast5s = [x for x in os.listdir(directory) if x.endswith(".fast5")]
         shuffle(fast5s)
 
         total_amount = 0
         n = 0
         for i in xrange(len(fast5s)):
-            training_files.append(directory + fast5s[i])
+            add_to_training_files(directory + fast5s[i])
+            add_to_references(reference_files[j])
             n += 1
             total_amount += get_2d_length(directory + fast5s[i])
             if total_amount >= training_amount:
@@ -96,7 +100,7 @@ def cull_training_files(directories, training_amount):
                                                                     dir=directory),
               end="\n", file=sys.stderr)
 
-    return training_files
+    return zip(training_files, references)
 
 
 def get_expectations(work_queue, done_queue):
@@ -175,7 +179,7 @@ def build_hdp(hdp_type, template_hdp_path, complement_hdp_path, alignments,
 def main(argv):
     # parse command line arguments
     args = parse_args()
-
+    print(args.files_dir, args.mut_ref)
     # build the HDP if that's what we're doing
     if args.buildHDP is not None:
         assert (None not in [args.buildHDP, args.templateHDP, args.complementHDP, args.buildAlignments])
@@ -244,8 +248,15 @@ def main(argv):
             in_template_hmm = template_hmm
             in_complement_hmm = complement_hmm
 
+        # if we're using 'mutated' or non-canonical reference sequences, they come in a list. if we're not then
+        # we make a list of the 'normal' reference sequence
+        if args.mut_ref is None:
+            reference_sequences = [reference_seq] * len(args.files_dir)
+        else:
+            reference_sequences = args.mut_ref
+
         # first cull a set of files to get expectations on
-        training_files = cull_training_files(args.files_dir, args.amount)
+        training_files = cull_training_files(args.files_dir, reference_sequences, args.amount)
 
         # setup
         workers = args.nb_jobs
@@ -254,10 +265,10 @@ def main(argv):
         jobs = []
 
         # get expectations for all the files in the queue
-        for fast5 in training_files:
+        for fast5, r_seq in training_files:
             alignment_args = {
                 "in_fast5": fast5,
-                "reference": reference_seq,
+                "reference": r_seq,
                 "destination": working_directory_path,
                 "stateMachineType": args.stateMachineType,
                 "banded": args.banded,
@@ -270,9 +281,9 @@ def main(argv):
                 "diagonal_expansion": args.diag_expansion,
                 "constraint_trim": args.constraint_trim,
             }
-            #alignment = SignalAlignment(**alignment_args)
-            #alignment.run(get_expectations=True)
-            work_queue.put(alignment_args)
+            alignment = SignalAlignment(**alignment_args)
+            alignment.run(get_expectations=True)
+            #work_queue.put(alignment_args)
 
         for w in xrange(workers):
             p = Process(target=get_expectations, args=(work_queue, done_queue))
