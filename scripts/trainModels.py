@@ -54,7 +54,9 @@ def parse_args():
     parser.add_argument('--buildAlignments', '-al', action='store', dest='buildAlignments', default=None)
     parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None)
     parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None)
-
+    parser.add_argument('--mutated_reference', '-mr', action='append', default=None,
+                        dest='mut_ref', required=False, type=str,
+                        help="mutated reference sequence to train on")
     args = parser.parse_args()
     return args
 
@@ -268,9 +270,9 @@ def main(argv):
                 "diagonal_expansion": args.diag_expansion,
                 "constraint_trim": args.constraint_trim,
             }
-            alignment = SignalAlignment(**alignment_args)
-            alignment.run(get_expectations=True)
-            #work_queue.put(alignment_args)
+            #alignment = SignalAlignment(**alignment_args)
+            #alignment.run(get_expectations=True)
+            work_queue.put(alignment_args)
 
         for w in xrange(workers):
             p = Process(target=get_expectations, args=(work_queue, done_queue))
