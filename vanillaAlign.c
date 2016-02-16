@@ -327,7 +327,6 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
     // make sequence objects, seperate the target sequences based on HMM type, also implant the match model if we're
     // using a conditional model
     if (type == vanilla) {
-        st_uglyf("SENTINAL - getting vanilla expectations\n");
         Sequence *target = sequence_construct2(lX, trainingTarget, sequence_getKmer2,
                                                sequence_sliceNucleotideSequence2);
         vanillaHmm_implantMatchModelsintoHmm(sM, hmmExpectations);
@@ -335,14 +334,11 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
         getExpectationsUsingAnchors(sM, hmmExpectations, target, eventSequence, filteredRemappedAnchors, p,
                                     diagonalCalculation_signal_Expectations, 1, 1);
     } else if (type == threeState_hdp) {
-        st_uglyf("SENTINAL - getting HDP expectations\n");
         Sequence *target = sequence_construct2(lX, trainingTarget, sequence_getKmer3,
                                                sequence_sliceNucleotideSequence2);
-
         getExpectationsUsingAnchors(sM, hmmExpectations, target, eventSequence, filteredRemappedAnchors, p,
                                     diagonalCalculation_signal_Expectations, 1, 1);
     } else {
-        st_uglyf("SENTINAL - getting normal expectations\n");
         Sequence *target = sequence_construct2(lX, trainingTarget, sequence_getKmer,
                                                sequence_sliceNucleotideSequence2);
 
@@ -505,7 +501,6 @@ int main(int argc, char *argv[]) {
                 return 1;
         }
     }
-
     // HDP build option
     if (build) {
         st_uglyf("vanillaAlign - NOTICE: Building HDP\n");
@@ -515,6 +510,7 @@ int main(int argc, char *argv[]) {
         if (alignments != NULL) {
             if (!((hdpType >= 0) && (hdpType <= 3))) {
                 st_errAbort("Invalid HDP type");
+                st_uglyf("balls");
             }
             NanoporeHdpType type = (NanoporeHdpType) hdpType;
             nanoporeHdp_buildNanoporeHdpFromAlignment(type, templateModelFile, complementModelFile, alignments,
@@ -585,7 +581,7 @@ int main(int argc, char *argv[]) {
         if (sMtype != threeState_hdp) {
             fprintf(stderr, "vanillaAlign - Warning: this kind of stateMachine does not use the HDPs you gave\n");
         }
-        st_uglyf("vanillaAlign - using NanoporeHDPs\n");
+        fprintf(stderr, "vanillaAlign - using NanoporeHDPs\n");
     }
 
     // load reference sequence (reference sequence)
@@ -597,7 +593,7 @@ int main(int argc, char *argv[]) {
 
     // descale events if using hdp
     if (sMtype == threeState_hdp) {
-        st_uglyf("vanillaAlign - descaling Nanopore Events\n");
+        fprintf(stderr, "vanillaAlign - descaling Nanopore Events\n");
         nanopore_descaleNanoporeRead(npRead);
     }
 
@@ -606,7 +602,6 @@ int main(int argc, char *argv[]) {
     p->threshold = threshold;
     p->constraintDiagonalTrim = constraintTrim;
     p->diagonalExpansion = diagExpansion;
-    st_uglyf("vanillaAlign - PARAMETER: threshold:%f\n", threshold);
     // get pairwise alignment from stdin, in exonerate CIGAR format
     FILE *fileHandleIn = stdin;
 
@@ -620,6 +615,8 @@ int main(int argc, char *argv[]) {
     // slice out the section of the reference we're aligning to
     char *trimmedRefSeq = getSubSequence(referenceSequence, pA->start1, pA->end1, pA->strand1);
     trimmedRefSeq = (pA->strand1 ? trimmedRefSeq : stString_reverseComplementString(trimmedRefSeq));
+
+    // change bases to methylated/hydroxymethylated, if asked to
 
     // reverse complement for complement event sequence
     char *rc_trimmedRefSeq = stString_reverseComplementString(trimmedRefSeq);

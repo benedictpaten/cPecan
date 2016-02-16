@@ -362,7 +362,8 @@ int64_t* kmer_to_word(char* kmer, char* alphabet, int64_t alphabet_size, int64_t
         while (kmer[i] != alphabet[j]) {
             j++;
             if (j == alphabet_size) {
-                fprintf(stderr, "K-mer contains character outside alphabet.\n");
+                fprintf(stderr, "vanillaAlign - ERROR: K-mer contains character outside alphabet. "
+                        "Got offending kmer is: %s. alphabet is %s\n", kmer, alphabet);
                 exit(EXIT_FAILURE);
             }
         }
@@ -911,33 +912,35 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
                                                const char *alignments,
                                                const char *templateHDP, const char *complementHDP) {
     fprintf(stderr, "vanillaAlign - Building Nanopore HDP\n");
-    fprintf(stderr, "vanillaAlign - Updating Template HDP from alignments...");
-    NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile);
-    update_nhdp_from_alignment_with_filter(nHdpT, alignments, FALSE, "t");
-    fprintf(stderr, "done\n");
+#pragma omp parallel sections
+ {
+    {
+        fprintf(stderr, "vanillaAlign - Updating Template HDP from alignments...\n");
+        NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile);
+        update_nhdp_from_alignment_with_filter(nHdpT, alignments, FALSE, "t");
 
-    fprintf(stderr, "vanillaAlign - Running Gibbs for template...");
-    execute_nhdp_gibbs_sampling(nHdpT, 10000, 100000, 100, FALSE);
-    finalize_nhdp_distributions(nHdpT);
-    fprintf(stderr, "done\n");
+        fprintf(stderr, "vanillaAlign - Running Gibbs for template...\n");
+        execute_nhdp_gibbs_sampling(nHdpT, 10000, 100000, 100, FALSE);
+        finalize_nhdp_distributions(nHdpT);
 
-    fprintf(stderr, "vanillaAlign - Serializing template to %s...", templateHDP);
-    serialize_nhdp(nHdpT, templateHDP);
-    fprintf(stderr, "done\n");
-    destroy_nanopore_hdp(nHdpT);
+        fprintf(stderr, "vanillaAlign - Serializing template to %s...\n", templateHDP);
+        serialize_nhdp(nHdpT, templateHDP);
+        destroy_nanopore_hdp(nHdpT);
+    }
+#pragma omp section
+    {
+        fprintf(stderr, "vanillaAlign - Updating Complement HDP from alignments...\n");
+        NanoporeHDP *nHdpC = loadNanoporeHdpFromScratch(type, complementModelFile);
+        update_nhdp_from_alignment_with_filter(nHdpC, alignments, FALSE, "c");
 
-    fprintf(stderr, "vanillaAlign - Updating Complement HDP from alignments...");
-    NanoporeHDP *nHdpC = loadNanoporeHdpFromScratch(type, complementModelFile);
-    update_nhdp_from_alignment_with_filter(nHdpC, alignments, FALSE, "c");
-    fprintf(stderr, "done\n");
+        fprintf(stderr, "vanillaAlign - Running Gibbs for complement...\n");
+        execute_nhdp_gibbs_sampling(nHdpC, 10000, 100000, 100, FALSE);
+        finalize_nhdp_distributions(nHdpC);
 
-    fprintf(stderr, "vanillaAlign - Running Gibbs for complement...");
-    execute_nhdp_gibbs_sampling(nHdpC, 10000, 100000, 100, FALSE);
-    finalize_nhdp_distributions(nHdpC);
-    fprintf(stderr, "done\n");
-
-    fprintf(stderr, "vanillaAlign - Serializing complement to %s...", complementHDP);
-    serialize_nhdp(nHdpC, complementHDP);
-    fprintf(stderr, "done\n");
-    destroy_nanopore_hdp(nHdpC);
+        fprintf(stderr, "vanillaAlign - Serializing complement to %s...\n", complementHDP);
+        serialize_nhdp(nHdpC, complementHDP);
+        destroy_nanopore_hdp(nHdpC);
+    }
 }
+}
+

@@ -147,7 +147,6 @@ Band *band_construct(stList *anchorPairs, int64_t lX, int64_t lY, int64_t expans
     int64_t xL = 0, yL = 0, xU = 0, yU = 0;
 
     while (xay <= band->lXalY) {
-        //st_uglyf("---> LANDMARK!!!>>>>>>2 : xay: %lld\n", xay);
         band->diagonals[xay] = band_setCurrentDiagonal(xay, xL, yL, xU, yU);
         if (nxay == xay++) {
             //The previous diagonals become the next

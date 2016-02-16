@@ -256,6 +256,7 @@ def main(argv):
             reference_sequences = args.mut_ref
 
         # first cull a set of files to get expectations on
+        # TODO need to change substitution thing here
         training_files = cull_training_files(args.files_dir, reference_sequences, args.amount)
 
         # setup
@@ -281,9 +282,9 @@ def main(argv):
                 "diagonal_expansion": args.diag_expansion,
                 "constraint_trim": args.constraint_trim,
             }
-            #alignment = SignalAlignment(**alignment_args)
-            #alignment.run(get_expectations=True)
-            work_queue.put(alignment_args)
+            alignment = SignalAlignment(**alignment_args)
+            alignment.run(get_expectations=True)
+            #work_queue.put(alignment_args)
 
         for w in xrange(workers):
             p = Process(target=get_expectations, args=(work_queue, done_queue))

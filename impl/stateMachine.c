@@ -179,7 +179,6 @@ double emissions_kmer_getGapProb(const double *emissionGapProbs, void *kmer) {
         kmer_i[x] = *((char *)kmer+x);
     }
     kmer_i[KMER_LENGTH] = '\0';
-
     int64_t i = emissions_discrete_getKmerIndex(kmer_i);
     //index_check(i);
     free(kmer_i);

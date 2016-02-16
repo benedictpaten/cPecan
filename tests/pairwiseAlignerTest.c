@@ -157,6 +157,8 @@ static void test_sequenceConstruct(CuTest* testCase) {
     sequence_sequenceDestroy(testSequence);
 }
 
+//todo sequence construct 2 test
+
 static void test_cell(CuTest *testCase) {
     StateMachine *sM = stateMachine5_construct(fiveState, SYMBOL_NUMBER_NO_N,
                                                emissions_symbol_setEmissionsToDefaults,
@@ -205,7 +207,7 @@ static void test_dpDiagonal(CuTest *testCase) {
                                                emissions_symbol_getGapProb,
                                                emissions_symbol_getGapProb,
                                                emissions_symbol_getMatchProb,
-                                               cell_updateExpectations);           // match prob fcn
+                                               cell_updateExpectations);
 
     Diagonal diagonal = diagonal_construct(3, -1, 1);
 
