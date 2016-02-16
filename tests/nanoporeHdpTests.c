@@ -847,14 +847,14 @@ static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testC
     char *modelFile = stString_print("../../cPecan/models/template_median68pA.model");
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
     char *strand = "t";
-    NanoporeHDP *nHdp = deserialize_nhdp("../../cPecan/tests/temp/template.nhdp");
-    //NanoporeHDP *nHdp = flat_hdp_model_2("ACGHMT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
-    //                                     5.0, 0.5, 5.0, 0.5,
-    //                                     0.0, 100, 1000,
-    //                                     modelFile);
-    //update_nhdp_from_alignment_with_filter(nHdp, alignmentFile, FALSE, strand);
-    //execute_nhdp_gibbs_sampling(nHdp, 1000, 10000, 100, FALSE);
-    //finalize_nhdp_distributions(nHdp);
+
+    NanoporeHDP *nHdp = flat_hdp_model_2("ACGHMT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
+                                         5.0, 0.5, 5.0, 0.5,
+                                         0.0, 100, 1000,
+                                         modelFile);
+    update_nhdp_from_alignment_with_filter(nHdp, alignmentFile, FALSE, strand);
+    execute_nhdp_gibbs_sampling(nHdp, 1000, 10000, 100, FALSE);
+    finalize_nhdp_distributions(nHdp);
 
     // stateMachine
     StateMachine *sMt = getHdpStateMachine3(nHdp);
