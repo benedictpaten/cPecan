@@ -517,39 +517,47 @@ int main(int argc, char *argv[]) {
                                                       templateHdp, complementHdp);
             return 0;
         } else {
-            if (templateExpectationsFile != NULL) {
-                if (templateHdp == NULL) {
-                    st_errAbort("Need to provide HDP file");
-                }
-                NanoporeHDP *nHdpT = deserialize_nhdp(templateHdp);
-                Hmm *hdpHmm = hdpHmm_loadFromFile2(templateExpectationsFile, nHdpT);
-                (void) hdpHmm;
-                fprintf(stderr, "vanillaAlign - Running Gibbs on TemplateHDP...");
-                execute_nhdp_gibbs_sampling(nHdpT, 10000, 100000, 100, FALSE);
-                finalize_nhdp_distributions(nHdpT);
-                fprintf(stderr, "done\n");
+#pragma omp parallel sections
+            {
+                {
+                if (templateExpectationsFile != NULL) {
+                    if (templateHdp == NULL) {
+                        st_errAbort("Need to provide HDP file");
+                    }
+                    NanoporeHDP *nHdpT = deserialize_nhdp(templateHdp);
+                    Hmm *hdpHmm = hdpHmm_loadFromFile2(templateExpectationsFile, nHdpT);
+                    (void) hdpHmm;
+                    fprintf(stderr, "vanillaAlign - Running Gibbs on TemplateHDP...");
+                    execute_nhdp_gibbs_sampling(nHdpT, 10000, 100000, 100, FALSE);
+                    finalize_nhdp_distributions(nHdpT);
+                    fprintf(stderr, "done\n");
 
-                fprintf(stderr, "vanillaAlign - Serializing template to %s...", templateHdp);
-                serialize_nhdp(nHdpT, templateHdp);
-                fprintf(stderr, "done\n");
-                destroy_nanopore_hdp(nHdpT);
-            }
-            if (complementExpectationsFile != NULL) {
-                if (complementHdp == NULL) {
-                    st_errAbort("Need to provide HDP file");
+                    fprintf(stderr, "vanillaAlign - Serializing template to %s...", templateHdp);
+                    serialize_nhdp(nHdpT, templateHdp);
+                    fprintf(stderr, "done\n");
+                    destroy_nanopore_hdp(nHdpT);
                 }
-                NanoporeHDP *nHdpC = deserialize_nhdp(complementHdp);
-                Hmm *hdpHmm = hdpHmm_loadFromFile2(templateExpectationsFile, nHdpC);
-                (void) hdpHmm;
-                fprintf(stderr, "vanillaAlign - Running Gibbs on ComplementHDP...");
-                execute_nhdp_gibbs_sampling(nHdpC, 10000, 100000, 100, FALSE);
-                finalize_nhdp_distributions(nHdpC);
-                fprintf(stderr, "done\n");
+                }
+#pragma omp section
+                {
+                if (complementExpectationsFile != NULL) {
+                    if (complementHdp == NULL) {
+                        st_errAbort("Need to provide HDP file");
+                    }
+                    NanoporeHDP *nHdpC = deserialize_nhdp(complementHdp);
+                    Hmm *hdpHmm = hdpHmm_loadFromFile2(templateExpectationsFile, nHdpC);
+                    (void) hdpHmm;
+                    fprintf(stderr, "vanillaAlign - Running Gibbs on ComplementHDP...");
+                    execute_nhdp_gibbs_sampling(nHdpC, 10000, 100000, 100, FALSE);
+                    finalize_nhdp_distributions(nHdpC);
+                    fprintf(stderr, "done\n");
 
-                fprintf(stderr, "vanillaAlign - Serializing complement to %s...", complementHdp);
-                serialize_nhdp(nHdpC, complementHdp);
-                fprintf(stderr, "done\n");
-                destroy_nanopore_hdp(nHdpC);
+                    fprintf(stderr, "vanillaAlign - Serializing complement to %s...", complementHdp);
+                    serialize_nhdp(nHdpC, complementHdp);
+                    fprintf(stderr, "done\n");
+                    destroy_nanopore_hdp(nHdpC);
+                }
+                }
             }
             return 0;
         }

@@ -874,27 +874,27 @@ NanoporeHDP* deserialize_nhdp(const char* filepath) {
 
 static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const char *modelFile) {
     if (nHdpType == singleLevelFixed) {
-        NanoporeHDP *nHdp = flat_hdp_model("ACGHMT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
+        NanoporeHDP *nHdp = flat_hdp_model("ACEGOT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
                                            5.0, 0.5,
                                            0.0, 100.0, 100, modelFile);
         return nHdp;
     }
     if (nHdpType == singleLevelPrior) {
-        NanoporeHDP *nHdp = flat_hdp_model_2("ACGHMT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
+        NanoporeHDP *nHdp = flat_hdp_model_2("ACEGOT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
                                              5.0, 0.5, 5.0, 0.5, // base_alpha, base_beta, leaf_alpha, leaf_beta
                                              0.0, 100, 100,
                                              modelFile);
         return nHdp;
     }
     if (nHdpType == multisetFixed) {
-        NanoporeHDP *nHdp = multiset_hdp_model("ACGHMT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
+        NanoporeHDP *nHdp = multiset_hdp_model("ACEGOT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
                                                1.0, 1.0, 1.0,
                                                0.0, 100, 100,
                                                modelFile);
         return nHdp;
     }
     if (nHdpType == multisetPrior) {
-        NanoporeHDP *nHdp = multiset_hdp_model_2("ACGHMT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
+        NanoporeHDP *nHdp = multiset_hdp_model_2("ACEGOT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
                                                  5.0, 0.5,
                                                  5.0, 0.5,
                                                  5.0, 0.5,

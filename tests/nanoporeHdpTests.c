@@ -833,7 +833,7 @@ static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testC
     char *ZymoReference = stString_print("../../cPecan/tests/test_npReads/ZymoRef.txt");
     FILE *fH = fopen(ZymoReference, "r");
     char *ZymoReferenceSeq = stFile_getLineFromFile(fH);
-    char *CtoM_referenceSeq = stString_replace(ZymoReferenceSeq, "C", "M");
+    char *CtoM_referenceSeq = stString_replace(ZymoReferenceSeq, "C", "E");
     // npRead
     char *npReadFile = stString_print("../../cPecan/tests/test_npReads/ZymoC_ch_1_file1.npRead");
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
@@ -848,7 +848,7 @@ static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testC
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
     char *strand = "t";
 
-    NanoporeHDP *nHdp = flat_hdp_model_2("ACGHMT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
+    NanoporeHDP *nHdp = flat_hdp_model_2("ACEGOT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
                                          5.0, 0.5, 5.0, 0.5,
                                          0.0, 100, 1000,
                                          modelFile);
@@ -1004,7 +1004,7 @@ static void test_HdpHmmWithAssignments_flat_model(CuTest *testCase) {
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
     char *templateModelFile = "../../cPecan/models/template_median68pA.model";
     // make NanoporeHDP to compare to
-    NanoporeHDP *nHdp1 = flat_hdp_model("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
+    NanoporeHDP *nHdp1 = flat_hdp_model("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                         5.0, 0.5,
                                         0.0, 100.0, 100, templateModelFile);
     update_nhdp_from_alignment_with_filter(nHdp1, alignmentFile, FALSE, "t");
@@ -1012,7 +1012,7 @@ static void test_HdpHmmWithAssignments_flat_model(CuTest *testCase) {
     finalize_nhdp_distributions(nHdp1);
 
     // make NanoporeHDP from Hmm
-    NanoporeHDP *nHdp2 = flat_hdp_model("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
+    NanoporeHDP *nHdp2 = flat_hdp_model("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                         5.0, 0.5, // base_gamma, leaf_gamma
                                         0.0, 100.0, 100, templateModelFile);
     // load Hmm from disk and update the NanoporeHDP
@@ -1029,7 +1029,7 @@ static void test_HdpHmmWithAssignments_flat_model2(CuTest *testCase) {
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
     char *templateModelFile = "../../cPecan/models/template_median68pA.model";
     // make NanoporeHDP to compare to
-    NanoporeHDP *nHdp1 = flat_hdp_model_2("ACGMT", (SYMBOL_NUMBER_NO_N + 1), KMER_LENGTH,
+    NanoporeHDP *nHdp1 = flat_hdp_model_2("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                           5.0, 0.5, 5.0, 0.5, // base_alpha, base_beta, leaf_alpha, leaf_beta
                                           0.0, 100, 100,
                                           templateModelFile);
@@ -1038,7 +1038,7 @@ static void test_HdpHmmWithAssignments_flat_model2(CuTest *testCase) {
     finalize_nhdp_distributions(nHdp1);
 
     // make NanoporeHDP from Hmm
-    NanoporeHDP *nHdp2 = flat_hdp_model_2("ACGMT", (SYMBOL_NUMBER_NO_N + 1), KMER_LENGTH,
+    NanoporeHDP *nHdp2 = flat_hdp_model_2("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                           5.0, 0.5, 5.0, 0.5,
                                           0.0, 100, 100,
                                           templateModelFile);
@@ -1056,7 +1056,7 @@ static void test_HdpHmmWithAssignments_multiset_model(CuTest *testCase) {
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
     char *templateModelFile = "../../cPecan/models/template_median68pA.model";
     // make NanoporeHDP to compare to
-    NanoporeHDP *nHdp1 = multiset_hdp_model("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
+    NanoporeHDP *nHdp1 = multiset_hdp_model("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                             1.0, 1.0, 1.0,
                                             0.0, 100, 100,
                                             templateModelFile);
@@ -1065,7 +1065,7 @@ static void test_HdpHmmWithAssignments_multiset_model(CuTest *testCase) {
     finalize_nhdp_distributions(nHdp1);
 
     // make NanoporeHDP from Hmm
-    NanoporeHDP *nHdp2 = multiset_hdp_model("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
+    NanoporeHDP *nHdp2 = multiset_hdp_model("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                             1.0, 1.0, 1.0,
                                             0.0, 100, 100,
                                             templateModelFile);
@@ -1083,7 +1083,7 @@ static void test_HdpHmmWithAssignments_multiset_model2(CuTest *testCase) {
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
     char *templateModelFile = "../../cPecan/models/template_median68pA.model";
     // make NanoporeHDP to compare to
-    NanoporeHDP *nHdp1 = multiset_hdp_model_2("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
+    NanoporeHDP *nHdp1 = multiset_hdp_model_2("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                               5.0, 0.5,
                                               5.0, 0.5,
                                               5.0, 0.5,
@@ -1094,7 +1094,7 @@ static void test_HdpHmmWithAssignments_multiset_model2(CuTest *testCase) {
     finalize_nhdp_distributions(nHdp1);
 
     // make NanoporeHDP from Hmm
-    NanoporeHDP *nHdp2 = multiset_hdp_model_2("ACGT", SYMBOL_NUMBER_NO_N, KMER_LENGTH,
+    NanoporeHDP *nHdp2 = multiset_hdp_model_2("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                               5.0, 0.5,
                                               5.0, 0.5,
                                               5.0, 0.5,
