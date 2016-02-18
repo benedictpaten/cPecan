@@ -44,6 +44,8 @@ def parse_args():
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
+    parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None)
+    parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None)
 
     args = parser.parse_args()
     return args
@@ -113,11 +115,14 @@ def main(args):
     for fast5 in fast5s:
         alignment_args = {
             "reference": reference_seq,
+            "cytosine_substitution": None,
             "destination": temp_dir_path,
             "stateMachineType": args.stateMachineType,
             "bwa_index": bwa_ref_index,
             "in_templateHmm": args.in_T_Hmm,
             "in_complementHmm": args.in_C_Hmm,
+            "in_templateHdp": args.templateHDP,
+            "in_complementHdp": args.complementHDP,
             "banded": args.banded,
             "in_fast5": args.files_dir + fast5,
             "threshold": args.threshold,

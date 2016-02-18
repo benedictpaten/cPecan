@@ -460,28 +460,30 @@ void cell_signal_updateTransAndKmerSkipExpectations(double *fromCells, double *t
 void cell_signal_updateTransAndKmerSkipExpectations2(double *fromCells, double *toCells, int64_t from, int64_t to,
                                                     double eP, double tP, void *extraArgs) {
     //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
+    // unpack the extraArgs thing
     double totalProbability = *((double *) ((void **) extraArgs)[0]);
     HdpHmm *hmmExpectations = ((void **) extraArgs)[1];
 
-    // pointer to the position in the sequence (kmer)
-    char *kmer = (char *)((void **) extraArgs)[2];
-    // pointer to the event mean
-    double *event = (double *)((void **) extraArgs)[3];
+    char *kmer = (char *)((void **) extraArgs)[2];  // pointer to the position in the sequence (kmer)
+
+    double *event = (double *)((void **) extraArgs)[3];  // pointer to the event mean
+
     // kmer index
-    int64_t kmerIdx = hmmExpectations->baseContinuousPairHmm.baseContinuousHmm.baseHmm.getElementIndexFcn(
-            ((void **) extraArgs)[2]); // this gives you the kmer index
+    //int64_t kmerIdx = hmmExpectations->baseContinuousPairHmm.baseContinuousHmm.baseHmm.getElementIndexFcn(
+    //        ((void **) extraArgs)[2]); // this gives you the kmer index
 
     // Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
 
     // update transitions expectation
-    hmmExpectations->baseContinuousPairHmm.baseContinuousHmm.baseHmm.addToTransitionExpectationFcn(
-            (Hmm *)hmmExpectations, from, to, p);
-    //
-    if (to == shortGapX) {
-        hmmExpectations->baseContinuousPairHmm.baseContinuousHmm.baseHmm.addToEmissionExpectationFcn(
-                (Hmm *)hmmExpectations, 0, kmerIdx, 0, p);
-    }
+    hmmExpectations->baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, from, to, p);
+
+    // this is where I update the kmer-skip prob, but I've stopped using it with the expanded alphabet
+    //if (to == shortGapX) {
+    //    hmmExpectations->baseContinuousPairHmm.baseContinuousHmm.baseHmm.addToEmissionExpectationFcn(
+    //            (Hmm *)hmmExpectations, 0, kmerIdx, 0, p);
+    //}
+
     if ((to == match) & (p >= hmmExpectations->threshold)) {
         // add to emissions expectations function here
         hmmExpectations->addToAssignments((Hmm *)hmmExpectations, kmer, event);

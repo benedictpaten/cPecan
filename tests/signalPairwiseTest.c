@@ -1814,6 +1814,7 @@ static void test_vanillaHmm_em(CuTest *testCase) {
 CuSuite *signalPairwiseTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
 
+
     SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
     SUITE_ADD_TEST(suite, test_bivariateGaussPdfMatchProb);
     SUITE_ADD_TEST(suite, test_twoDistributionPdf);

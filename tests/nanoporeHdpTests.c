@@ -907,42 +907,30 @@ static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testC
 
 static void test_hdpHmmWithoutAssignments(CuTest *testCase) {
     // make the hmm object
-    Hmm *hmm = hdpHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState_hdp, 0.02,
-                                        continuousPairHmm_addToTransitionsExpectation,
-                                        continuousPairHmm_setTransitionExpectation,
-                                        continuousPairHmm_getTransitionExpectation,
-                                        continuousPairHmm_addToKmerGapExpectation,
-                                        continuousPairHmm_setKmerGapExpectation,
-                                        continuousPairHmm_getKmerGapExpectation,
-                                        emissions_discrete_getKmerIndexFromKmer);
+    Hmm *hmm = hdpHmm_constructEmpty(0.0, 3, threeStateHdp, 0.02,
+                                     continuousPairHmm_addToTransitionsExpectation,
+                                     continuousPairHmm_setTransitionExpectation,
+                                     continuousPairHmm_getTransitionExpectation);
     HdpHmm *hdpHmm = (HdpHmm *) hmm;
 
     // Add some transition expectations
-    int64_t nStates = hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.stateNumber;
+    int64_t nStates = hdpHmm->baseHmm.stateNumber;
 
     for (int64_t from = 0; from < nStates; from++) {
         for (int64_t to = 0; to < nStates; to++) {
             double dummy = from * nStates + to;
-            hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.addToTransitionExpectationFcn(
-                    (Hmm *) hdpHmm, from, to, dummy);
+            hdpHmm->baseHmm.addToTransitionExpectationFcn((Hmm *) hdpHmm, from, to, dummy);
         }
     }
 
-    // Add some emissions to the kmer skip probs
-    int64_t nSymbols = hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.symbolSetSize;
-    double dummyTotal = 0.0;
-    for (int64_t i = 0; i < nSymbols; i++) {
-        double dummy = (nSymbols * nStates) + i;
-        hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.setEmissionExpectationFcn(
-                (Hmm *) hdpHmm, 0, i, 0, dummy);
-        dummyTotal += dummy;
-    }
-
+    // make a simple nucleotide and event sequence
     char *sequence = "ACGTCATACATGACTATA";
     double fakeMeans[3] = { 65.0, 64.0, 63.0 };
+
     for (int64_t a = 0; a < 3; a++) {
         hdpHmm->addToAssignments((Hmm *)hdpHmm, sequence + (a * KMER_LENGTH), fakeMeans + a);
     }
+
     CuAssertTrue(testCase, hdpHmm->numberOfAssignments == 3);
 
     // dump the HMM to a file
@@ -957,47 +945,30 @@ static void test_hdpHmmWithoutAssignments(CuTest *testCase) {
     hmm = hdpHmm_loadFromFile(tempFile, NULL);
     hdpHmm = (HdpHmm *)hmm;
     stFile_rmrf(tempFile);
-    CuAssertTrue(testCase, (3 == hdpHmm->numberOfAssignments));
+
+    CuAssertTrue(testCase, (3 == hdpHmm->numberOfAssignments));  // recheck number of assignments
 
     // Check the transition expectations
     for (int64_t from = 0; from < nStates; from++) {
         for (int64_t to = 0; to < nStates; to++) {
-            double retrievedProb = hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.getTransitionsExpFcn(
-                    (Hmm *) hdpHmm, from, to);
+            double retrievedProb = hdpHmm->baseHmm.getTransitionsExpFcn((Hmm *) hdpHmm, from, to);
             double correctProb = from * nStates + to;
             CuAssertTrue(testCase, retrievedProb == correctProb);
         }
     }
 
-    // check the kmer skip probs
-    for (int64_t i = 0; i < nSymbols; i++) {
-        double received = hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.getEmissionExpFcn(
-                (Hmm *) hdpHmm, 0, i, 0);
-        double correct = (nSymbols * nStates) + i;
-        CuAssertDblEquals(testCase, received, correct, 0.0);
-    }
-
     // normalize
-    continuousPairHmm_normalize((Hmm *) hdpHmm);
+    hmmDiscrete_normalize2((Hmm *)hdpHmm, FALSE);
 
     // Recheck transitions
     for (int64_t from = 0; from < nStates; from++) {
         for (int64_t to = 0; to < nStates; to++) {
             double z = from * nStates * nStates + (nStates * (nStates - 1)) / 2;
-            double retrievedNormedProb = hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.getTransitionsExpFcn(
-                    (Hmm *) hdpHmm, from, to);
+            double retrievedNormedProb = hdpHmm->baseHmm.getTransitionsExpFcn((Hmm *) hdpHmm, from, to);
             CuAssertDblEquals(testCase, (from * nStates + to) / z, retrievedNormedProb, 0.0);
         }
     }
-
-    // Recheck kmerGap emissions
-    for (int64_t i = 0; i < nSymbols; i++) {
-        double received = hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.getEmissionExpFcn(
-                (Hmm *) hdpHmm, 0, i, 0);
-        double correctNormed = ((nSymbols * nStates) + i) / dummyTotal;
-        CuAssertDblEquals(testCase, received, correctNormed, 0.001);
-    }
-    continuousPairHmm_destruct((Hmm *) hdpHmm);
+    hdpHmm_destruct((Hmm *) hdpHmm);
 }
 
 static void test_HdpHmmWithAssignments_flat_model(CuTest *testCase) {
@@ -1076,7 +1047,7 @@ static void test_HdpHmmWithAssignments_multiset_model(CuTest *testCase) {
     finalize_nhdp_distributions(nHdp2);
 
     // test against model updated with simple alignment
-    test_checkHDPs(testCase, nHdp2, nHdp1, 0.00001);
+    test_checkHDPs(testCase, nHdp2, nHdp1, 0.0001);
 }
 
 static void test_HdpHmmWithAssignments_multiset_model2(CuTest *testCase) {
@@ -1130,14 +1101,10 @@ static void test_hdpHmm_em(CuTest *testCase) {
 
     double pLikelihood = -INFINITY;
 
-    Hmm *hdpHmm = hdpHmm_constructEmpty(0.0, 3, NUM_OF_KMERS, threeState_hdp, p->threshold,
+    Hmm *hdpHmm = hdpHmm_constructEmpty(0.0001, 3, threeStateHdp, p->threshold,
                                         continuousPairHmm_addToTransitionsExpectation,
                                         continuousPairHmm_setTransitionExpectation,
-                                        continuousPairHmm_getTransitionExpectation,
-                                        continuousPairHmm_addToKmerGapExpectation,
-                                        continuousPairHmm_setKmerGapExpectation,
-                                        continuousPairHmm_getKmerGapExpectation,
-                                        emissions_discrete_getKmerIndexFromKmer);
+                                        continuousPairHmm_getTransitionExpectation);
     continuousPairHmm_randomize(hdpHmm);
 
     // make initial NanoporeHdp from alignment
@@ -1160,14 +1127,10 @@ static void test_hdpHmm_em(CuTest *testCase) {
     hdpHmm_destruct(hdpHmm);
 
     for (int64_t iter = 0; iter < 10; iter++) {
-        Hmm *hmmExpectations = hdpHmm_constructEmpty(0.0001, 3, NUM_OF_KMERS, threeState_hdp, p->threshold,
+        Hmm *hmmExpectations = hdpHmm_constructEmpty(0.0001, 3, threeStateHdp, p->threshold,
                                                      continuousPairHmm_addToTransitionsExpectation,
                                                      continuousPairHmm_setTransitionExpectation,
-                                                     continuousPairHmm_getTransitionExpectation,
-                                                     continuousPairHmm_addToKmerGapExpectation,
-                                                     continuousPairHmm_setKmerGapExpectation,
-                                                     continuousPairHmm_getKmerGapExpectation,
-                                                     emissions_discrete_getKmerIndexFromKmer);
+                                                     continuousPairHmm_getTransitionExpectation);
         // E step
         // get anchors using lastz
         stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(ZymoReferenceSeq, npRead->twoDread, p);
@@ -1205,7 +1168,8 @@ static void test_hdpHmm_em(CuTest *testCase) {
                        hmmExpectations->getEmissionExpFcn(hmmExpectations, 0, x, 0));
         }
         */
-        //st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", hmmExpectations->likelihood, iter);
+
+        st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", hmmExpectations->likelihood, iter);
 
         // M step
         // dump hmm (expectations) to disk

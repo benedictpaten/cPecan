@@ -108,6 +108,7 @@ void hmmDiscrete_randomize(Hmm *hmm) { //TODO clunky make this better
     hmmDiscrete_normalize((Hmm *)hmmD);
 }
 
+// todo depreciate this in favor of norm2 (below)
 void hmmDiscrete_normalize(Hmm *hmm) {
     HmmDiscrete *hmmD = (HmmDiscrete *) hmm;
     // Transitions

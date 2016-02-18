@@ -25,7 +25,7 @@ typedef enum {
     vanilla = 4,
     echelon = 5,
     fourState = 6,
-    threeState_hdp = 7,
+    threeStateHdp = 7,
 } StateMachineType;
 
 typedef enum {
