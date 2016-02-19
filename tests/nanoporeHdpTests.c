@@ -1205,7 +1205,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
 
 CuSuite *NanoporeHdpTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-/*
+
     SUITE_ADD_TEST(suite, test_first_kmer_index);
     SUITE_ADD_TEST(suite, test_second_kmer_index);
     SUITE_ADD_TEST(suite, test_sixth_kmer_index);
@@ -1218,9 +1218,9 @@ CuSuite *NanoporeHdpTestSuite(void) {
     SUITE_ADD_TEST(suite, test_sm3Hdp_dpDiagonal);
     SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
-*/
+
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding_withReplacement);
-/*
+
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
     SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_flat_model);
     SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_flat_model2);
@@ -1228,6 +1228,6 @@ CuSuite *NanoporeHdpTestSuite(void) {
     SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_multiset_model2);
     //SUITE_ADD_TEST(suite, test_nhdp_buildFromAlignment);  // use to make test NanoporeHDPs
     SUITE_ADD_TEST(suite, test_hdpHmm_em);
-*/
+
     return suite;
 }
