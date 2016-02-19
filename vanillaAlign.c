@@ -367,7 +367,7 @@ int main(int argc, char *argv[]) {
     int64_t hdpType = 99;
 
     int64_t j;
-    int64_t diagExpansion = 20;
+    int64_t diagExpansion = 50;
     double threshold = 0.01;
     int64_t constraintTrim = 14;
     char *templateModelFile = stString_print("../../cPecan/models/template_median68pA.model");
@@ -686,6 +686,10 @@ int main(int argc, char *argv[]) {
 
                 // write to file
                 fprintf(stderr, "vanillaAlign - writing expectations to file: %s\n", templateExpectationsFile);
+                if (sMtype == threeStateHdp) {
+                    fprintf(stderr, "vanillaAlign - got %lld HDP assignments\n",
+                            hmmContinuous_howManyAssignments(templateExpectations));
+                }
                 hmmContinuous_writeToFile(templateExpectationsFile, templateExpectations, sMtype);
             }
 
@@ -700,6 +704,10 @@ int main(int argc, char *argv[]) {
 
                 // write to file
                 fprintf(stderr, "vanillaAlign - writing expectations to file: %s\n", complementExpectationsFile);
+                if (sMtype == threeStateHdp) {
+                    fprintf(stderr, "vanillaAlign - got %lld HDP assignments\n",
+                            hmmContinuous_howManyAssignments(complementExpectations));
+                }
                 hmmContinuous_writeToFile(complementExpectationsFile, complementExpectations, sMtype);
             }
         }

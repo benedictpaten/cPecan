@@ -127,4 +127,6 @@ void hmmContinuous_normalize(Hmm *hmm, StateMachineType type);
 
 void hmmContinuous_writeToFile(const char *outFile, Hmm *hmm, StateMachineType type);
 
+int64_t hmmContinuous_howManyAssignments(Hmm *hmm);
+
 #endif

@@ -1123,6 +1123,13 @@ Hmm *hmmContinuous_getEmptyHmm(StateMachineType type, double pseudocount, double
     }
     return 0;
 }
+int64_t hmmContinuous_howManyAssignments(Hmm *hmm) {
+    if (hmm->type != threeStateHdp) {
+        st_errAbort("hmmContinuous: this type of Hmm doesn't have assignments got type: %lld", hmm->type);
+    }
+    HdpHmm *hdpHmm = (HdpHmm *)hmm;
+    return hdpHmm->numberOfAssignments;
+}
 
 void hmmContinuous_normalize(Hmm *hmm, StateMachineType type) {
     assert((type == vanilla) || (type == threeState));

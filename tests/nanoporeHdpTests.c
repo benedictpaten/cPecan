@@ -848,7 +848,7 @@ static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testC
     char *alignmentFile = stString_print("../../cPecan/tests/test_alignments/simple_alignment.tsv");
     char *strand = "t";
 
-    NanoporeHDP *nHdp = flat_hdp_model_2("ACEGOT", (SYMBOL_NUMBER_NO_N + 2), KMER_LENGTH,
+    NanoporeHDP *nHdp = flat_hdp_model_2("ACEGOT", SYMBOL_NUMBER_EPIGENETIC_C, KMER_LENGTH,
                                          5.0, 0.5, 5.0, 0.5,
                                          0.0, 100, 1000,
                                          modelFile);
@@ -879,9 +879,9 @@ static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testC
                                                 sequence_sliceEventSequence2);
 
     // do alignment of template events
-    //stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
-    //                                                   diagonalCalculationPosteriorMatchProbs,
-    //                                                   0, 0);
+    stList *alignedPairs = getAlignedPairsUsingAnchors(sMt, refSeq, templateSeq, filteredRemappedAnchors, p,
+                                                       diagonalCalculationPosteriorMatchProbs,
+                                                       0, 0);
 
     stList *alignedPairs2 = getAlignedPairsUsingAnchors(sMt, CtoM_refSeq, templateSeq, filteredRemappedAnchors, p,
                                                         diagonalCalculationPosteriorMatchProbs,
@@ -891,9 +891,10 @@ static void test_sm3Hdp_getAlignedPairsWithBanding_withReplacement(CuTest *testC
     //checkAlignedPairs(testCase, alignedPairs, lX, lY);
 
     // for ch1_file1 template there should be this many aligned pairs with banding
-    st_uglyf("got %lld alignedPairs with anchors\n", stList_length(alignedPairs2));
-    //CuAssertTrue(testCase, stList_length(alignedPairs) == 2887);
-    //CuAssertTrue(testCase, stList_length(alignedPairs2) == 3206);
+    //st_uglyf("got %lld alignedPairs on the normal sequence\n", stList_length(alignedPairs));
+    //st_uglyf("got %lld alignedPairs on the methyl sequence\n", stList_length(alignedPairs2));
+    CuAssertTrue(testCase, stList_length(alignedPairs) == 2887);
+    CuAssertTrue(testCase, stList_length(alignedPairs2) == 2887);
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
@@ -1204,7 +1205,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
 
 CuSuite *NanoporeHdpTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
-
+/*
     SUITE_ADD_TEST(suite, test_first_kmer_index);
     SUITE_ADD_TEST(suite, test_second_kmer_index);
     SUITE_ADD_TEST(suite, test_sixth_kmer_index);
@@ -1217,9 +1218,9 @@ CuSuite *NanoporeHdpTestSuite(void) {
     SUITE_ADD_TEST(suite, test_sm3Hdp_dpDiagonal);
     SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
-
+*/
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding_withReplacement);
-
+/*
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
     SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_flat_model);
     SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_flat_model2);
@@ -1227,6 +1228,6 @@ CuSuite *NanoporeHdpTestSuite(void) {
     SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_multiset_model2);
     //SUITE_ADD_TEST(suite, test_nhdp_buildFromAlignment);  // use to make test NanoporeHDPs
     SUITE_ADD_TEST(suite, test_hdpHmm_em);
-
+*/
     return suite;
 }
