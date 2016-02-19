@@ -63,6 +63,7 @@ def parse_args():
 # Pipeline Script
 args = parse_args()  # parse arguments
 working_directory = args.out  # this is the directory we will use for everything
+assert os.path.isdir(working_directory), "ERROR: the working directory you specified doesn't exist."
 pipeline_log = open(working_directory + "pipeline.log", 'a')
 
 # build alignment
@@ -79,12 +80,12 @@ pipeline_log.write("[pipeline] NOTICE: Making build alignment using files from:\
 check_call(build_alignment_command.split(), stderr=pipeline_log, stdout=pipeline_log)
 
 # initial HDP
+assert (os.path.isfile(build_alignment_location)), "ERROR: Didn't find build alignment"
 pipeline_log.write("[pipeline] NOTICE: Making initial HDP of type {}\n".format(args.hdp_type))
 template_hdp_location = working_directory + "template." + args.hdp_type + ".nhdp"
 complement_hdp_location = working_directory + "complement." + args.hdp_type + ".nhdp"
 initial_hdp_build_out = open(working_directory + "build_initial_hdp.out", 'w')
 initial_hdp_build_err = open(working_directory + "build_initial_hdp.err", 'w')
-assert (os.path.isfile(build_alignment_location)), "ERROR: Didn't find build alignment"
 build_initial_hdp_command = "./trainModels --buildHdp={hdpType} -tH={tHdpLoc} -cH={cHdpLoc} -al={buildAln}" \
                             "".format(hdpType=args.hdp_type, tHdpLoc=template_hdp_location,
                                       cHdpLoc=complement_hdp_location, buildAln=build_alignment_location)
@@ -93,6 +94,7 @@ initial_hdp_build_out.close()
 initial_hdp_build_err.close()
 
 # trainModels
+assert (os.path.isfile(template_hdp_location) and os.path.isfile(complement_hdp_location)), "ERROR: couldn't find HDPs"
 pipeline_log.write("[pipeline] NOTICE: Training HDP models.\n")
 template_trained_hdp_location = working_directory + "template_trained." + args.hdp_type + ".nhdp"
 complement_trained_hdp_location = working_directory + "complement_trained." + args.hdp_type + ".nhdp"
@@ -105,9 +107,14 @@ train_models_command = "./trainModels -r={ref} -i={iter} -a={amount} -smt=threeS
                        "-cH={cHdp} -o={wd} -t={threshold} " \
                        "".format(ref=args.ref, iter=args.iter, amount=args.amount, tHdp=template_trained_hdp_location,
                                  cHdp=complement_trained_hdp_location, wd=working_directory, threshold=args.threshold)
+assert (len(args.files_dir) >= 1), "ERROR: need to provide at least 1 directory of reads to train on."
 for directory in args.files_dir:
     train_models_command += "-d={dir} ".format(dir=directory)
 if args.cytosine_sub is not None:
+    pipeline_log.write("[pipeline] NOTICE: using cytosine sibstitutions\n")
+    # TODO fill with None?
+    assert len(args.cytosine_sub) == len(args.files_dir), "ERROR: need to provide a cytosine substitution for each " \
+                                                          "directory.  Just use C if you don't want a change."
     for substitution in args.cytosine_sub:
         train_models_command += "-cs={sub} ".format(sub=substitution)
 check_call(train_models_command.split(), stdout=train_hdp_out, stderr=train_hdp_err)

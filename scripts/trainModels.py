@@ -77,7 +77,8 @@ def get_2d_length(fast5):
 
 def cull_training_files(directories, cytosine_substitutions, training_amount):
     print("trainModels - culling training files.\n", end="", file=sys.stderr)
-
+    assert len(directories) == len(cytosine_substitutions), "[trainModels] ERROR: need to have the same number of " \
+                                                            "substitutions as directories"
     training_files = []
     add_to_training_files = training_files.append
     substitutions = []
@@ -195,10 +196,11 @@ def main(argv):
     Writing trained models to: {outLoc}
     Performing {iterations} iterations.
     Using model: {model}
+    Using HDPs: {thdp} / {chdp}
     \n
     """.format(files_dir=args.files_dir, amount=args.amount, ref=args.ref,
                inTHmm=args.in_T_Hmm, inCHmm=args.in_C_Hmm, outLoc=args.out,
-               iterations=args.iter, model=args.stateMachineType)
+               iterations=args.iter, model=args.stateMachineType, thdp=args.templateHDP, chdp=args.complementHDP)
 
     assert (args.files_dir is not None), "Need to specify which files to train on"
     assert (args.ref is not None), "Need to provide a reference file"
