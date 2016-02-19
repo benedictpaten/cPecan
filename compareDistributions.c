@@ -74,10 +74,10 @@ int main(int argc, char *argv[]) {
     }
 
     char *modelFile = argv[1];
-    fprintf(stderr, "[NOTICE] Loading NanoporeHDP from %s\n", modelFile);
+    fprintf(stderr, "[compareDistributions] NOTICE: Loading NanoporeHDP from %s\n", modelFile);
 
     char *workingDirectoryPath = argv[2];
-    fprintf(stderr, "[NOTICE] Putting distribution files in %s\n", workingDirectoryPath);
+    fprintf(stderr, "[compareDistributions] NOTICE: Putting distribution files in %s\n", workingDirectoryPath);
 
     NanoporeHDP *nHdp= deserialize_nhdp(modelFile);
 

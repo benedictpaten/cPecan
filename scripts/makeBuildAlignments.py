@@ -29,7 +29,7 @@ def parse_args():
                         dest='max_assignments',
                         help='total number of assignments to collect FOR EACH GROUP')
     parser.add_argument('--threshold', '-t', action='store', type=float, default=0.25, dest='threshold')
-    parser.add_argument('--out', '-o', action='store', type=str, required=True)
+    parser.add_argument('--out', '-o', action='store', type=str, required=True, dest='out_file')
 
     return parser.parse_args()
 
@@ -85,8 +85,9 @@ def make_build_alignment(c_alns, mc_alns, hmc_alns, strand, threshold, max_assig
     nb_mc_assignments = mC_table.shape[0] if mC_table is not None else "None"
     nb_hmc_assignments = hmC_table.shape[0] if hmC_table is not None else "None"
 
-    print("NOTICE: I found {C} C-assignments, {mC} mC-assignments, and {hmC} hmC-assignments for strand"
-          " {strand}".format(C=nb_c_assignments, mC=nb_mc_assignments, hmC=nb_hmc_assignments, strand=strand),
+    print("[buildAlignments] NOTICE: I found {C} C-assignments, {mC} mC-assignments, and {hmC} hmC-assignments "
+          "for strand {strand}"
+          "".format(C=nb_c_assignments, mC=nb_mc_assignments, hmC=nb_hmc_assignments, strand=strand),
           file=sys.stderr)
     tables = []
 
@@ -114,11 +115,11 @@ def main(arguments):
 
     entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t0.0\t{event}\t0.0\n"
 
-    with open(args.out, 'w') as out_file:
+    with open(args.out_file, 'w') as f:
         for row in template_build_alignment.itertuples():
-            out_file.write(entry_line.format(strand="t", kmer=row[2], event=row[1]))
+            f.write(entry_line.format(strand="t", kmer=row[2], event=row[1]))
         for row in complement_build_alignment.itertuples():
-            out_file.write(entry_line.format(strand="c", kmer=row[2], event=row[1]))
+            f.write(entry_line.format(strand="c", kmer=row[2], event=row[1]))
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

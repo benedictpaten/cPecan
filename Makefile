@@ -8,7 +8,8 @@ libTests = tests/*.c
 cPecanDependencies =  ${basicLibsDependencies}
 cPecanLibs = ${basicLibs}
 
-all : ${libPath}/cPecanLib.a ${binPath}/cPecanLibTests ${binPath}/vanillaAlign ${binPath}/trainModels ${binPath}/signalAlign ${sonLibrootPath}/nanoporelib.py ${binPath}/compareDistributions
+all : ${libPath}/cPecanLib.a ${binPath}/cPecanLibTests ${binPath}/vanillaAlign ${binPath}/trainModels \
+      ${binPath}/signalAlign ${sonLibrootPath}/nanoporelib.py ${binPath}/compareDistributions ${binPath}/hdp_pipeline
 	# disabled right now so that we don't build Lastz every time I do an update
 	#cd externalTools && make all
 	
@@ -31,7 +32,11 @@ ${binPath}/compareDistributions : compareDistributions.c ${libPath}/cPecanLib.a 
 ${binPath}/trainModels : ${rootPath}scripts/trainModels.py
 	cp ${rootPath}scripts/trainModels.py ${binPath}/trainModels
 	chmod +x ${binPath}/trainModels
-	
+
+${binPath}/hdp_pipeline : ${rootPath}scripts/hdp_pipeline.py
+	cp ${rootPath}scripts/hdp_pipeline.py ${binPath}/hdp_pipeline
+	chmod +x ${binPath}/hdp_pipeline
+
 ${binPath}/signalAlign : ${rootPath}scripts/signalAlign.py
 	cp ${rootPath}scripts/signalAlign.py ${binPath}/signalAlign
 	chmod +x ${binPath}/signalAlign

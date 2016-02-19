@@ -427,7 +427,7 @@ int main(int argc, char *argv[]) {
         switch (key) {
             case 'h':
                 usage();
-                return 0;
+                return 1;
             case 's':
                 sMtype = threeState;
                 break;

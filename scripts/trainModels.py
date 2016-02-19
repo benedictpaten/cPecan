@@ -179,7 +179,7 @@ def build_hdp(hdp_type, template_hdp_path, complement_hdp_path, alignments,
 def main(argv):
     # parse command line arguments
     args = parse_args()
-    print(args.files_dir, args.cytosine_sub)
+
     # build the HDP if that's what we're doing
     if args.buildHDP is not None:
         assert (None not in [args.buildHDP, args.templateHDP, args.complementHDP, args.buildAlignments])

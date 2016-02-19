@@ -30,6 +30,7 @@ def parse_args():
 
     return parser.parse_args()
 
+
 def histogram_runner(work_queue, done_queue):
     try:
         for f in iter(work_queue.get, 'STOP'):
