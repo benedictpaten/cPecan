@@ -74,7 +74,7 @@ build_alignment_command = "{cP}scripts/makeBuildAlignments.py -o={bA} -t={thresh
                                     hmC=args.hmC_alns, bA=build_alignment_location)
 if args.C_alns is not None: build_alignment_command += "-C={C} ".format(C=args.C_alns)
 if args.mC_alns is not None: build_alignment_command += "-mC={mC} ".format(mC=args.mC_alns)
-if args.hmC_alns is not None: build_alignment_command += "-mC={hmC} ".format(hmC=args.hmC_alns)
+if args.hmC_alns is not None: build_alignment_command += "-hmC={hmC} ".format(hmC=args.hmC_alns)
 pipeline_log.write("[pipeline] NOTICE: Making build alignment using files from:\n\t{C}\n\t{mC}\n\t{hmC}\n"
                    "".format(C=args.C_alns, mC=args.mC_alns, hmC=args.hmC_alns))
 check_call(build_alignment_command.split(), stderr=pipeline_log, stdout=pipeline_log)
