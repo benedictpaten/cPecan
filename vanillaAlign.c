@@ -141,7 +141,8 @@ StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentPar
 void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile, const char *nHdpOutFile) {
     NanoporeHDP *nHdp = deserialize_nhdp(nHdpFile);
     Hmm *hdpHmm = hdpHmm_loadFromFile(expectationsFile, nHdp);
-    (void) hdpHmm;
+    hmmContinuous_destruct(hdpHmm, hdpHmm->type);
+
     fprintf(stderr, "vanillaAlign - Running Gibbs on HDP\n");
     execute_nhdp_gibbs_sampling(nHdp, 10000, 100000, 100, FALSE);
     finalize_nhdp_distributions(nHdp);
@@ -539,7 +540,6 @@ int main(int argc, char *argv[]) {
                     if (templateHdp == NULL) {
                         st_errAbort("Need to provide HDP file");
                     }
-                    // todo make this it's own function
                     updateHdpFromAssignments(templateHdp, templateExpectationsFile, templateHdp);
                 }
                 }

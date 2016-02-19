@@ -315,11 +315,13 @@ def main(argv):
                                       files=complement_expectations_files,
                                       model=complement_model,
                                       hmm_file=complement_hmm)
+
         # Build HDP from last round of assignments
         if args.stateMachineType == "threeStateHdp":
             build_hdp(hdp_type=None, template_hdp_path=args.templateHDP, complement_hdp_path=args.complementHDP,
                       alignments=None, template_assignments=template_hmm, complement_assignments=complement_hmm)
 
+        # log the running likelihood
         if len(template_model.running_likelihoods) > 0 and len(complement_model.running_likelihoods) > 0:
             print("{i}| {t_likelihood}\t{c_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1],
                                                                c_likelihood=complement_model.running_likelihoods[-1],
