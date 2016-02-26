@@ -45,8 +45,8 @@ class Kmer_histogram(object):
                 total += selected_rows.shape[0]
                 aln_kmer_hist = pd.DataFrame({"event_mean": selected_rows["event_mean"]})
                 add_to_hist(aln_kmer_hist)
-            except:
-                print("ERROR: problem with alignment {}".format(alignment))
+            except Exception:
+                print("ERROR: {exc} {aln}".format(exc=Exception, aln=alignment))
                 continue
             if total >= self.max_assignments:
                     break
