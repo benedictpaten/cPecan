@@ -48,15 +48,17 @@ def histogram_runner(work_queue, done_queue):
 
 
 def main(args):
+    args = parse_args()
     # get the kmers we want
     start_message = """
     # Generating Kmer histograms from alignments: {alns}
     # Getting a maximum of {maxNb} assignments
     # Using threshold: {thresh}
     """.format(alns=args.alns, maxNb=args.max_assignments, thresh=args.threshold)
+
     print start_message
 
-    args = parse_args()
+
     kmers_of_interest = []
     if args.kmers is None:
         for kmer in product("ACTG", repeat=6):
