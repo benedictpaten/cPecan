@@ -855,7 +855,6 @@ static void test_hmmDiscrete_5StateAsymmetric_symbols(CuTest *testCase) {
 }
 
 static void test_HmmDiscrete_em(CuTest *testCase, StateMachineType sMType, int64_t symbolSetSize) {
-    //Todo add switch for kmer/nucleotide/event test
     for (int64_t test = 0; test < 10; test++) {
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(10, 100));
@@ -907,7 +906,7 @@ static void test_HmmDiscrete_em(CuTest *testCase, StateMachineType sMType, int64
                             getBlastPairsForPairwiseAlignmentParameters,
                             0, 0);
 
-            hmmDiscrete_normalize(hmmD);
+            hmmDiscrete_normalize2(hmmD, TRUE);
             //Log stuff
             for (int64_t from = 0; from < sM->stateNumber; from++) {
                 for (int64_t to = 0; to < sM->stateNumber; to++) {

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import sys
 from alignmentAnalysisLib import Kmer_histogram
 from itertools import product
@@ -13,16 +14,13 @@ def parse_args():
     # query files
     parser.add_argument('--alignments', '-a', action='store',
                         dest='alns', required=False, type=str, default=None,
-                        help="alignment files")
+                        help="alignment files, add file extension")
     parser.add_argument('--number_of_assignments', '-n', action='store', type=int, default=10000,
                         dest='max_assignments',
                         help='total number of assignments to collect FOR EACH GROUP')
     parser.add_argument('--kmer', '-k', action='append', default=None,
                         dest='kmers', required=False, type=str,
-                        help="which kmers to plot")
-    parser.add_argument('--strand', '-s', action='store',
-                        dest='strand', required=False, type=str, default=None,
-                        help="strand")
+                        help="which kmers to plot, optional")
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
                         default=4, type=int, help="number of jobs to run concurrently")
     parser.add_argument('--threshold', '-t', action='store', type=float, default=0.25, dest='threshold')
@@ -30,6 +28,15 @@ def parse_args():
 
     return parser.parse_args()
 
+def check_for_destination_directory(working_directory_path, new_directory):
+    try:
+        if os.path.isdir(working_directory_path + new_directory):
+            print "WARNING: destination for {} histograms already exists".format(new_directory)
+        else:
+            os.mkdir(working_directory_path + new_directory)
+        return working_directory_path + new_directory
+    except:
+        return None
 
 def histogram_runner(work_queue, done_queue):
     try:
@@ -59,16 +66,22 @@ def main(args):
     done_queue = Manager().Queue()
     jobs = []
 
-    for kmer in kmers_of_interest:
-        hist_args = {
-            "path_to_alignments": args.alns,
-            "kmer": kmer,
-            "strand": args.strand,
-            "threshold": args.threshold,
-            "max_assignments": 1000,
-            "out_dir": args.out,
-        }
-        work_queue.put(hist_args)
+    template_directory = check_for_destination_directory(args.out, "template_hist/")
+    complement_directory = check_for_destination_directory(args.out, "complement_hist/")
+    if template_directory is None or complement_directory is None:
+        print >> sys.stderr, "problem making destination directories"
+        sys.exit(1)
+    for strand, destination in zip(["t", "c"], [template_directory, complement_directory]):
+        for kmer in kmers_of_interest:
+            hist_args = {
+                "path_to_alignments": args.alns,
+                "kmer": kmer,
+                "strand": strand,
+                "threshold": args.threshold,
+                "max_assignments": 1000,
+                "out_dir": destination,
+            }
+            work_queue.put(hist_args)
 
     for w in xrange(workers):
         p = Process(target=histogram_runner, args=(work_queue, done_queue))

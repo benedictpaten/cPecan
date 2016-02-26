@@ -89,53 +89,37 @@ double hmmDiscrete_getEmissionExpectation(Hmm *hmm, int64_t state, int64_t x, in
 }
 
 // Randomize/Normalize
-void hmmDiscrete_randomize(Hmm *hmm) { //TODO clunky make this better
-    HmmDiscrete *hmmD = (HmmDiscrete *) hmm;
-    // Transitions
-    for (int64_t from = 0; from < hmmD->baseHmm.stateNumber; from++) {
-        for (int64_t to = 0; to < hmmD->baseHmm.stateNumber; to++) {
-            hmmDiscrete_setTransitionExpectation((Hmm *)hmmD, from, to, st_random());
+void hmmDiscrete_randomizeTransitions(Hmm *hmm) {
+    for (int64_t from = 0; from < hmm->stateNumber; from++) {
+        for (int64_t to = 0; to < hmm->stateNumber; to++) {
+            //hmmDiscrete_setTransitionExpectation((Hmm *)hmmD, from, to, st_random());
+            hmm->setTransitionFcn(hmm, from, to, st_random());
         }
     }
-    // Emissions
-    for (int64_t state = 0; state < hmmD->baseHmm.stateNumber; state++) {
-        for (int64_t x = 0; x < hmmD->baseHmm.symbolSetSize; x++) {
-            for (int64_t y = 0; y < hmmD->baseHmm.symbolSetSize; y++) {
-                hmmDiscrete_setEmissionExpectation((Hmm *)hmmD, state, x, y, st_random());
-            }
-        }
-    }
-    hmmDiscrete_normalize((Hmm *)hmmD);
 }
 
-// todo depreciate this in favor of norm2 (below)
-void hmmDiscrete_normalize(Hmm *hmm) {
+void hmmDiscrete_randomizeEmissions(Hmm *hmm) {
+    if (hmm->symbolSetSize <= 0) {
+        st_errAbort("hmmDiscrete_randomizeEmissions: got NULL for symbolSetSize\n");
+    }
+    for (int64_t state = 0; state < hmm->stateNumber; state++) {
+        for (int64_t x = 0; x < hmm->symbolSetSize; x++) {
+            for (int64_t y = 0; y < hmm->symbolSetSize; y++) {
+                //hmmDiscrete_setEmissionExpectation((Hmm *)hmmD, state, x, y, st_random());
+                hmm->setEmissionExpectationFcn(hmm, state, x, y, st_random());
+            }
+        }
+    }
+}
+void hmmDiscrete_randomize(Hmm *hmm) {
     HmmDiscrete *hmmD = (HmmDiscrete *) hmm;
     // Transitions
-    for (int64_t from = 0; from < hmmD->baseHmm.stateNumber; from++) {
-        double total = 0.0;
-        for (int64_t to = 0; to < hmmD->baseHmm.stateNumber; to++) {
-            total += hmmDiscrete_getTransitionExpectation((Hmm *)hmmD, from, to);
-        }
-        for (int64_t to = 0; to < hmmD->baseHmm.stateNumber; to++) {
-            double newProb = hmmDiscrete_getTransitionExpectation((Hmm *)hmmD, from, to) / total;
-            hmmDiscrete_setTransitionExpectation((Hmm *)hmmD, from, to, newProb);
-        }
-    }
-    for (int64_t state = 0; state < hmmD->baseHmm.stateNumber; state++) {
-        double total = 0.0;
-        for (int64_t x = 0; x < hmmD->baseHmm.symbolSetSize; x++) {
-            for (int64_t y = 0; y < hmmD->baseHmm.symbolSetSize; y++) {
-                total += hmmDiscrete_getEmissionExpectation((Hmm *)hmmD, state, x, y);
-            }
-        }
-        for (int64_t x = 0; x < hmmD->baseHmm.symbolSetSize; x ++) {
-            for (int64_t y = 0; y < hmmD->baseHmm.symbolSetSize; y++) {
-                double newProb = hmmDiscrete_getEmissionExpectation((Hmm *)hmmD, state, x, y) / total;
-                hmmDiscrete_setEmissionExpectation((Hmm *)hmmD, state, x, y, newProb);
-            }
-        }
-    }
+    hmmDiscrete_randomizeTransitions(hmm);
+
+    // Emissions
+    hmmDiscrete_randomizeEmissions(hmm);
+
+    hmmDiscrete_normalize2((Hmm *)hmmD, TRUE);
 }
 
 void hmmDiscrete_normalize2(Hmm *hmm, bool normalizeEmissions) {
@@ -296,7 +280,7 @@ Hmm *hmmDiscrete_loadFromFile(const char *fileName) {
 }
 
 // Housekeeping
-void hmmDiscrete_destruct(Hmm *hmm) { //TODO clean this up
+void hmmDiscrete_destruct(Hmm *hmm) {
     HmmDiscrete *hmmD = (HmmDiscrete *) hmm;
     free(hmmD->transitions);
     free(hmmD->emissions);

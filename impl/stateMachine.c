@@ -122,8 +122,8 @@ int64_t emissions_discrete_getKmerIndex(void *kmer) {
     if (kmerLen == 0) {
         return NUM_OF_KMERS + 1;
     }
-    // TODO hardwire this for speed?
-    int64_t axisLength = intPow(SYMBOL_NUMBER_NO_N, KMER_LENGTH);
+    //int64_t axisLength = intPow(SYMBOL_NUMBER_NO_N, KMER_LENGTH);
+    int64_t axisLength = NUM_OF_KMERS;
     int64_t l = axisLength / SYMBOL_NUMBER_NO_N;
     int64_t i = 0;
     int64_t x = 0;
@@ -420,10 +420,10 @@ int64_t emissions_signal_getKmerSkipBin(double *matchModel, void *kmers) {
 
 double emissions_signal_getBetaOrAlphaSkipProb(StateMachine *sM, void *kmers, bool getAlpha) {
     // downcast
-    StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *) sM;
+    //StateMachine3Vanilla *sM3v = (StateMachine3Vanilla *) sM;
     // get the skip bin
-    int64_t bin = emissions_signal_getKmerSkipBin(sM3v->model.EMISSION_MATCH_PROBS, kmers);
-    return getAlpha ? sM3v->model.EMISSION_GAP_X_PROBS[bin+30] : sM3v->model.EMISSION_GAP_X_PROBS[bin];
+    int64_t bin = emissions_signal_getKmerSkipBin(sM->EMISSION_MATCH_PROBS, kmers);
+    return getAlpha ? sM->EMISSION_GAP_X_PROBS[bin+30] : sM->EMISSION_GAP_X_PROBS[bin];
 }
 
 double emissions_signal_getKmerSkipProb(StateMachine *sM, void *kmers) {
@@ -544,7 +544,7 @@ double emissions_signal_multipleKmerMatchProb(const double *eventModel, void *km
             return LOG_ZERO;
         }
     }
-    // todo make this a pre-calculated thing
+
     return p - log(n);
 }
 
@@ -1417,11 +1417,12 @@ static void stateMachineEchelon_cellCalculate(StateMachine *sM,
     StateMachineEchelon *sMe = (StateMachineEchelon *) sM;
     // transitions
     // from M
-    double a_mx = sMe->getKmerSkipProb((StateMachine *) sMe, cX), la_mx = log(a_mx); // beta
+    double a_mx = sMe->getKmerSkipProb((StateMachine *)sMe, cX, 0), la_mx = log(a_mx); // beta
     double a_mh = 1 - a_mx, la_mh = log(a_mh); // 1 - beta
 
     // from X (kmer skip)
-    double a_xx = a_mx, la_xx = log(a_xx); // alpha, to seperate alpha, need to change here
+    //double a_xx = a_mx, la_xx = log(a_xx); // alpha, to seperate alpha, need to change here
+    double a_xx = sMe->getKmerSkipProb((StateMachine *)sMe, cX, 1), la_xx = log(a_xx);
     double a_xh = 1 - a_xx, la_xh = log(a_xh); // 1 - alpha
 
     if (lower != NULL) {
@@ -1438,57 +1439,6 @@ static void stateMachineEchelon_cellCalculate(StateMachine *sM,
             for (int64_t from = 0; from < 6; from++) {
                 doTransition(middle, current, from, n,
                              sMe->getMatchProbFcn(sMe->model.EMISSION_MATCH_PROBS, cX, cY, n),
-                             (la_mh + sMe->getDurationProb(cY, n)), extraArgs);
-            }
-        }
-        // now do from gapX to the match states
-        for (int64_t n = 1; n < 6; n++) {
-            doTransition(middle, current, gapX, n, sMe->getMatchProbFcn(sMe->model.EMISSION_MATCH_PROBS, cX, cY, n),
-                         (la_xh + sMe->getDurationProb(cY, n)), extraArgs);
-        }
-    }
-    if (upper != NULL) {
-        // only allowed to go from match states to match0 (extra event state)
-        for (int64_t n = 1; n < 6; n++) {
-            doTransition(upper, current, n, match0,
-                         sMe->getScaledMatchProbFcn(sMe->model.EMISSION_GAP_Y_PROBS, cX, cY),
-                         //sMe->getDurationProb(cY, 0), extraArgs);
-                         (la_mh + sMe->getDurationProb(cY, 0)), extraArgs);
-        }
-    }
-}
-
-static void stateMachineEchelonB_cellCalculate(StateMachine *sM,
-                                              double *current, double *lower, double *middle, double *upper,
-                                              void *cX, void *cY,
-                                              void (*doTransition)(double *, double *, int64_t, int64_t,
-                                                                   double, double, void *),
-                                              void *extraArgs) {
-    StateMachineEchelonB *sMe = (StateMachineEchelonB *) sM;
-    // transitions
-    // from M
-    double la_mx = sMe->TRANSITION_MATCH_TO_SKIP;
-    double la_mh = sMe->TRANSITION_MATCH_TO_HUB;
-
-    // from X (kmer skip)
-    double la_xx = sMe->TRANSITION_SKIP_CONTINUE;
-    double la_xh = sMe->TRANSITION_SKIP_TO_HUB;
-
-    if (lower != NULL) {
-        // go from all of the match states to gapX
-        // TODO put kmer skip prob in here?
-        for (int64_t n = 1; n < 6; n++) {
-            doTransition(lower, current, n, gapX, 0, la_mx, extraArgs);
-        }
-        // gapX --> gapX
-        doTransition(lower, current, gapX, gapX, 0, la_xx, extraArgs);
-    }
-    if (middle != NULL) {
-        // first we handle going from all of the match states to match1 through match5
-        for (int64_t n = 1; n < 6; n++) {
-            for (int64_t from = 0; from < 6; from++) {
-                doTransition(middle, current, from, n,
-                             sMe->getMatchProbFcn(sMe->model.EMISSION_MATCH_PROBS, cX, cY, n), // eP
                              (la_mh + sMe->getDurationProb(cY, n)), extraArgs);
             }
         }
@@ -1652,7 +1602,7 @@ StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t para
 StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t parameterSetSize,
                                             void (*setEmissionsToDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                             double (*durationProbFcn)(void *event, int64_t n),
-                                            double (*skipProbFcn)(StateMachine *sM, void *kmerList),
+                                            double (*skipProbFcn)(StateMachine *sM, void *kmerList, bool),
                                             double (*matchProbFcn)(const double *, void *, void *, int64_t n),
                                             double (*scaledMatchProbFcn)(const double *, void *, void *),
                                             void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,
@@ -1824,7 +1774,8 @@ StateMachine *getStateMachineEchelon(const char *modelFile) {
     StateMachine *sMe = stateMachineEchelon_construct(echelon, NUM_OF_KMERS,
                                                       emissions_signal_initEmissionsToZero,
                                                       emissions_signal_getDurationProb,
-                                                      emissions_signal_getKmerSkipProb,
+                                                      //emissions_signal_getKmerSkipProb,
+                                                      emissions_signal_getBetaOrAlphaSkipProb,
                                                       emissions_signal_multipleKmerMatchProb,
                                                       emissions_signal_getEventMatchProbWithTwoDists,
                                                       NULL); // cell update expectation, to be implemented

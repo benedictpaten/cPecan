@@ -103,8 +103,6 @@ Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, StateMachine
 
 void hdpHmm_loadTransitions(StateMachine *sM, Hmm *hmm);
 
-void hdpHmm_updateStateMachineHDP(const char *expectationsFile, StateMachine *sM);
-
 void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle);
 
 Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *ndhp);
@@ -114,10 +112,6 @@ void hdpHmm_destruct(Hmm *hmm);
 
 // CORE
 void hmmContinuous_loadSignalHmm(const char *hmmFile, StateMachine *sM, StateMachineType type);
-
-//Hmm *hmmContinuous_loadSignalHmmFromFile(const char *fileName, StateMachineType type);
-
-//void hmmContinuous_loadExpectations(StateMachine *sM, Hmm *hmm, StateMachineType type);
 
 void hmmContinuous_destruct(Hmm *hmm, StateMachineType type);
 

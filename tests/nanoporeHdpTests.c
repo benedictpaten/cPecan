@@ -994,7 +994,7 @@ static void test_HdpHmmWithAssignments_flat_model(CuTest *testCase) {
     finalize_nhdp_distributions(nHdp2);
 
     // test against model updated with simple alignment
-    test_checkHDPs(testCase, nHdp2, nHdp1, 0.000001);
+    test_checkHDPs(testCase, nHdp2, nHdp1, 0.0001);
 }
 
 static void test_HdpHmmWithAssignments_flat_model2(CuTest *testCase) {
@@ -1079,7 +1079,14 @@ static void test_HdpHmmWithAssignments_multiset_model2(CuTest *testCase) {
     finalize_nhdp_distributions(nHdp2);
 
     // test against model updated with simple alignment
-    test_checkHDPs(testCase, nHdp2, nHdp1, 0.001);
+    test_checkHDPs(testCase, nHdp2, nHdp1, 0.0001);
+}
+
+void updateStateMachineHDP(const char *expectationsFile, StateMachine *sM) {
+    StateMachine3_HDP *sM3Hdp = (StateMachine3_HDP *)sM;
+    Hmm *transitionsExpectations = hdpHmm_loadFromFile(expectationsFile, sM3Hdp->hdpModel);
+    hdpHmm_loadTransitions((StateMachine *) sM3Hdp, transitionsExpectations);
+    hdpHmm_destruct(transitionsExpectations);
 }
 
 static void test_hdpHmm_em(CuTest *testCase) {
@@ -1106,7 +1113,8 @@ static void test_hdpHmm_em(CuTest *testCase) {
                                         continuousPairHmm_addToTransitionsExpectation,
                                         continuousPairHmm_setTransitionExpectation,
                                         continuousPairHmm_getTransitionExpectation);
-    continuousPairHmm_randomize(hdpHmm);
+    //continuousPairHmm_randomize(hdpHmm);
+    hmmDiscrete_randomizeTransitions(hdpHmm);
 
     // make initial NanoporeHdp from alignment
 
@@ -1149,28 +1157,13 @@ static void test_hdpHmm_em(CuTest *testCase) {
         finalize_nhdp_distributions(nHdp);
 
         getExpectationsUsingAnchors(sMt, hmmExpectations, refSeq, templateSeq, filteredRemappedAnchors,
-                                    p, diagonalCalculation_signal_Expectations, 0, 0);
+                                    p, diagonalCalculation_Expectations, 0, 0);
 
         // norm
-        continuousPairHmm_normalize(hmmExpectations);
+        //continuousPairHmm_normalize(hmmExpectations);
+        hmmDiscrete_normalize2(hmmExpectations, FALSE);
 
-        // Log stuff
-        /*
-        for (int64_t from = 0; from < sMt->stateNumber; from++) {
-            for (int64_t to = 0; to < sMt->stateNumber; to++) {
-                //st_logInfo("Transition from %" PRIi64 " to %" PRIi64 " has expectation %f\n", from, to,
-                //           hmmExpectations->getTransitionsExpFcn(hmmExpectations, from, to));
-                st_uglyf("Transition from %" PRIi64 " to %" PRIi64 " has expectation %f\n", from, to,
-                           hmmExpectations->getTransitionsExpFcn(hmmExpectations, from, to));
-            }
-        }
-        for (int64_t x = 0; x < hdpHmm->symbolSetSize; x++) {
-            st_logInfo("Emission x %" PRIi64 " has expectation %f\n", x,
-                       hmmExpectations->getEmissionExpFcn(hmmExpectations, 0, x, 0));
-        }
-        */
-
-        st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", hmmExpectations->likelihood, iter);
+        //st_uglyf("->->-> Got expected likelihood %f for iteration %" PRIi64 "\n", hmmExpectations->likelihood, iter);
 
         // M step
         // dump hmm (expectations) to disk
@@ -1180,7 +1173,7 @@ static void test_hdpHmm_em(CuTest *testCase) {
         fclose(fH);
 
         // load into nHdp
-        hdpHmm_updateStateMachineHDP(tempHdpHmmFile, sMt);
+        updateStateMachineHDP(tempHdpHmmFile, sMt);
         remove(tempHdpHmmFile);
 
         // Tests
@@ -1218,9 +1211,7 @@ CuSuite *NanoporeHdpTestSuite(void) {
     SUITE_ADD_TEST(suite, test_sm3Hdp_dpDiagonal);
     SUITE_ADD_TEST(suite, test_sm3Hdp_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding);
-
     SUITE_ADD_TEST(suite, test_sm3Hdp_getAlignedPairsWithBanding_withReplacement);
-
     SUITE_ADD_TEST(suite, test_hdpHmmWithoutAssignments);
     SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_flat_model);
     SUITE_ADD_TEST(suite, test_HdpHmmWithAssignments_flat_model2);

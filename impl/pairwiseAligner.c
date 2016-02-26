@@ -32,6 +32,7 @@
 
 const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID = "PAIRWISE_ALIGNMENT_EXCEPTION";
 
+
 Diagonal diagonal_construct(int64_t xay, int64_t xmyL, int64_t xmyR) {
     if ((xay + xmyL) % 2 != 0 || (xay + xmyR) % 2 != 0 || xmyL > xmyR) {
         stThrowNew(PAIRWISE_ALIGNMENT_EXCEPTION_ID,
@@ -283,27 +284,11 @@ void sequence_padSequence(Sequence *sequence) {
     sequence->elements = stString_print("%s%s", sequence->elements, endPadding);
 }
 
-Sequence *sequence_sliceNucleotideSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength,
-                                           void *(*getFcn)(void *, int64_t)) {
-    size_t elementSize = sizeof(char);
-    void *elementSlice = (char *)inputSequence->elements + (start * elementSize);
-    Sequence *newSequence = sequence_construct(sliceLength, elementSlice, getFcn);
-    return newSequence;
-}
-
 Sequence *sequence_sliceNucleotideSequence2(Sequence *inputSequence, int64_t start, int64_t sliceLength) {
     size_t elementSize = sizeof(char);
     void *elementSlice = (char *)inputSequence->elements + (start * elementSize);
     Sequence *newSequence = sequence_construct2(sliceLength, elementSlice,
                                                 inputSequence->get, inputSequence->sliceFcn);
-    return newSequence;
-}
-
-Sequence *sequence_sliceEventSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength,
-                                      void *(*getFcn)(void *, int64_t)) {
-    size_t elementSize = sizeof(double);
-    void *elementSlice = (char *)inputSequence->elements + ((start * NB_EVENT_PARAMS) * elementSize);
-    Sequence *newSequence = sequence_construct(sliceLength, elementSlice, getFcn);
     return newSequence;
 }
 
@@ -512,22 +497,10 @@ void cell_signal_updateBetaAndAlphaProb(double *fromCells, double *toCells, int6
     }
 }
 
-// todo might be removeable
-static void cell_calculateExpectation(StateMachine *sM,
-                                      double *current, double *lower, double *middle, double *upper,
-                                      void* cX, void* cY,
-                                      void *extraArgs) {
-    void *extraArgs2[4] = { ((void **)extraArgs)[0], // &totalProbabability
-                            ((void **)extraArgs)[1], // hmmExpectations
-                            cX,
-                            cY };
-    sM->cellCalculate(sM, current, lower, middle, upper, cX, cY, cell_updateExpectations, extraArgs2);
-}
-
-static void cell_signal_calculateUpdateExpectation(StateMachine *sM,
-                                                   double *current, double *lower, double *middle, double *upper,
-                                                   void *cX, void *cY,
-                                                   void *extraArgs) {
+static void cell_calculateUpdateExpectation(StateMachine *sM,
+                                            double *current, double *lower, double *middle, double *upper,
+                                            void *cX, void *cY,
+                                            void *extraArgs) {
     void *extraArgs2[4] = { ((void **)extraArgs)[0], // &totalProbabability
                             ((void **)extraArgs)[1], // hmmExpectations
                             cX,   // pointer to char in sequence
@@ -812,7 +785,7 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
                 posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
                 stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
             }
-            //if (posteriorProbability <= p->threshold) { // todo remove this!?
+            //if (posteriorProbability <= p->threshold) {
             //    //st_uglyf("NOT Adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f)\n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1));
             //}
         }
@@ -855,7 +828,7 @@ void diagonalCalculationMultiPosteriorMatchProbs(StateMachine *sM, int64_t xay, 
                         stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, (x + n) - 1, y - 1));
                     }
                 }
-                //if (posteriorProbability <= p->threshold) { // todo remove this?!
+                //if (posteriorProbability <= p->threshold) {
                 //    //st_uglyf("NOT adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f), s:%lld \n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1), s);
                 //}
             }
@@ -865,33 +838,11 @@ void diagonalCalculationMultiPosteriorMatchProbs(StateMachine *sM, int64_t xay, 
     //st_uglyf("final length for alignedPairs: %lld\n", stList_length(alignedPairs));
 }
 
-void diagonalCalculationExpectations(StateMachine *sM, int64_t xay,
-                                     DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
-                                     double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs) {
-    /*
-     * Updates the expectations of the transitions/emissions for the given diagonal.
-     */
-    Hmm *hmmExpectations = extraArgs; // maybe change around hmm here?
-    void *extraArgs2[2] = { &totalProbability, hmmExpectations }; // this is where you pack in totalprob
-
-    // update likelihood
-    hmmExpectations->likelihood += totalProbability;
-
-    // We do this once per diagonal, which is a hack, rather than for the
-    // whole matrix. The correction factor is approximately 1/number of
-    // diagonals.
-    diagonalCalculation(sM,
-                        dpMatrix_getDiagonal(backwardDpMatrix, xay),
-                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
-                        dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
-                        sX, sY, cell_calculateExpectation, extraArgs2);
-}
-
-void diagonalCalculation_signal_Expectations(StateMachine *sM, int64_t xay,
-                                             DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
-                                             Sequence* sX, Sequence* sY,
-                                             double totalProbability,
-                                             PairwiseAlignmentParameters *p, void *extraArgs) {
+void diagonalCalculation_Expectations(StateMachine *sM, int64_t xay,
+                                      DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
+                                      Sequence *sX, Sequence *sY,
+                                      double totalProbability,
+                                      PairwiseAlignmentParameters *p, void *extraArgs) {
     /*
      * Updates the expectations of the transitions/emissions for the given diagonal.
      */
@@ -908,7 +859,7 @@ void diagonalCalculation_signal_Expectations(StateMachine *sM, int64_t xay,
                         dpMatrix_getDiagonal(backwardDpMatrix, xay),
                         dpMatrix_getDiagonal(forwardDpMatrix, xay - 1),
                         dpMatrix_getDiagonal(forwardDpMatrix, xay - 2),
-                        sX, sY, cell_signal_calculateUpdateExpectation, extraArgs2);
+                        sX, sY, cell_calculateUpdateExpectation, extraArgs2);
 }
 
 
@@ -1652,7 +1603,8 @@ void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
 
     getExpectationsUsingAnchors(sM, hmmExpectations, SsX, SsY,
                                 anchorPairs, p,
-                                diagonalCalculationExpectations,
+            //diagonalCalculationExpectations, // TODO left off here TEST next
+                                diagonalCalculation_Expectations,
                                 alignmentHasRaggedLeftEnd,
                                 alignmentHasRaggedRightEnd);
 

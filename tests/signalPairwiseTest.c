@@ -1669,7 +1669,7 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
                                                     sequence_sliceEventSequence2);
 
         getExpectationsUsingAnchors(sMt, cpHmm, refSeq, templateSeq, filteredRemappedAnchors,
-                                    p, diagonalCalculation_signal_Expectations, 0, 0);
+                                    p, diagonalCalculation_Expectations, 0, 0);
 
         continuousPairHmm_normalize(cpHmm);
 
@@ -1779,7 +1779,7 @@ static void test_vanillaHmm_em(CuTest *testCase) {
 
         // get expectations
         getExpectationsUsingAnchors(sMt, vHmm, refSeq, templateSeq, filteredRemappedAnchors,
-                                    p, diagonalCalculation_signal_Expectations, 0, 0);
+                                    p, diagonalCalculation_Expectations, 0, 0);
 
         // norm it
         vanillaHmm_normalizeKmerSkipBins(vHmm);
@@ -1814,7 +1814,6 @@ static void test_vanillaHmm_em(CuTest *testCase) {
 CuSuite *signalPairwiseTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
 
-
     SUITE_ADD_TEST(suite, test_getLogGaussPdfMatchProb);
     SUITE_ADD_TEST(suite, test_bivariateGaussPdfMatchProb);
     SUITE_ADD_TEST(suite, test_twoDistributionPdf);
@@ -1828,6 +1827,7 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_echelon_dpDiagonal);
     SUITE_ADD_TEST(suite, test_stateMachine4_dpDiagonal);
     SUITE_ADD_TEST(suite, test_strawMan_diagonalDPCalculations);
+
     SUITE_ADD_TEST(suite, test_stateMachine4_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_vanilla_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_echelon_diagonalDPCalculations);
@@ -1843,6 +1843,5 @@ CuSuite *signalPairwiseTestSuite(void) {
     SUITE_ADD_TEST(suite, test_vanillaHmm);
     SUITE_ADD_TEST(suite, test_continuousPairHmm_em);
     SUITE_ADD_TEST(suite, test_vanillaHmm_em);
-
     return suite;
 }

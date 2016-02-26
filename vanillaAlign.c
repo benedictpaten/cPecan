@@ -136,6 +136,7 @@ StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentPar
     else {
         st_errAbort("vanillaAlign - ERROR: buildStateMachine, didn't get correct input\n");
     }
+    return 0;
 }
 
 void updateHdpFromAssignments(const char *nHdpFile, const char *expectationsFile, const char *nHdpOutFile) {
@@ -342,17 +343,17 @@ void getSignalExpectations(const char *model, const char *inputHmm, NanoporeHDP 
         vanillaHmm_implantMatchModelsintoHmm(sM, hmmExpectations);
 
         getExpectationsUsingAnchors(sM, hmmExpectations, target, eventSequence, filteredRemappedAnchors, p,
-                                    diagonalCalculation_signal_Expectations, 1, 1);
+                                    diagonalCalculation_Expectations, 1, 1);
     } else if (type == threeStateHdp) {
         Sequence *target = sequence_construct2(lX, trainingTarget, sequence_getKmer3,
                                                sequence_sliceNucleotideSequence2);
         getExpectationsUsingAnchors(sM, hmmExpectations, target, eventSequence, filteredRemappedAnchors, p,
-                                    diagonalCalculation_signal_Expectations, 1, 1);
+                                    diagonalCalculation_Expectations, 1, 1);
     } else {
         Sequence *target = sequence_construct2(lX, trainingTarget, sequence_getKmer,
                                                sequence_sliceNucleotideSequence2);
         getExpectationsUsingAnchors(sM, hmmExpectations, target, eventSequence, filteredRemappedAnchors, p,
-                                    diagonalCalculation_signal_Expectations, 1, 1);
+                                    diagonalCalculation_Expectations, 1, 1);
     }
     stateMachine_destruct(sM);
 }

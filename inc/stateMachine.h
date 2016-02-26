@@ -238,27 +238,12 @@ typedef struct _StateMachineEchelon {
     double DEFAULT_END_MATCH_PROB; //0.79015888282447311; // stride_prb
     double DEFAULT_END_FROM_X_PROB; //0.19652425498269727; // skip_prob
 
-    double (*getKmerSkipProb)(StateMachine *sM, void *kmerList); // beta
+    double (*getKmerSkipProb)(StateMachine *sM, void *kmerList, bool); // beta
     double (*getDurationProb)(void *event, int64_t n); // P(dj|n)
     double (*getMatchProbFcn)(const double *eventModel, void *kmers, void *event, int64_t n); // P(ej|xi..xn)
     double (*getScaledMatchProbFcn)(const double *scaledEventModel, void *kmer, void *event);
 
 } StateMachineEchelon;
-
-typedef struct _StateMachineEchelonB {
-    // 8-state general hmm
-    StateMachine model;
-
-    double TRANSITION_MATCH_TO_SKIP; // skip_prob = 1 - stride prob
-    double TRANSITION_MATCH_TO_HUB;  // stride_prob
-    double TRANSITION_SKIP_CONTINUE; // keep skipping prob
-    double TRANSITION_SKIP_TO_HUB;   // stop skipping = 1 - keep skipping prob
-
-    double (*getDurationProb)(void *event, int64_t n); // P(dj|n)
-    double (*getMatchProbFcn)(const double *eventModel, void *kmers, void *event, int64_t n); // P(ej|xi..xn)
-    double (*getScaledMatchProbFcn)(const double *scaledEventModel, void *kmer, void *event);
-
-} StateMachineEchelonB;
 
 typedef struct _stateMachineFunctions { // TODO rename these to be more general or might remove them all together
     double (*gapXProbFcn)(const double *, void *);
@@ -321,7 +306,7 @@ StateMachine *stateMachine3Vanilla_construct(StateMachineType type, int64_t para
 StateMachine *stateMachineEchelon_construct(StateMachineType type, int64_t parameterSetSize,
                                             void (*setEmissionsToDefaults)(StateMachine *sM, int64_t nbSkipParams),
                                             double (*durationProbFcn)(void *event, int64_t n),
-                                            double (*skipProbFcn)(StateMachine *sM, void *kmerList),
+                                            double (*skipProbFcn)(StateMachine *sM, void *kmerList, bool),
                                             double (*matchProbFcn)(const double *, void *, void *, int64_t n),
                                             double (*scaledMatchProbFcn)(const double *, void *, void *),
                                             void (*cellCalcUpdateExpFcn)(double *fromCells, double *toCells,

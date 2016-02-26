@@ -52,15 +52,12 @@ Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(voi
 Sequence *sequence_construct2(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
                               Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t));
 
+
 void sequence_padSequence(Sequence *sequence);
 
 //slice a sequence object
-Sequence *sequence_sliceNucleotideSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength,
-                                           void *(*getFcn)(void *, int64_t));
 Sequence *sequence_sliceNucleotideSequence2(Sequence *inputSequence, int64_t start, int64_t sliceLength);
 
-Sequence *sequence_sliceEventSequence(Sequence *inputSequence, int64_t start, int64_t sliceLength,
-                                      void *(*getFcn)(void *, int64_t));
 Sequence *sequence_sliceEventSequence2(Sequence *inputSequence, int64_t start, int64_t sliceLength);
 
 void sequence_sequenceDestroy(Sequence *seq);
@@ -263,11 +260,11 @@ void diagonalCalculationExpectations(StateMachine *sM, int64_t xay,
                                      DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix, Sequence* sX, Sequence* sY,
                                      double totalProbability, PairwiseAlignmentParameters *p, void *extraArgs);
 
-void diagonalCalculation_signal_Expectations(StateMachine *sM, int64_t xay,
-                                             DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
-                                             Sequence* sX, Sequence* sY,
-                                             double totalProbability,
-                                             PairwiseAlignmentParameters *p, void *extraArgs);
+void diagonalCalculation_Expectations(StateMachine *sM, int64_t xay,
+                                      DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
+                                      Sequence *sX, Sequence *sY,
+                                      double totalProbability,
+                                      PairwiseAlignmentParameters *p, void *extraArgs);
 
 void getPosteriorProbsWithBanding(StateMachine *sM,
                                   stList *anchorPairs,

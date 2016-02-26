@@ -30,19 +30,6 @@ static HmmContinuous *hmmContinuous_constructEmpty(
     hmmC->baseHmm.matrixSize = MODEL_PARAMS;
     hmmC->baseHmm.likelihood = 0.0;
 
-    // initialize match models, for storage in between iterations
-    // todo remove this
-    //hmmC->matchModel = st_malloc(hmmC->baseHmm.matrixSize * hmmC->baseHmm.symbolSetSize * sizeof(double));
-    //hmmC->extraEventMatchModel = st_malloc(hmmC->baseHmm.matrixSize * hmmC->baseHmm.symbolSetSize
-    //                                       * sizeof(double));
-
-    // setup assignments list
-    //hmmC->threshold = threshold; // threshold is the minimum posterior match prob that we will make an assignment
-    //hmmC->assignments = stList_construct3(0, (void (*)(void *)) stDoubleTuple_destruct);
-    //hmmC->eventAssignments = stList_construct3(0, &free);
-    //hmmC->kmerAssignments = stList_construct3(0, &free);
-    //hmmC->numberOfAssignments = 0;
-
     // Set up functions
     // transitions
     hmmC->baseHmm.addToTransitionExpectationFcn = addToTransitionExpFcn; // add
@@ -185,7 +172,10 @@ void continuousPairHmm_destruct(Hmm *hmm) {
 
 // normalizers/randomizers
 void continuousPairHmm_normalize(Hmm *hmm) {
-    // todo make an assert here to check for type
+    if (hmm->type != threeState) {
+        st_errAbort("continuousPairHmm_normalize: got invalid HMM type: %lld", hmm->type);
+    }
+
     // normalize transitions
     hmmDiscrete_normalize2(hmm, 0);
     // tally up the total
@@ -492,7 +482,6 @@ void vanillaHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
      * line 2: [correlation coeff] \t [match model .. \t]  \n
      * line 3: [correlation coeff] [extra event matchModel]
      * See emissions_signal_loadPoreModel for description of matchModel
-     * TODO might want to make poremodel and this more similar?
      */
     VanillaHmm *vHmm = (VanillaHmm *)hmm;
 
@@ -661,7 +650,7 @@ Hmm *hdpHmm_constructEmpty(double pseudocount, int64_t stateNumber, StateMachine
     // setup base Hmm
     hmm->baseHmm.type = type;
     hmm->baseHmm.stateNumber = stateNumber;
-    hmm->baseHmm.symbolSetSize = NULL;
+    hmm->baseHmm.symbolSetSize = 0;
     hmm->baseHmm.matrixSize = MODEL_PARAMS;
     hmm->baseHmm.likelihood = 0.0;
 
@@ -705,14 +694,6 @@ void hdpHmm_loadTransitions(StateMachine *sM, Hmm *hmm) {
     sM3->TRANSITION_GAP_EXTEND_Y = log(hmm->getTransitionsExpFcn(hmm, shortGapY, shortGapY));
     sM3->TRANSITION_GAP_SWITCH_TO_X = log(hmm->getTransitionsExpFcn(hmm, shortGapY, shortGapX));
     // todo experiment with tying the above probs?
-}
-
-// todo depreciate this
-void hdpHmm_updateStateMachineHDP(const char *expectationsFile, StateMachine *sM) {
-    StateMachine3_HDP *sM3Hdp = (StateMachine3_HDP *)sM;
-    Hmm *transitionsExpectations = hdpHmm_loadFromFile(expectationsFile, sM3Hdp->hdpModel);
-    hdpHmm_loadTransitions((StateMachine *) sM3Hdp, transitionsExpectations);
-    hdpHmm_destruct(transitionsExpectations);
 }
 
 void hdpHmm_writeToFile(Hmm *hmm, FILE *fileHandle) {
@@ -909,169 +890,6 @@ Hmm *hdpHmm_loadFromFile(const char *fileName, NanoporeHDP *nHdp) {
     fclose(fH);
     return (Hmm *)hdpHmm;
 }
-
-// TODO depreciate
-/*
-Hmm *hdpHmm_loadFromFile2(const char *fileName, NanoporeHDP *nHdp) {
-    // open file
-    FILE *fH = fopen(fileName, "r");
-
-    // line 0
-    char *string = stFile_getLineFromFile(fH);
-    stList *tokens = stString_split(string);
-
-    int type;
-    int64_t stateNumber, symbolSetSize, numberOfAssignments;
-    double threshold;
-
-    int64_t j = sscanf(stList_get(tokens, 0), "%i", &type); // type
-    if (j != 1) {
-        st_errAbort("Failed to parse type (int) from string: %s\n", string);
-    }
-    j = sscanf(stList_get(tokens, 1), "%lld", &stateNumber); // stateNumber
-    if (j != 1) {
-        st_errAbort("Failed to parse state number (int) from string: %s\n", string);
-    }
-    j = sscanf(stList_get(tokens, 2), "%lld", &symbolSetSize); // symbolSetSize
-    if (j != 1) {
-        st_errAbort("Failed to parse symbol set size (int) from string: %s\n", string);
-    }
-    j = sscanf(stList_get(tokens, 3), "%lf", &threshold);
-    if (j != 1) {
-        st_errAbort("Failed to parse threshold (double) from string: %s\n", string);
-    }
-    j = sscanf(stList_get(tokens, 4), "%lld", &numberOfAssignments); // number of assignments
-    if (j != 1) {
-        st_errAbort("Failed to parse number of assignments (int) from string: %s\n", string);
-    }
-
-    Hmm *hmm = hdpHmm_constructEmpty(0.0, stateNumber, NUM_OF_KMERS, type, threshold,
-                                     continuousPairHmm_addToTransitionsExpectation,
-                                     continuousPairHmm_setTransitionExpectation,
-                                     continuousPairHmm_getTransitionExpectation,
-                                     continuousPairHmm_addToKmerGapExpectation,
-                                     continuousPairHmm_setKmerGapExpectation,
-                                     continuousPairHmm_getKmerGapExpectation,
-                                     emissions_discrete_getKmerIndexFromKmer);
-    HdpHmm *hdpHmm = (HdpHmm *) hmm;
-    hdpHmm->numberOfAssignments = numberOfAssignments;
-    //hdpHmm->nhdp = nHdp;
-    // cleanup
-    free(string);
-    stList_destruct(tokens);
-
-    // Transitions
-    string = stFile_getLineFromFile(fH);
-    tokens = stString_split(string);
-
-    int64_t nb_transitions = (hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.stateNumber
-                              * hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.stateNumber);
-
-    // check for the correct number of transitions
-    if (stList_length(tokens) != nb_transitions + 1) { // + 1 bc. likelihood is also on that line
-        st_errAbort(
-                "Incorrect number of transitions in the input HMM file %s, got %" PRIi64 " instead of %" PRIi64 "\n",
-                fileName, stList_length(tokens), nb_transitions + 1);
-    }
-    // load them
-    for (int64_t i = 0; i < nb_transitions; i++) {
-        j = sscanf(stList_get(tokens, i), "%lf", &(hdpHmm->baseContinuousPairHmm.transitions[i]));
-        if (j != 1) {
-            st_errAbort("Failed to parse transition prob (float) from string: %s\n", string);
-        }
-    }
-    // load likelihood
-    j = sscanf(stList_get(tokens, stList_length(tokens) - 1), "%lf",
-               &(hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.likelihood));
-    if (j != 1) {
-        st_errAbort("Failed to parse likelihood (float) from string: %s\n", string);
-    }
-    // Cleanup transitions line
-    free(string);
-    stList_destruct(tokens);
-
-    // Emissions (Kmer skip probabilities)
-    string = stFile_getLineFromFile(fH);
-    tokens = stString_split(string);
-    // check
-    if (stList_length(tokens) != hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.symbolSetSize) {
-        st_errAbort(
-                "Incorrect number of emissions in the input HMM file %s, got %" PRIi64 " instead of %" PRIi64 "\n",
-                fileName, stList_length(tokens), hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.symbolSetSize);
-    }
-    // load them
-    for (int64_t i = 0; i < hdpHmm->baseContinuousPairHmm.baseContinuousHmm.baseHmm.symbolSetSize; i++) {
-        j = sscanf(stList_get(tokens, i), "%lf", &(hdpHmm->baseContinuousPairHmm.individualKmerGapProbs[i]));
-        if (j != 1) {
-            st_errAbort("Failed to parse the individual kmer skip probs from string %s\n", string);
-        }
-    }
-    // Cleanup emissions line
-    free(string);
-    stList_destruct(tokens);
-
-    // load the assignments into the Nanopore Hdp [this is basically the same as Jordan's code for updating from
-    // an alignment]
-    if (nHdp != NULL) {
-        fprintf(stderr, "vanillaAlign - loading NanoporeHdp\n");
-        // make stLists to hold things temporarily
-        stList *signalList = stList_construct3(0, &free);
-
-        // parse the events (current means)
-        string = stFile_getLineFromFile(fH);
-        tokens = stString_split(string);
-
-        // check to make sure everything is there
-        if (stList_length(tokens) != hdpHmm->numberOfAssignments) {
-            st_errAbort("Incorrect number of events got %lld, should be %lld\n",
-                        stList_length(tokens), hdpHmm->numberOfAssignments);
-        }
-
-        // parse the events into a list
-        char *signal_str;
-        for (int64_t i = 0; i < hdpHmm->numberOfAssignments; i++) {
-            signal_str = (char *)stList_get(tokens, i);
-            double *signal_ptr = (double *)st_malloc(sizeof(double));
-            sscanf(signal_str, "%lf", signal_ptr);
-            stList_append(signalList, signal_ptr);
-        }
-
-        // cleanup event line
-        free(string);
-        stList_destruct(tokens);
-
-        // parse the kmer assignment line
-        string = stFile_getLineFromFile(fH);
-        tokens = stString_split(string);
-        if (stList_length(tokens) != hdpHmm->numberOfAssignments) {
-            st_errAbort("Incorrect number of events got %lld, should be %lld\n",
-                        stList_length(tokens), hdpHmm->numberOfAssignments);
-        }
-        char *assignedKmer;
-        int64_t *dp_ids = st_malloc(sizeof(int64_t) * hdpHmm->numberOfAssignments);
-        for (int64_t i = 0; i < hdpHmm->numberOfAssignments; i++) {
-            assignedKmer = (char *)stList_get(tokens, i);
-            dp_ids[i] = kmer_id(assignedKmer,
-                                nHdp->alphabet,
-                                nHdp->alphabet_size,
-                                nHdp->kmer_length);
-        }
-        // cleanup
-        free(string);
-        stList_destruct(tokens);
-
-        // convert to arrays
-        int64_t dataLength;
-        double *signal = stList_toDoublePtr(signalList, &dataLength);
-        stList_destruct(signalList);
-        reset_hdp_data(nHdp->hdp);
-        pass_data_to_hdp(nHdp->hdp, signal, dp_ids, dataLength);
-    }
-    // close file
-    fclose(fH);
-    return (Hmm *)hdpHmm;
-}
-*/
 
 void hdpHmm_destruct(Hmm *hmm) {
     HdpHmm *hdpHmm = (HdpHmm *)hmm;

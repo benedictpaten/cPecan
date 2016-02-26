@@ -516,7 +516,7 @@ int main(int argc, char *argv[]) {
                                                                       emissions_symbol_getGapProb,
                                                                       emissions_symbol_getMatchProb);
         sM = getStateMachine5(hmm, sMfs);
-        hmmDiscrete_normalize(hmm);
+        hmmDiscrete_normalize2(hmm, TRUE);
         hmmDiscrete_destruct(hmm);
     }
     else {
@@ -584,7 +584,7 @@ int main(int argc, char *argv[]) {
         if(expectationsFile != NULL) {
             st_logInfo("Computing expectations\n");
             getExpectationsUsingAnchors(sM, hmmExpectations, SsubSeqX, SsubSeqY, filteredAnchoredPairs,
-                                pairwiseAlignmentBandingParameters, diagonalCalculationExpectations, 1, 1);
+                                        pairwiseAlignmentBandingParameters, diagonalCalculation_Expectations, 1, 1);
         }
         else {
             //Get posterior prob pairs
