@@ -49,6 +49,13 @@ def histogram_runner(work_queue, done_queue):
 
 def main(args):
     # get the kmers we want
+    start_message = """
+    # Generating Kmer histograms from alignments: {alns}
+    # Getting a maximum of {maxNb} assignments
+    # Using threshold: {thresh}
+    """.format(alns=args.alns, maxNb=args.max_assignments, thresh=args.threshold)
+    print start_message
+
     args = parse_args()
     kmers_of_interest = []
     if args.kmers is None:
@@ -71,6 +78,7 @@ def main(args):
     if template_directory is None or complement_directory is None:
         print >> sys.stderr, "problem making destination directories"
         sys.exit(1)
+
     for strand, destination in zip(["t", "c"], [template_directory, complement_directory]):
         for kmer in kmers_of_interest:
             hist_args = {
@@ -78,7 +86,7 @@ def main(args):
                 "kmer": kmer,
                 "strand": strand,
                 "threshold": args.threshold,
-                "max_assignments": 1000,
+                "max_assignments": args.max_assignments,
                 "out_dir": destination,
             }
             work_queue.put(hist_args)
