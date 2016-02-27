@@ -104,5 +104,7 @@ def main(args):
 
     done_queue.put('STOP')
 
+    print "\t# Finished Generating Kmer Histograms #"
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
