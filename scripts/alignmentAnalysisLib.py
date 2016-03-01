@@ -61,6 +61,7 @@ class Kmer_histogram(object):
             for row in self.histogram.itertuples():
                 f.write("{mean}\n".format(mean=row[1]))
             f.write("\n")
+            f.close()
 
     def run(self):
         alignments = randomly_select_alignments(self.path_to_alignments)
