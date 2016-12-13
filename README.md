@@ -2,4 +2,4 @@
 
 #####Currently being reworked to incorporate minION new data types
 
-Standby...
+Please see [SignalAlign](https://github.com/ArtRand/signalAlign) for continuation of this project.
