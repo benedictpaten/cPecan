@@ -851,7 +851,7 @@ stList *getBlastPairs(const char *sX, const char *sY, int64_t lX, int64_t lY, in
     }
     FILE *fileHandle = popen(command, "r");
     if (fileHandle == NULL) {
-        st_errAbort("Problems with lastz pipe");
+        st_errnoAbort("Problems with lastz pipe");
     }
     //Read from stream
     struct PairwiseAlignment *pA;
@@ -866,8 +866,8 @@ stList *getBlastPairs(const char *sX, const char *sY, int64_t lX, int64_t lY, in
     }
     int64_t status = pclose(fileHandle);
     if (status != 0) {
-        st_errAbort("pclose failed when getting rid of lastz pipe with value %" PRIi64 " and command %s", status,
-                command);
+        st_errnoAbort("pclose failed when getting rid of lastz pipe with value %" PRIi64 " and command %s", status,
+                      command);
     }
     free(command);
 
