@@ -2,3 +2,5 @@
 externalTools/lastz-distrib-*/src/lastz
 externalTools/lastz-distrib-*/src/lastz_D
 venv/
+.idea
+*.pyc
