@@ -70,6 +70,8 @@ def parse_args(args=None):
                         help="location of the cPecanRealign executable")
     parser.add_argument('--keep_temp_files', action='store_true', dest='keep_temp', default=False,
                         help="Keep temporary files")
+    parser.add_argument('--failed_align_directory', action='store', dest='fail', default=None,
+                        help="Special location to store failed alignment files")
 
     return parser.parse_args()
 
@@ -182,8 +184,10 @@ def run_pecan(read, reference_map, alignment_file, args):
     #     read_str = reverse_complement(read_str, reverse=True, complement=True)
 
     # write files
-    ref_loc = os.path.join(workdir, "{}_ref.fa".format(read_id))
-    read_loc = os.path.join(workdir, "{}_read.fa".format(read_id))
+    ref_filename = "{}_ref.fa".format(read_id)
+    read_filename = "{}_read.fa".format(read_id)
+    ref_loc = os.path.join(workdir, ref_filename)
+    read_loc = os.path.join(workdir, read_filename)
     cigar_loc = os.path.join(workdir, "{}_cig.txt".format(read_id))
     aln_loc = os.path.join(workdir, '{}_out.txt'.format(read_id))
     with open(ref_loc, 'w') as ref_out:
@@ -213,6 +217,10 @@ def run_pecan(read, reference_map, alignment_file, args):
     success = True
     if not os.path.isfile(aln_loc):
         log("\tAlignment output not created: {}".format(aln_loc))
+        log("\t\tread_len:%6d\tref_len:%6d\ttags:%s" % (len(read_str), len(ref_str), read.get_tags()))
+        if args.fail is not None:
+            os.rename(ref_loc, os.path.join(args.fail, ref_filename))
+            os.rename(read_loc, os.path.join(args.fail, read_filename))
         success = False
     else:
         nucleotide_probs = calculate_nucleotide_probs(aln_loc, read_str, args)
@@ -228,10 +236,10 @@ def run_pecan(read, reference_map, alignment_file, args):
 
     # cleanup
     if not args.keep_temp:
-        os.remove(ref_loc)
-        os.remove(read_loc)
-        os.remove(cigar_loc)
-        os.remove(aln_loc)
+        if os.path.exists(ref_loc): os.remove(ref_loc)
+        if os.path.exists(read_loc): os.remove(read_loc)
+        if os.path.exists(cigar_loc): os.remove(cigar_loc)
+        if os.path.exists(aln_loc): os.remove(aln_loc)
 
     return success
 
@@ -474,6 +482,11 @@ def main():
     if not os.path.isdir(args.workdir): os.mkdir(args.workdir)
     assert os.path.isdir(args.workdir), "--workdir_directory argument could not be found/created: " \
                                                 "{}".format(args.workdir)
+    if args.fail is not None:
+        if not os.path.isdir(args.fail): os.mkdir(args.fail)
+        assert os.path.isdir(args.fail), "--failed_align_directory argument could not be found/created: " \
+                                                    "{}".format(args.fail)
+
 
     alignment_files = glob.glob(args.aln)
     assert len(alignment_files) > 0, "Could not find files matching {}".format(args.aln)
