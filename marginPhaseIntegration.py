@@ -9,6 +9,7 @@ from datetime import datetime
 import glob
 import numpy as np
 import string
+from multiprocessing import Manager, Process, current_process
 
 # nucleotides
 NUC_A = "A"
@@ -48,6 +49,9 @@ POSITIVE_STRAND_KEY = "positive_strand"
 ALIGNED_IDENTITY_KEY="aligned_identity"
 NO_GAP_ALIGNED_IDENTITY_KEY="no_gap_aligned_identity"
 
+# multithread
+TOTAL_KEY = "total"
+FAILURE_KEY = "failure"
 
 def parse_args(args=None):
     parser = ArgumentParser(description=__doc__)
@@ -60,6 +64,8 @@ def parse_args(args=None):
                         help="directory to put the alignments")
     parser.add_argument('--workdir_directory', '-w', action='store', dest='workdir', default="tmp",
                         help="workdir for temporary files")
+    parser.add_argument('--threads', '-t', action='store', dest='threads', default=1, type=int,
+                        help="number of threads to run on")
     parser.add_argument('--validate', '-v', action='store_true', dest='validate', default=False,
                         help="validate files in output directory after normal execution")
     parser.add_argument('--validate_directory', action='store', dest='validate_dir', default=None,
@@ -163,23 +169,121 @@ def calculate_nucleotide_probs(aln_loc, read_str, args):
     return nucleotide_probs
 
 
+def run_service(service, iterable, iterable_arguments, iterable_argument_name, worker_count,
+                service_arguments={}, log_function=print):
+
+    args = iterable_arguments.keys()
+    args.append(iterable_argument_name)
+    if log_function is not None:
+        # log_function("[run_service] running service {} with {} workers, {} iterables, and arguments {}"
+        #              .format(service, worker_count, len(service_iterable), args))
+        log_function("[run_service] running service {} with {} workers".format(service, worker_count))
+
+    # setup workers for multiprocessing
+    work_queue = Manager().Queue()
+    done_queue = Manager().Queue()
+
+    # add everything to work queue
+    jobs = []
+    for x in iterable:
+        args = dict({iterable_argument_name: x},
+                    **iterable_arguments)
+        work_queue.put(args)
+
+    # start workers
+    for w in xrange(worker_count):
+        p = Process(target=service, args=(work_queue, done_queue), kwargs=service_arguments)
+        p.start()
+        jobs.append(p)
+        work_queue.put('STOP')
+
+    # wait for threads to finish, then stop the done queue
+    for p in jobs:
+        p.join()
+    done_queue.put('STOP')
+
+    # if example service model is used, metrics can be gathered in this way
+    messages = []
+    total = 0
+    failure = 0
+    for f in iter(done_queue.get, 'STOP'):
+        if f.startswith(TOTAL_KEY):
+            total += int(f.split(":")[1])
+        elif f.startswith(FAILURE_KEY):
+            failure += int(f.split(":")[1])
+        else:
+            messages.append(f)
+
+    # if we should be logging and if there is material to be logged
+    if log_function is not None and (total + failure + len(messages)) > 0:
+        log_function("[run_service] Summary {}:\n[run_service]\tTotal:     {}\n[run_service]\tFailure:   {}"
+                     .format(service, total, failure))
+        log_function("[run_service]\tMessages:\n[run_service]\t\t{}".format("\n[run_service]\t\t".join(messages)))
+
+    # return relevant info
+    return total, failure, messages
+
+
+def realign_service(work_queue, done_queue, reference_location, verbose=False):
+    # prep
+    total_handled = 0
+    failure_count = 0
+
+    #catch overall exceptions
+    try:
+        # get reference
+        reference_map = get_reference_map(reference_location)
+
+        # iterate over reads
+        for f in iter(work_queue.get, 'STOP'):
+            # catch exceptions on each element
+            try:
+                # logging
+                if verbose: print("[realign_service] '{}' processing {}".format(current_process().name, f))
+
+                # invoke the work
+                success = run_pecan(**dict({"reference_map":reference_map}, **f))
+                if not success: failure_count += 1
+
+            except Exception, e:
+                # get error and log it
+                message = e.message if e.message is not None and len(e.message) != 0 else "{}:{}".format(type(e), str(e))
+                error = "realign_service '{}' failed with: {}".format(current_process().name, message)
+                print("[realign_service] " + error)
+                done_queue.put(error)
+                failure_count += 1
+            total_handled += 1
+
+    except Exception, e:
+        # get error and log it
+        message = e.message if e.message is not None and len(e.message) != 0 else "{}:{}".format(type(e), str(e))
+        error = "realign_service '{}' critically failed with: {}".format(current_process().name, message)
+        print("[realign_service] " + error)
+        done_queue.put(error)
+    finally:
+        # logging
+        print("[example_service] '%s' completed %d calls with %d failures"
+              % (current_process().name, total_handled, failure_count))
+        done_queue.put("{}:{}".format(TOTAL_KEY, total_handled))
+        done_queue.put("{}:{}".format(FAILURE_KEY, failure_count))
+
+
 def run_pecan(read, reference_map, alignment_file, args):
     #prep
     workdir = args.workdir
-    #todo assert soft clipping done appropriately
 
     # reference
-    contig = read.reference_name
+    contig = read['reference_name']
     assert contig in reference_map, "Contig {} not found in {} (from {})".format(
-        contig, [reference_map.keys()], args.ref)
+        contig, reference_map.keys(), args.ref)
     full_reference = reference_map[contig]
-    ref_start = read.reference_start
-    ref_end = read.reference_end
+    ref_start = read['reference_start']
+    ref_end = read['reference_end']
     ref_str = full_reference[ref_start:ref_end + 1].upper()
 
     # read
-    read_id = read.query_name
-    read_str = read.query_alignment_sequence.upper()
+    read_id = read['query_name']
+    read_str = read['query_alignment_sequence'].upper()
     # if read.is_reverse:
     #     read_str = reverse_complement(read_str, reverse=True, complement=True)
 
@@ -211,13 +315,13 @@ def run_pecan(read, reference_map, alignment_file, args):
     process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=sys.stderr, bufsize=-1)
     output, _ = process.communicate()
     sts = process.wait()
-    if sts != 0: raise RuntimeError( "Command exited with non-zero status %i: %s" % (sts, cmd))
+    if sts != 0: raise Exception( "Command exited with non-zero status %i: %s" % (sts, cmd))
 
     # get alignment
     success = True
     if not os.path.isfile(aln_loc):
         log("\tAlignment output not created: {}".format(aln_loc))
-        log("\t\tread_len:%6d\tref_len:%6d\ttags:%s" % (len(read_str), len(ref_str), read.get_tags()))
+        # log("\t\tread_len:%6d\tref_len:%6d\ttags:%s" % (len(read_str), len(ref_str), read.get_tags()))
         if args.fail is not None:
             os.rename(ref_loc, os.path.join(args.fail, ref_filename))
             os.rename(read_loc, os.path.join(args.fail, read_filename))
@@ -230,7 +334,7 @@ def run_pecan(read, reference_map, alignment_file, args):
         metadata = {META_READ_ID: read_id, META_ALIGN_FILE: alignment_file, META_REFERNCE_FILE: args.ref,
                     META_CONTIG: contig, META_PECAN_CMD: cmd, META_REF_START: ref_start,
                     META_DATE_GENERATED: str(datetime.now()),
-                    META_FORWARD: None if read.is_reverse is None else not read.is_reverse}
+                    META_FORWARD: None if read['is_reverse'] is None else not read['is_reverse']}
         write_probabilities_out(out_loc, nucleotide_probs, contig, ref_start, metadata, args)
         assert os.path.isfile(out_loc), "Output file {} not created".format(out_loc)
 
@@ -244,25 +348,29 @@ def run_pecan(read, reference_map, alignment_file, args):
     return success
 
 
-def realign_alignments(alignment_filename, reference_map, args):
+def realign_alignments(alignment_filename, args):
     # prep
     samfile = None
-    read_count = 0
-    failure_count = 0
+    read_count = None
+    failure_count = None
 
     # read alignments
     try:
         log("Alignment file {}:".format(alignment_filename))
         samfile = pysam.AlignmentFile(alignment_filename, 'rb' if alignment_filename.endswith("bam") else 'r')
-        for read in samfile.fetch():
-            # init
-            read_count += 1
 
-            # invoke pecan
-            success = run_pecan(read, reference_map, alignment_filename, args)
-
-            if not success:
-                failure_count += 1
+        # run service (for multithreading)
+        iterable_arguments = {"args":args, "alignment_file":alignment_filename}
+        iterable = map(lambda read: {
+            'is_reverse':read.is_reverse,
+            'reference_name':read.reference_name,
+            'reference_start':read.reference_start,
+            'reference_end':read.reference_end,
+            'query_name':read.query_name,
+            'query_alignment_sequence':read.query_alignment_sequence,
+        }, samfile.fetch())
+        read_count, failure_count, messages = run_service(realign_service, iterable, iterable_arguments, "read", args.threads,
+            service_arguments={'reference_location': args.ref}, log_function=log)
 
     # close
     finally:
@@ -486,21 +594,20 @@ def main():
         if not os.path.isdir(args.fail): os.mkdir(args.fail)
         assert os.path.isdir(args.fail), "--failed_align_directory argument could not be found/created: " \
                                                     "{}".format(args.fail)
+    assert args.threads > 0, "--threads parameter must be positive integer"
 
 
     alignment_files = glob.glob(args.aln)
     assert len(alignment_files) > 0, "Could not find files matching {}".format(args.aln)
 
-    # load reference
-    reference_map = get_reference_map(args.ref)
-
     # generate alignments
     for alignment_file in alignment_files:
-        realign_alignments(alignment_file, reference_map, args)
+        realign_alignments(alignment_file, args)
 
     # maybe validate
     if args.validate:
         log("Validating output")
+        reference_map = get_reference_map(args.ref)
         validate_snp_directory(args.out, reference_map, print_indiv_summary=False)
 
     # cleanup
