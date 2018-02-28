@@ -127,49 +127,6 @@ def write_probabilities_out(out_loc, probabilities, contig, ref_start, metadata,
             output.write("\t".join(map(str,line)) + "\n")
 
 
-def calculate_nucleotide_probs(aln_loc, read_str, args):
-    # prep
-    pos_alignments = {}
-
-    # read alignment
-    with open(aln_loc, 'r') as aln_in:
-        for line in aln_in:
-            if line.startswith("#") or len(line.strip()) == 0: continue
-            line = line.split()
-            ref_pos = int(line[0])
-            read_pos = int(line[1])
-            prob = float(line[2])
-            if ref_pos not in pos_alignments:
-                pos_alignments[ref_pos] = {n:0.0 for n in NUCLEOTIDES}
-            read_char = read_str[read_pos].upper()
-            pos_alignments[ref_pos][read_char] += prob
-
-    # update missing probs (which should be treated as 'gap')
-    max_pos = 0
-    for ref_pos in pos_alignments.keys():
-        probs = pos_alignments[ref_pos]
-        total = sum(probs.values())
-        if total > 1.0:
-            if total >= 1.9: log("\tAlignment file {} has prob {} at reference pos {}".format(aln_loc, total, ref_pos))
-            probs = {n:(probs[n]/total) for n in NUCLEOTIDES}
-        probs[NUC_GAP] += max(0.0, 1.0 - sum(probs.values()))
-        if ref_pos > max_pos: max_pos = ref_pos
-
-    # get ordered probs
-    nucleotide_probs = list()
-    for pos in xrange(0, max_pos + 1):
-        if pos not in pos_alignments:
-            probs = {n:(0.0 if n != NUC_GAP else 1.0) for n in NUCLEOTIDES}
-        else:
-            probs = pos_alignments[pos]
-        # save probs
-        probs[POS] = pos
-        nucleotide_probs.append(probs)
-
-    # return it
-    return nucleotide_probs
-
-
 def run_service(service, iterable, iterable_arguments, iterable_argument_name, worker_count,
                 service_arguments={}, log_function=print):
     start = time.time()
@@ -326,7 +283,7 @@ def run_pecan(read, reference_map, alignment_file, args):
     process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=sys.stderr, bufsize=-1)
     output, _ = process.communicate()
     sts = process.wait()
-    if sts != 0: raise Exception( "Command exited with non-zero status %i: %s" % (sts, cmd))
+    if sts != 0: raise Exception( "Command exited with non-zero status %d: %s" % (sts, cmd))
 
     # get alignment
     success = True
@@ -357,6 +314,58 @@ def run_pecan(read, reference_map, alignment_file, args):
         if os.path.exists(aln_loc): os.remove(aln_loc)
 
     return success
+
+
+def calculate_nucleotide_probs(aln_loc, read_str, args):
+    # prep
+    pos_alignments = {}
+    max_read_idx = len(read_str) - 1
+
+    # read alignment
+    with open(aln_loc, 'r') as aln_in:
+        linenr = -1
+        for line in aln_in:
+            linenr += 1
+            if line.startswith("#") or len(line.strip()) == 0: continue
+            orig_line = line
+            line = line.rstrip().split()
+            if len(line) != 3:
+                raise Exception("Line {} malformed in {}: '{}'".format(linenr, aln_loc, orig_line.rstrip("\n")))
+            ref_pos = int(line[0])
+            read_pos = int(line[1])
+            prob = float(line[2])
+            if read_pos > max_read_idx:
+                raise Exception("Line {} in {} reported read pos {} which exceeds read length {}: '{}'".format(
+                    linenr, read_pos, max_read_idx, aln_loc, orig_line.rstrip("\n")))
+            if ref_pos not in pos_alignments:
+                pos_alignments[ref_pos] = {n:0.0 for n in NUCLEOTIDES}
+            read_char = read_str[read_pos].upper()
+            pos_alignments[ref_pos][read_char] += prob
+
+    # update missing probs (which should be treated as 'gap')
+    max_pos = 0
+    for ref_pos in pos_alignments.keys():
+        probs = pos_alignments[ref_pos]
+        total = sum(probs.values())
+        if total > 1.0:
+            if total >= 1.9: log("\tAlignment file {} has prob {} at reference pos {}".format(aln_loc, total, ref_pos))
+            probs = {n:(probs[n]/total) for n in NUCLEOTIDES}
+        probs[NUC_GAP] += max(0.0, 1.0 - sum(probs.values()))
+        if ref_pos > max_pos: max_pos = ref_pos
+
+    # get ordered probs
+    nucleotide_probs = list()
+    for pos in xrange(0, max_pos + 1):
+        if pos not in pos_alignments:
+            probs = {n:(0.0 if n != NUC_GAP else 1.0) for n in NUCLEOTIDES}
+        else:
+            probs = pos_alignments[pos]
+        # save probs
+        probs[POS] = pos
+        nucleotide_probs.append(probs)
+
+    # return it
+    return nucleotide_probs
 
 
 def realign_alignments(alignment_filename, args):
