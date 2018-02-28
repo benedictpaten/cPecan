@@ -2,6 +2,7 @@
 from __future__ import print_function
 from multiprocessing import Manager, Process, current_process
 import random
+import time
 
 TOTAL_KEY = "total"
 FAILURE_KEY = "failure"
@@ -71,6 +72,8 @@ def example_service(work_queue, done_queue, service_name="example_service"):
 # it accepts an optional service_argument parameter which is passed directly to the service
 def run_service(service, iterable, iterable_arguments, iterable_argument_name, worker_count,
                 service_arguments={}, log_function=print):
+
+    start = time.time()
     args = iterable_arguments.keys()
     args.append(iterable_argument_name)
     if log_function is not None:
@@ -110,8 +113,8 @@ def run_service(service, iterable, iterable_arguments, iterable_argument_name, w
 
     # if we should be logging and if there is material to be logged
     if log_function is not None and (total + failure + len(messages)) > 0:
-        log_function("[run_service] Summary {}:\n[run_service]\tTotal:     {}\n[run_service]\tFailure:   {}"
-                     .format(service, total, failure))
+        log_function("[run_service] Summary {}:\n[run_service]\tTime: {}s\n[run_service]\tTotal: {}\n[run_service]\tFailure: {}"
+                     .format(service, int(time.time() - start), total, failure))
         log_function("[run_service]\tMessages:\n[run_service]\t\t{}".format("\n[run_service]\t\t".join(messages)))
 
     # return relevant info

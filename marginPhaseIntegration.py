@@ -8,7 +8,8 @@ import subprocess
 from datetime import datetime
 import glob
 import numpy as np
-import string
+import traceback
+import time
 from multiprocessing import Manager, Process, current_process
 
 # nucleotides
@@ -149,7 +150,7 @@ def calculate_nucleotide_probs(aln_loc, read_str, args):
         probs = pos_alignments[ref_pos]
         total = sum(probs.values())
         if total > 1.0:
-            if total >= 1.1: log("\tAlignment file {} has prob {} at reference pos {}".format(aln_loc, total, ref_pos))
+            if total >= 1.9: log("\tAlignment file {} has prob {} at reference pos {}".format(aln_loc, total, ref_pos))
             probs = {n:(probs[n]/total) for n in NUCLEOTIDES}
         probs[NUC_GAP] += max(0.0, 1.0 - sum(probs.values()))
         if ref_pos > max_pos: max_pos = ref_pos
@@ -171,7 +172,7 @@ def calculate_nucleotide_probs(aln_loc, read_str, args):
 
 def run_service(service, iterable, iterable_arguments, iterable_argument_name, worker_count,
                 service_arguments={}, log_function=print):
-
+    start = time.time()
     args = iterable_arguments.keys()
     args.append(iterable_argument_name)
     if log_function is not None:
@@ -216,8 +217,8 @@ def run_service(service, iterable, iterable_arguments, iterable_argument_name, w
 
     # if we should be logging and if there is material to be logged
     if log_function is not None and (total + failure + len(messages)) > 0:
-        log_function("[run_service] Summary {}:\n[run_service]\tTotal:     {}\n[run_service]\tFailure:   {}"
-                     .format(service, total, failure))
+        log_function("[run_service] Summary {}:\n[run_service]\tTime: {}s\n[run_service]\tTotal: {}\n[run_service]\tFailure: {}"
+                     .format(service, int(time.time() - start), total, failure))
         log_function("[run_service]\tMessages:\n[run_service]\t\t{}".format("\n[run_service]\t\t".join(messages)))
 
     # return relevant info
@@ -242,7 +243,7 @@ def realign_service(work_queue, done_queue, reference_location, verbose=False):
                 if verbose: print("[realign_service] '{}' processing {}".format(current_process().name, f))
 
                 # invoke the work
-                success = run_pecan(**dict({"reference_map":reference_map}, **f))
+                success = wrapped_run_pecan(**dict({"reference_map":reference_map}, **f))
                 if not success: failure_count += 1
 
             except Exception, e:
@@ -266,6 +267,16 @@ def realign_service(work_queue, done_queue, reference_location, verbose=False):
               % (current_process().name, total_handled, failure_count))
         done_queue.put("{}:{}".format(TOTAL_KEY, total_handled))
         done_queue.put("{}:{}".format(FAILURE_KEY, failure_count))
+
+
+def wrapped_run_pecan(read, reference_map, alignment_file, args):
+    try:
+        return run_pecan(read, reference_map, alignment_file, args)
+    except Exception as e:
+        print("Exception ({}) handling read '{}' in '{}': {}\n\t\t{}".format(
+            type(e), read['query_name'], alignment_file, e, "\n\t\t".join(traceback.format_exc().split("\n"))))
+        raise e
+
 
 
 def run_pecan(read, reference_map, alignment_file, args):
@@ -382,23 +393,23 @@ def realign_alignments(alignment_filename, args):
     return read_count
 
 
-
-def reverse_complement(dna, reverse=True, complement=True):
-    # Make translation table
-    trans_table = string.maketrans('ATGCatgc', 'TACGtacg')
-
-    # Make complement to DNA
-    comp_dna = dna.translate(trans_table)
-
-    # Output all as strings
-    if reverse and complement:
-        return comp_dna[::-1]
-    if reverse and not complement:
-        return dna[::-1]
-    if complement and not reverse:
-        return comp_dna
-    if not complement and not reverse:
-        return dna
+#
+# def reverse_complement(dna, reverse=True, complement=True):
+#     # Make translation table
+#     trans_table = string.maketrans('ATGCatgc', 'TACGtacg')
+#
+#     # Make complement to DNA
+#     comp_dna = dna.translate(trans_table)
+#
+#     # Output all as strings
+#     if reverse and complement:
+#         return comp_dna[::-1]
+#     if reverse and not complement:
+#         return dna[::-1]
+#     if complement and not reverse:
+#         return comp_dna
+#     if not complement and not reverse:
+#         return dna
 
 
 def validate_snp_directory(snp_directory, reference_map, alignment_sam_location=None, print_indiv_summary=False):
@@ -418,8 +429,18 @@ def validate_snp_directory(snp_directory, reference_map, alignment_sam_location=
 
     log("\tValidating {} files in '{}'".format(len(files), snp_directory))
 
+    failure_count = 0
     for file in files:
-        summary, problem = validate_snp_file(file, reference_map, print_summary=print_indiv_summary)
+        try:
+            summary, problem = validate_snp_file(file, reference_map, print_summary=print_indiv_summary)
+        except Exception, e:
+            log("\tException handling {}:\n\t\t{}".format(file, e))
+            failure_count += 1
+            filename = os.path.basename(file)
+            if not filename.startswith("FAIL"):
+                path = file.rstrip(filename)
+                os.rename(file, os.path.join(path, "FAIL.{}".format(filename)))
+            continue
         consensus_identity = summary[V_CONSENSUS_IDENTITY]
         posterior_identity = summary[V_POSTERIOR_IDENTITY]
         all_consensus_identities.append(consensus_identity)
@@ -435,6 +456,8 @@ def validate_snp_directory(snp_directory, reference_map, alignment_sam_location=
 
     # printing results
     log("\nSummary of {} files:".format(len(files)))
+    if failure_count > 0:
+        log("\tFAILURES                  {} ({}%)".format(failure_count, int(100.0 * failure_count / len(files))))
     log("\tAVG Identity Ratio:       {}".format(np.mean(all_consensus_identities)))
     log("\tAVG Length:               {}".format(np.mean(all_lengths)))
     log("\tOverall P Identity Ratio: {}".format(1.0 * sum(all_posterior_identities) / sum(all_lengths)))
@@ -459,7 +482,9 @@ def validate_snp_file(snp_file, reference_map, print_summary=False, print_sequen
 
     metadata = {}
     with open(snp_file, 'r') as snp:
+        linenr = -1
         for line in snp:
+            linenr += 1
             if line.startswith("##"):
                 for key in METADATA:
                     if key in line: metadata[key] = line.split(":")[1].strip()
@@ -482,7 +507,10 @@ def validate_snp_file(snp_file, reference_map, print_summary=False, print_sequen
                     True if metadata[META_FORWARD] == 'True' else (False if metadata[META_FORWARD] == 'False' else None)
                 full_reference_sequence = reference_map[metadata[META_CONTIG]]
             else:
-                line = line.split("\t")
+                orig_line = line
+                line = line.strip().split("\t")
+                if len(line) != 7:
+                    raise Exception("Line {} malformed in {}: '{}'".format(linenr, snp_file, orig_line.rstrip("\n")))
                 # positions
                 pos = int(line[1])
                 # set first_position (for reference matching)
