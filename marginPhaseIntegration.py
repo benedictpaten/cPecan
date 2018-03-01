@@ -336,7 +336,7 @@ def calculate_nucleotide_probs(aln_loc, read_str, args):
             prob = float(line[2])
             if read_pos > max_read_idx:
                 raise Exception("Line {} in {} reported read pos {} which exceeds read length {}: '{}'".format(
-                    linenr, read_pos, max_read_idx, aln_loc, orig_line.rstrip("\n")))
+                    linenr, aln_loc, read_pos, max_read_idx, orig_line.rstrip("\n")))
             if ref_pos not in pos_alignments:
                 pos_alignments[ref_pos] = {n:0.0 for n in NUCLEOTIDES}
             read_char = read_str[read_pos].upper()
