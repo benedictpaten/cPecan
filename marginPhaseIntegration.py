@@ -10,6 +10,7 @@ import glob
 import numpy as np
 import traceback
 import time
+import re
 from multiprocessing import Manager, Process, current_process
 
 # nucleotides
@@ -71,10 +72,10 @@ def parse_args(args=None):
                         help="validate files in output directory after normal execution")
     parser.add_argument('--validate_directory', action='store', dest='validate_dir', default=None,
                         help="validate files in directory instead of normal execution")
-    parser.add_argument('--lastz_exe', action='store', dest='lastz', default='cPecanLastz',
-                        help="location of the cPecanLastz executable")
     parser.add_argument('--realign_exe', action='store', dest='realign', default='cPecanRealign',
                         help="location of the cPecanRealign executable")
+    parser.add_argument('--realign_hmm', action='store', dest='hmm', default=None,
+                        help="hmm configuration to use during realign")
     parser.add_argument('--keep_temp_files', action='store_true', dest='keep_temp', default=False,
                         help="Keep temporary files")
     parser.add_argument('--failed_align_directory', action='store', dest='fail', default=None,
@@ -110,21 +111,6 @@ def get_reference_map(ref_location):
     # save last fasta
     reference_map[contig] = "".join(fasta)
     return reference_map
-
-
-def write_probabilities_out(out_loc, probabilities, contig, ref_start, metadata, args):
-    with open(out_loc, 'w') as output:
-        # header
-        metadata_keys = metadata.keys()
-        metadata_keys.sort()
-        for key in metadata_keys:
-            output.write("##{}:{}\n".format(key, metadata[key]))
-        output.write("#CHROM\tPOS\tpA\tpC\tpG\tpT\tp_\n")
-
-        # probabilities
-        for prob in probabilities:
-            line = [contig, (ref_start + prob[POS]), prob[NUC_A], prob[NUC_C], prob[NUC_G], prob[NUC_T], prob[NUC_GAP]]
-            output.write("\t".join(map(str,line)) + "\n")
 
 
 def run_service(service, iterable, iterable_arguments, iterable_argument_name, worker_count,
@@ -240,6 +226,10 @@ def run_pecan(read, reference_map, alignment_file, args):
     #prep
     workdir = args.workdir
 
+    # read
+    read_id = read['query_name']
+    read_str = read['query_alignment_sequence'].upper()
+
     # reference
     contig = read['reference_name']
     assert contig in reference_map, "Contig {} not found in {} (from {})".format(
@@ -248,36 +238,40 @@ def run_pecan(read, reference_map, alignment_file, args):
     ref_start = read['reference_start']
     ref_end = read['reference_end']
     ref_str = full_reference[ref_start:ref_end + 1].upper()
+    ref_id = ">{}_{}_REF".format(contig, read_id)
 
-    # read
-    read_id = read['query_name']
-    read_str = read['query_alignment_sequence'].upper()
-    # if read.is_reverse:
-    #     read_str = reverse_complement(read_str, reverse=True, complement=True)
+    # cigar
+    query_start, query_end, reference_start, reference_end, cigar_string = parse_cigar(read['cigar'], ref_start)
+    assert query_end - query_start == len(read_str)
+    assert reference_end - reference_start == ref_end - ref_start
+
+    full_cigar_string = "cigar: %s %i %i + %s %i %i + 1 %s" % (
+        read_id, 0, query_end - query_start, ref_id, 0, reference_end - reference_start, cigar_string)
 
     # write files
     ref_filename = "{}_ref.fa".format(read_id)
     read_filename = "{}_read.fa".format(read_id)
+    cigar_filename = "{}_cig.txt".format(read_id)
     ref_loc = os.path.join(workdir, ref_filename)
     read_loc = os.path.join(workdir, read_filename)
-    cigar_loc = os.path.join(workdir, "{}_cig.txt".format(read_id))
+    cigar_loc = os.path.join(workdir, cigar_filename)
     aln_loc = os.path.join(workdir, '{}_out.txt'.format(read_id))
     with open(ref_loc, 'w') as ref_out:
-        ref_out.write(">{}_{}_REF\n{}\n".format(contig, read_id, ref_str))
+        ref_out.write(">{}\n{}\n".format(ref_id, ref_str))
     with open(read_loc, 'w') as read_out:
         read_out.write(">{}\n{}\n".format(read_id, read_str))
+    with open(cigar_loc, 'w') as cig_out:
+        cig_out.write("{}\n".format(full_cigar_string))
 
     # generate command
-    lastz_args = "--format=cigar --ambiguous=iupac --chain"
     realign_args = "--rescoreByPosteriorProb --splitMatrixBiggerThanThis 100 --diagonalExpansion 20"
-    lastz_command = "%s %s %s[nameparse=darkspace] %s[nameparse=darkspace]"\
-                   % (args.lastz, lastz_args, ref_loc, read_loc)
-    tee_command = "tee %s 2>/dev/null" % (cigar_loc) # gets rid of error when multiple alignments are found
+    if args.hmm is not None:
+        realign_args += " --loadHmm {}".format(args.hmm)
+    cat_cigar_command = "cat %s" % (cigar_loc)
     realign_command = "%s %s --outputAllPosteriorProbs %s %s %s"\
                      % (args.realign, realign_args, aln_loc, ref_loc, read_loc)
     # final command
-    # cmd = "%s | %s | %s" % (lastz_command, tee_command, realign_command)
-    cmd = "%s | %s | head -n1 | %s" % (lastz_command, tee_command, realign_command)
+    cmd = "%s | %s" % (cat_cigar_command, realign_command)
 
     # run realign command
     process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=sys.stderr, bufsize=-1)
@@ -316,6 +310,42 @@ def run_pecan(read, reference_map, alignment_file, args):
     return success
 
 
+def parse_cigar(cigar_string, ref_start):
+    # use a regular expression to parse the string into operations and lengths
+    cigar_tuples = re.findall(r'([0-9]+)([MIDNSHPX=])', cigar_string)
+
+    clipping = {"S", "H"}
+    alignment_operations = {"M", "I", "D"}
+
+    # make some counters
+    query_start = 0
+    past_start = False
+    query_end = 0
+    reference_start = ref_start - 1  # fence posts adjustment
+    reference_end = 0
+
+    exonerated_cigar = " ".join(["%s %i" % (operation, int(length)) for length, operation in
+                                 cigar_tuples if operation in alignment_operations])
+
+    # this is how you calculate the reference map region
+    for length, op in cigar_tuples:
+        if op in clipping and past_start is False:
+            query_start += int(length)
+        if op == "M" or op == "D":
+            reference_end += int(length)
+            if past_start is False:
+                past_start = True
+        if op == "M" or op == "I":
+            query_end += int(length)
+            if past_start is False:
+                past_start = True
+
+    query_end = query_end + query_start
+    reference_end = reference_end + reference_start
+
+    return query_start, query_end, reference_start, reference_end, exonerated_cigar
+
+
 def calculate_nucleotide_probs(aln_loc, read_str, args):
     # prep
     pos_alignments = {}
@@ -327,10 +357,11 @@ def calculate_nucleotide_probs(aln_loc, read_str, args):
         for line in aln_in:
             linenr += 1
             if line.startswith("#") or len(line.strip()) == 0: continue
-            orig_line = line
+            orig_line = line.rstrip("\n")
+            if len(orig_line) > 256: orig_line = orig_line[:255] + ".."
             line = line.rstrip().split()
             if len(line) != 3:
-                raise Exception("Line {} malformed in {}: '{}'".format(linenr, aln_loc, orig_line.rstrip("\n")))
+                raise Exception("Line {} malformed in {}: '{}'".format(linenr, aln_loc, orig_line))
             ref_pos = int(line[0])
             read_pos = int(line[1])
             prob = float(line[2])
@@ -368,6 +399,21 @@ def calculate_nucleotide_probs(aln_loc, read_str, args):
     return nucleotide_probs
 
 
+def write_probabilities_out(out_loc, probabilities, contig, ref_start, metadata, args):
+    with open(out_loc, 'w') as output:
+        # header
+        metadata_keys = metadata.keys()
+        metadata_keys.sort()
+        for key in metadata_keys:
+            output.write("##{}:{}\n".format(key, metadata[key]))
+        output.write("#CHROM\tPOS\tpA\tpC\tpG\tpT\tp_\n")
+
+        # probabilities
+        for prob in probabilities:
+            line = [contig, (ref_start + prob[POS]), prob[NUC_A], prob[NUC_C], prob[NUC_G], prob[NUC_T], prob[NUC_GAP]]
+            output.write("\t".join(map(str,line)) + "\n")
+
+
 def realign_alignments(alignment_filename, args):
     # prep
     samfile = None
@@ -388,6 +434,7 @@ def realign_alignments(alignment_filename, args):
             'reference_end':read.reference_end,
             'query_name':read.query_name,
             'query_alignment_sequence':read.query_alignment_sequence,
+            'cigar':read.cigarstring,
         }, samfile.fetch())
         read_count, failure_count, messages = run_service(realign_service, iterable, iterable_arguments, "read", args.threads,
             service_arguments={'reference_location': args.ref}, log_function=log)
@@ -469,8 +516,6 @@ def validate_snp_directory(snp_directory, reference_map, alignment_sam_location=
         log("\tFAILURES                  {} ({}%)".format(failure_count, int(100.0 * failure_count / len(files))))
     log("\tAVG Identity Ratio:       {}".format(np.mean(all_consensus_identities)))
     log("\tAVG Length:               {}".format(np.mean(all_lengths)))
-    log("\tOverall P Identity Ratio: {}".format(1.0 * sum(all_posterior_identities) / sum(all_lengths)))
-    log("\tOverall C Identity Ratio: {}".format(1.0 * sum(all_consensus_identities) / sum(all_lengths)))
     log("\tPosterior Identity Avg:   {}".format(np.mean(all_posterior_iden_ratio)))
     log("\tConsensus Identity Avg:   {}".format(np.mean(all_consensus_iden_ratio)))
     log("\tNo Gap Post Identity Avg: {}".format(np.mean(no_gap_post_iden_ratio)))
@@ -516,10 +561,11 @@ def validate_snp_file(snp_file, reference_map, print_summary=False, print_sequen
                     True if metadata[META_FORWARD] == 'True' else (False if metadata[META_FORWARD] == 'False' else None)
                 full_reference_sequence = reference_map[metadata[META_CONTIG]]
             else:
-                orig_line = line
+                orig_line = line.rstrip("\n")
+                if len(orig_line) > 256: orig_line = orig_line[:255] + ".."
                 line = line.strip().split("\t")
                 if len(line) != 7:
-                    raise Exception("Line {} malformed in {}: '{}'".format(linenr, snp_file, orig_line.rstrip("\n")))
+                    raise Exception("Line {} malformed in {}: '{}'".format(linenr, snp_file, orig_line))
                 # positions
                 pos = int(line[1])
                 # set first_position (for reference matching)
@@ -568,11 +614,12 @@ def validate_snp_file(snp_file, reference_map, print_summary=False, print_sequen
         # calculate with gaps
         length += 1
         if c == r: identity += 1
-        if r != 'N': posterior_identity += p[r]
-        # remove gap calc
-        if c != '_':
-            no_gap_length += 1
-            no_gap_post_iden += p[r]
+        if r != 'N':
+            posterior_identity += p[r]
+            # remove gap calc
+            if c != '_':
+                no_gap_length += 1
+                no_gap_post_iden += p[r]
 
     # for separating results
     if print_sequences: log("")
