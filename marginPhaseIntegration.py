@@ -85,7 +85,7 @@ def parse_args(args=None):
 
 
 def log(msg):
-    print(msg, file=sys.stderr)
+    print(msg, file=sys.stdout)
 
 
 def get_reference_map(ref_location):
