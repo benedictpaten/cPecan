@@ -102,7 +102,7 @@ def get_reference_map(ref_location):
                 if contig is not None:
                     reference_map[contig] = "".join(fasta)
                 # read new contig
-                contig = line.strip().lstrip(">")
+                contig = line.strip().lstrip(">").split()[0]
                 fasta = list()
             else:
                 # sanity check
