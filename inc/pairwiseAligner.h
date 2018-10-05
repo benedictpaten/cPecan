@@ -45,11 +45,24 @@ void pairwiseAlignmentBandingParameters_destruct(PairwiseAlignmentParameters *p)
 /*
  * Gets the set of posterior match probabilities under a simple HMM model of alignment for two DNA sequences.
  */
-stList *getAlignedPairs(StateMachine *sM, const char *string1, const char *string2, PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+stList *getAlignedPairs(StateMachine *sM, const char *string1, const char *string2, PairwiseAlignmentParameters *p,
+						bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+
+/*
+ * As getAlignedPairs, but also gives insert and delete probabilities.
+ * Return value is by initializing the matches, inserts and deletes lists with values.
+ */
+void getAlignedPairsWithIndels(StateMachine *sM, const char *string1, const char *string2, PairwiseAlignmentParameters *p,
+							   stList **alignedPairs, stList **gapXPairs, stList **gapYPairs,
+							   bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignment *pA, int64_t trim);
 
 stList *getAlignedPairsUsingAnchors(StateMachine *sM, const char *sX, const char *sY, stList *anchorPairs, PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+
+void getAlignedPairsWithIndelsUsingAnchors(StateMachine *sM, const char *sX, const char *sY, stList *anchorPairs,
+										   PairwiseAlignmentParameters *p, stList **alignedPairs, stList **gapXPairs, stList **gapYPairs,
+										   bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 /*
  * Expectation calculation functions for EM algorithms.
@@ -122,6 +135,8 @@ double logAdd(double x, double y);
 //Symbols
 
 Symbol symbol_convertCharToSymbol(char i);
+
+char symbol_convertSymbolToChar(Symbol i);
 
 Symbol *symbol_convertStringToSymbols(const char *s, int64_t sL);
 

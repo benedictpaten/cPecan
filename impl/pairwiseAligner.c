@@ -278,6 +278,21 @@ Symbol symbol_convertCharToSymbol(char i) {
     }
 }
 
+char symbol_convertSymbolToChar(Symbol i) {
+    switch (i) {
+		case a:
+			return 'A';
+		case c:
+			return 'C';
+		case g:
+			return 'G';
+		case t:
+			return 'T';
+		default:
+			return 'N';
+    }
+}
+
 Symbol *symbol_convertStringToSymbols(const char *s, int64_t sL) {
     assert(sL >= 0);
     assert(strlen(s) == sL);
@@ -582,6 +597,17 @@ double diagonalCalculationTotalProbability(StateMachine *sM, int64_t xay, DpMatr
     return totalProbability;
 }
 
+void addPosteriorProb(int64_t x, int64_t y, double posteriorProbability, stList *posteriorProbs, PairwiseAlignmentParameters *p) {
+	if (posteriorProbability >= p->threshold) {
+		if (posteriorProbability > 1.0) {
+			posteriorProbability = 1.0;
+		}
+		posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
+
+		stList_append(posteriorProbs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
+	}
+}
+
 void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
         const SymbolString sX, const SymbolString sY, double totalProbability, PairwiseAlignmentParameters *p,
         void *extraArgs) {
@@ -601,14 +627,45 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
             double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
             double posteriorProbability = exp(
                     (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
-            if (posteriorProbability >= p->threshold) {
-                if (posteriorProbability > 1.0) {
-                    posteriorProbability = 1.0;
-                }
-                posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
+            addPosteriorProb(x, y, posteriorProbability, alignedPairs, p);
+        }
+        xmy += 2;
+    }
+}
 
-                stList_append(alignedPairs, stIntTuple_construct3((int64_t) posteriorProbability, x - 1, y - 1));
-            }
+void diagonalCalculationPosteriorProbs(StateMachine *sM, int64_t xay, DpMatrix *forwardDpMatrix, DpMatrix *backwardDpMatrix,
+        const SymbolString sX, const SymbolString sY, double totalProbability, PairwiseAlignmentParameters *p,
+        void *extraArgs) {
+    assert(p->threshold >= 0.0);
+    assert(p->threshold <= 1.0);
+
+    stList *alignedPairs = ((void **) extraArgs)[0];
+    stList *gapXPairs = ((void **) extraArgs)[2];
+    stList *gapYPairs = ((void **) extraArgs)[4];
+
+    DpDiagonal *forwardDiagonal = dpMatrix_getDiagonal(forwardDpMatrix, xay);
+    DpDiagonal *backDiagonal = dpMatrix_getDiagonal(backwardDpMatrix, xay);
+    Diagonal diagonal = forwardDiagonal->diagonal;
+    int64_t xmy = diagonal_getMinXmy(diagonal);
+    //Walk over the cells computing the posteriors
+    while (xmy <= diagonal_getMaxXmy(diagonal)) {
+        int64_t x = diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy);
+        int64_t y = diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy);
+        if (x > 0 && y > 0) {
+            double *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
+            double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
+
+            double posteriorProbability = exp(
+                    (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
+            addPosteriorProb(x, y, posteriorProbability, alignedPairs, p);
+
+            posteriorProbability = exp(
+                                (cellForward[sM->gapXState] + cellBackward[sM->gapXState]) - totalProbability);
+            addPosteriorProb(x, y, posteriorProbability, gapXPairs, p);
+
+            posteriorProbability = exp(
+                                (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
+            addPosteriorProb(x, y, posteriorProbability, gapYPairs, p);
         }
         xmy += 2;
     }
@@ -1169,6 +1226,17 @@ static void alignedPairCoordinateCorrectionFn(int64_t offsetX, int64_t offsetY, 
     }
 }
 
+static void pairCoordinateCorrectionFn(int64_t offsetX, int64_t offsetY, void *extraArgs) {
+    for(int64_t i=0; i<6; i+=2) {
+		stList *subListOfPairs = ((void **) extraArgs)[i];
+		stList *pairs = ((void **) extraArgs)[i+1];
+		convertAlignedPairs(subListOfPairs, offsetX, offsetY); //Shift back the  pairs to the appropriate coordinates
+		while (stList_length(subListOfPairs) > 0) {
+			stList_append(pairs, stList_pop(subListOfPairs));
+		}
+    }
+}
+
 stList *getAlignedPairsUsingAnchors(StateMachine *sM, const char *sX, const char *sY, stList *anchorPairs, PairwiseAlignmentParameters *p,
         bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
     const int64_t lX = strlen(sX);
@@ -1189,6 +1257,36 @@ stList *getAlignedPairsUsingAnchors(StateMachine *sM, const char *sX, const char
     return alignedPairs;
 }
 
+void getAlignedPairsWithIndelsUsingAnchors(StateMachine *sM, const char *sX, const char *sY, stList *anchorPairs,
+										   PairwiseAlignmentParameters *p, stList **alignedPairs, stList **gapXPairs, stList **gapYPairs,
+										   bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
+	const int64_t lX = strlen(sX);
+	const int64_t lY = strlen(sY);
+
+	stList *subListOfAlignedPairs = stList_construct();
+	*alignedPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
+
+	stList *subListOfGapXPairs = stList_construct();
+	*gapXPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
+
+	stList *subListOfGapYPairs = stList_construct();
+	*gapYPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
+
+	void *extraArgs[6] = { subListOfAlignedPairs, *alignedPairs,
+			subListOfGapXPairs, *gapXPairs, subListOfGapYPairs, *gapYPairs };
+
+	getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(sM, anchorPairs, sX, sY, lX, lY, p,
+			alignmentHasRaggedLeftEnd, alignmentHasRaggedRightEnd, diagonalCalculationPosteriorProbs,
+			pairCoordinateCorrectionFn, extraArgs);
+
+	assert(stList_length(subListOfAlignedPairs) == 0);
+	stList_destruct(subListOfAlignedPairs);
+	assert(stList_length(subListOfGapXPairs) == 0);
+	stList_destruct(subListOfGapXPairs);
+	assert(stList_length(subListOfGapYPairs) == 0);
+	stList_destruct(subListOfGapYPairs);
+}
+
 stList *getAlignedPairs(StateMachine *sM, const char *sX, const char *sY, PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd,
         bool alignmentHasRaggedRightEnd) {
     stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(sX, sY, strlen(sX), strlen(sY), p);
@@ -1196,6 +1294,16 @@ stList *getAlignedPairs(StateMachine *sM, const char *sX, const char *sY, Pairwi
             alignmentHasRaggedRightEnd);
     stList_destruct(anchorPairs);
     return alignedPairs;
+}
+
+void getAlignedPairsWithIndels(StateMachine *sM, const char *sX, const char *sY, PairwiseAlignmentParameters *p,
+							   stList **alignedPairs, stList **gapXPairs, stList **gapYPairs,
+							   bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
+	stList *anchorPairs = getBlastPairsForPairwiseAlignmentParameters(sX, sY, strlen(sX), strlen(sY), p);
+	getAlignedPairsWithIndelsUsingAnchors(sM, sX, sY, anchorPairs, p,
+			alignedPairs, gapXPairs, gapYPairs,
+			alignmentHasRaggedLeftEnd, alignmentHasRaggedRightEnd);
+	stList_destruct(anchorPairs);
 }
 
 void getExpectationsUsingAnchors(StateMachine *sM, Hmm *hmmExpectations, const char *sX, const char *sY, stList *anchorPairs,

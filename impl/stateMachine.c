@@ -458,6 +458,8 @@ StateMachine *stateMachine5_construct(StateMachineType type) {
     sM5->model.type = type;
     sM5->model.stateNumber = 5;
     sM5->model.matchState = match;
+    sM5->model.gapXState = shortGapX;
+    sM5->model.gapYState = shortGapX;
     sM5->model.startStateProb = stateMachine5_startStateProb;
     sM5->model.endStateProb = stateMachine5_endStateProb;
     sM5->model.raggedStartStateProb = stateMachine5_raggedStartStateProb;
@@ -680,6 +682,8 @@ StateMachine *stateMachine3_construct(StateMachineType type) {
     sM3->model.type = type;
     sM3->model.stateNumber = 3;
     sM3->model.matchState = match;
+    sM3->model.gapXState = shortGapX;
+    sM3->model.gapYState = shortGapX;
     sM3->model.startStateProb = stateMachine3_startStateProb;
     sM3->model.endStateProb = stateMachine3_endStateProb;
     sM3->model.raggedStartStateProb = stateMachine3_raggedStartStateProb;
