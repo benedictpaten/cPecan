@@ -669,6 +669,49 @@ static void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
 }
 
 /*
+ * Test indel posterior prob calculating methods
+ */
+
+static void test_getAlignedPairsWithIndels(CuTest *testCase) {
+    for (int64_t test = 0; test < 100; test++) {
+        //Make a pair of sequences
+        char *sX = getRandomSequence(st_randomInt(0, 100));
+        char *sY = evolveSequence(sX); //stString_copy(seqX);
+        int64_t lX = strlen(sX);
+        int64_t lY = strlen(sY);
+        st_logInfo("Sequence X to align: %s END\n", sX);
+        st_logInfo("Sequence Y to align: %s END\n", sY);
+
+        //Now do alignment
+        PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+        StateMachine *sM = stateMachine5_construct(threeState);
+
+        stList *alignedPairs = NULL, *gapXPairs = NULL, *gapYPairs = NULL;
+
+        //void getAlignedPairsWithIndels(StateMachine *sM, const char *string1, const char *string2, PairwiseAlignmentParameters *p,
+        //							   stList **alignedPairs, stList **gapXPairs, stList **gapYPairs,
+        //							   bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+
+        getAlignedPairsWithIndels(sM, sX, sY, p, &alignedPairs, &gapXPairs, &gapYPairs, 0, 0);
+
+        //Check the aligned pairs.
+        checkAlignedPairs(testCase, alignedPairs, lX, lY);
+
+        // Check the inserts in Y
+        checkAlignedPairs(testCase, gapXPairs, lX, lY);
+
+        // Check the inserts in X
+        checkAlignedPairs(testCase, gapYPairs, lX, lY);
+
+        //Cleanup
+        stateMachine_destruct(sM);
+        free(sX);
+        free(sY);
+        stList_destruct(alignedPairs);
+    }
+}
+
+/*
  * EM training tests.
  */
 
@@ -842,12 +885,14 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_dpMatrix);
     SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
+    SUITE_ADD_TEST(suite, test_getAlignedPairsWithIndels);
     SUITE_ADD_TEST(suite, test_getBlastPairs);
     SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
     SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);
     SUITE_ADD_TEST(suite, test_getSplitPoints);
     SUITE_ADD_TEST(suite, test_getAlignedPairs);
     SUITE_ADD_TEST(suite, test_getAlignedPairsWithRaggedEnds);
+    SUITE_ADD_TEST(suite, test_getAlignedPairsWithIndels);
     SUITE_ADD_TEST(suite, test_hmm_5State);
     SUITE_ADD_TEST(suite, test_hmm_5StateAsymmetric);
     SUITE_ADD_TEST(suite, test_hmm_3State);

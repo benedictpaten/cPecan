@@ -10,36 +10,63 @@
 #include "sonLib.h"
 #include "pairwiseAligner.h"
 
+/*
+ * Basic data structures for representing a POA alignment.
+ */
+ 
+typedef struct _Poa {
+	stList *nodes; 
+} Poa;
+
 typedef struct _poaNode {
-	stList *inserts;
-	stList *deletes;
-	char base;
-	double *baseWeights;
+	stList *inserts; // Inserts that happen immediately after this position
+	stList *deletes; // Deletes that happen immediately after this position
+	char base; // Char representing base, e.g. 'A', 'C', etc.
+	double *baseWeights; // Array of length SYMBOL_NUMBER, encoding the weight given go each base, using the Symbol enum
 } PoaNode;
 
 typedef struct _poaInsert {
-	char *insert;
+	char *insert; // String representing characters of insert e.g. "GAT", etc.
 	double weight;
 } PoaInsert;
 
 typedef struct _poaDelete {
-	int64_t length;
+	int64_t length; // Length of delete
 	double weight;
 } PoaDelete;
 
-typedef struct _Poa {
-	stList *nodes;
-} Poa;
+/*
+ * Creates a POA representing the given reference sequence, with one node for each reference base and a 
+ * prefix 'N' base to represent place to add inserts/deletes that precede the first position of the reference.
+ */
+Poa *poa_getReferenceGraph(char *reference);
 
+/*
+ * Adds to given POA the matches, inserts and deletes from the alignment of the given read to the reference.
+ */
 void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList *deletes);
 
+/*
+ * Creates a POA representing the reference and the expected inserts / deletes and substitutions from the 
+ * alignment of the given set of reads aligned to the reference.
+ */
 Poa *poa_realign(stList *reads, char *reference,
 			  	 StateMachine *sM, PairwiseAlignmentParameters *p);
 
+/*
+ * Prints representation of the POA.
+ */
 void poa_print(Poa *poa, FILE *fH);
 
+/*
+ * Creates a consensus reference sequence from the POA
+ */
 char *poa_getConsensus(Poa *poa);
 
+/*
+ * Iteratively used poa_realign and poa_getConsensus to refine the median reference sequence for the given reads and 
+ * the starting reference.
+ */
 Poa *poa_realignIterative(stList *reads, char *reference,
 			  	 StateMachine *sM, PairwiseAlignmentParameters *p,
 				 uint64_t iterations);
