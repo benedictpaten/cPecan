@@ -256,6 +256,11 @@ def run_pecan(read, reference_map, alignment_file, args):
     read_loc = os.path.join(workdir, read_filename)
     cigar_loc = os.path.join(workdir, cigar_filename)
     aln_loc = os.path.join(workdir, '{}_out.txt'.format(read_id))
+    # may need to make a directory (for tmp and real) if read_id has '/' character in it
+    if '/' in read_id:
+        for dir in [os.path.dirname(ref_loc), os.path.dirname(os.path.join(args.out, "{}.tsv".format(read_id)))]:
+            if not os.path.isdir(dir):
+                os.makedirs(dir)
     with open(ref_loc, 'w') as ref_out:
         ref_out.write(">{}\n{}\n".format(ref_id, ref_str))
     with open(read_loc, 'w') as read_out:
@@ -314,6 +319,27 @@ def parse_cigar(cigar_string, ref_start):
     # use a regular expression to parse the string into operations and lengths
     cigar_tuples = re.findall(r'([0-9]+)([MIDNSHPX=])', cigar_string)
 
+    # need to do conversion for 'X' and '='
+    conversion = {'X':'M', '=':'M'}
+    tmp_tuples = list()
+    prev_tuple = None
+    for tuple in cigar_tuples:
+        if tuple[1] in conversion:
+            tuple = (int(tuple[0]), conversion[tuple[1]])
+        else:
+            tuple = (int(tuple[0]), tuple[1])
+        if prev_tuple is None:
+            prev_tuple = tuple
+            continue
+        if tuple[1] == prev_tuple[1]:
+            tuple = (prev_tuple[0] + tuple[0], tuple[1])
+        else:
+            tmp_tuples.append(prev_tuple)
+        prev_tuple = tuple
+    tmp_tuples.append(prev_tuple)
+    cigar_tuples = tmp_tuples
+
+    # determine clip and alignment
     clipping = {"S", "H"}
     alignment_operations = {"M", "I", "D"}
 
