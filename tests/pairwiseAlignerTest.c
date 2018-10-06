@@ -339,7 +339,7 @@ stList *getRandomAnchorPairs(int64_t lX, int64_t lY) {
     return anchorPairs;
 }
 
-static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY) {
+static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY, bool xGaps, bool yGaps) {
     st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
     stSortedSet *pairs = stSortedSet_construct3((int (*)(const void *, const void *)) stIntTuple_cmpFn,
             (void (*)(void *)) stIntTuple_destruct);
@@ -353,8 +353,20 @@ static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, 
         CuAssertTrue(testCase, score > 0);
         CuAssertTrue(testCase, score <= PAIR_ALIGNMENT_PROB_1);
 
-        CuAssertTrue(testCase, x >= 0);
-        CuAssertTrue(testCase, y >= 0);
+        if(yGaps) {
+        	CuAssertTrue(testCase, x >= -1);
+        }
+        else {
+        	CuAssertTrue(testCase, x >= 0);
+        }
+
+        if(xGaps) {
+        	CuAssertTrue(testCase, y >= -1);
+        }
+        else {
+        	CuAssertTrue(testCase, y >= 0);
+        }
+
         CuAssertTrue(testCase, x < lX);
         CuAssertTrue(testCase, y < lY);
 
@@ -390,8 +402,7 @@ static void test_getAlignedPairsWithBanding(CuTest *testCase) {
         getPosteriorProbsWithBanding(sM, anchorPairs, sX2, sY2, p, 0, 0, diagonalCalculationPosteriorMatchProbs,
                 extraArgs);
         //Check the aligned pairs.
-        //Check the aligned pairs.
-        checkAlignedPairs(testCase, alignedPairs, lX, lY);
+        checkAlignedPairs(testCase, alignedPairs, lX, lY, 0, 0);
 
         //Cleanup
         stateMachine_destruct(sM);
@@ -621,7 +632,7 @@ static void test_getAlignedPairs(CuTest *testCase) {
         stList *alignedPairs = getAlignedPairs(sM, sX, sY, p, 0, 0);
 
         //Check the aligned pairs.
-        checkAlignedPairs(testCase, alignedPairs, lX, lY);
+        checkAlignedPairs(testCase, alignedPairs, lX, lY, 0, 0);
 
         //Cleanup
         stateMachine_destruct(sM);
@@ -649,7 +660,7 @@ static void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(alignedPairs, sX, sY, 0.2);
 
         //Check the aligned pairs.
-        checkAlignedPairs(testCase, alignedPairs, strlen(sX), strlen(sY));
+        checkAlignedPairs(testCase, alignedPairs, strlen(sX), strlen(sY), 0, 0);
         CuAssertIntEquals(testCase, stList_length(alignedPairs), coreLength);
         for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
             stIntTuple *j = stList_get(alignedPairs, i);
@@ -695,13 +706,13 @@ static void test_getAlignedPairsWithIndels(CuTest *testCase) {
         getAlignedPairsWithIndels(sM, sX, sY, p, &alignedPairs, &gapXPairs, &gapYPairs, 0, 0);
 
         //Check the aligned pairs.
-        checkAlignedPairs(testCase, alignedPairs, lX, lY);
+        checkAlignedPairs(testCase, alignedPairs, lX, lY, 0, 0);
 
         // Check the inserts in Y
-        checkAlignedPairs(testCase, gapXPairs, lX, lY);
+        checkAlignedPairs(testCase, gapXPairs, lX, lY, 1, 0);
 
         // Check the inserts in X
-        checkAlignedPairs(testCase, gapYPairs, lX, lY);
+        checkAlignedPairs(testCase, gapYPairs, lX, lY, 0, 1);
 
         //Cleanup
         stateMachine_destruct(sM);

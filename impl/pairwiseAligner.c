@@ -651,22 +651,28 @@ void diagonalCalculationPosteriorProbs(StateMachine *sM, int64_t xay, DpMatrix *
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
         int64_t x = diagonal_getXCoordinate(diagonal_getXay(diagonal), xmy);
         int64_t y = diagonal_getYCoordinate(diagonal_getXay(diagonal), xmy);
+
+        double *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
+        double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
         if (x > 0 && y > 0) {
-            double *cellForward = dpDiagonal_getCell(forwardDiagonal, xmy);
-            double *cellBackward = dpDiagonal_getCell(backDiagonal, xmy);
+			// Posterior match prob
+			double posteriorProbability = exp(
+					(cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
+			addPosteriorProb(x, y, posteriorProbability, alignedPairs, p);
+        }
 
+        if(x > 0) {
             double posteriorProbability = exp(
-                    (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
-            addPosteriorProb(x, y, posteriorProbability, alignedPairs, p);
-
-            posteriorProbability = exp(
                                 (cellForward[sM->gapXState] + cellBackward[sM->gapXState]) - totalProbability);
             addPosteriorProb(x, y, posteriorProbability, gapXPairs, p);
+        }
 
-            posteriorProbability = exp(
+        if(y > 0) {
+            double posteriorProbability = exp(
                                 (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
             addPosteriorProb(x, y, posteriorProbability, gapYPairs, p);
         }
+
         xmy += 2;
     }
 }

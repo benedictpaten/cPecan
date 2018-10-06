@@ -70,5 +70,7 @@ char *poa_getConsensus(Poa *poa);
 Poa *poa_realignIterative(stList *reads, char *reference,
 			  	 StateMachine *sM, PairwiseAlignmentParameters *p,
 				 uint64_t iterations);
+				 
+void poa_destruct(Poa *poa);
 
 #endif /* REALIGNER_H_ */

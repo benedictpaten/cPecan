@@ -21,7 +21,7 @@ int stBaseAlignerRunAllTests(void) {
 	CuSuiteAddSuite(suite, pairwiseAlignmentTestSuite());
 	CuSuiteAddSuite(suite, multipleAlignerTestSuite());
 	CuSuiteAddSuite(suite, pairwiseAlignmentLongTestSuite());
-	CuSuiteAddSuite(suite, realignmentTestSuite);
+	CuSuiteAddSuite(suite, realignmentTestSuite());
 	CuSuiteRun(suite);
 	CuSuiteSummary(suite, output);
 	CuSuiteDetails(suite, output);

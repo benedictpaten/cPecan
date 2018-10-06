@@ -160,10 +160,11 @@ void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList 
 	stList_sort(inserts, cmpAlignedPairsByCoordinates);
 
 	// Let a complete-insert be a sequence of inserts with the same reference coordinate i
-	// and consecutive read coordinates j, j+1, ..., j+n, such that the i,j-1 is a match
-	// in the alignment subgraph and i+1,j+n+1 is similarly a match.
+	// and consecutive read coordinates j, j+1, ..., j+n, such that the i,j-1 is a match or equal to (-1,-1) (the beginning)
+	// in the alignment subgraph and i+1,j+n+1 is similarly a match or equal to (N, M) (the end of the alignment).
 
 	// Enumerate set of complete inserts
+	int64_t readLength = strlen(read), refLength = stList_length(poa->nodes)-1;
 	for(int64_t i=0; i<stList_length(inserts);) {
 
 		stIntTuple *insertStart = stList_get(inserts, i); // Start of putative complete-insert
@@ -190,15 +191,17 @@ void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList 
 
 		for(int64_t k=i; k<j; k++) {
 
-			// If k position is not flanked by a preceding match then can not be a complete insert
-			if(!isMatch(matchesSet, stIntTuple_get(insertStart, 1), stIntTuple_get(insertStart, 2) + k - i - 1)) {
+			// If k position is not flanked by a preceding match or the beginning then can not be a complete insert
+			if(!isMatch(matchesSet, stIntTuple_get(insertStart, 1), stIntTuple_get(insertStart, 2) + k - i - 1) &&
+					(stIntTuple_get(insertStart, 1) > -1 || stIntTuple_get(insertStart, 2) + k - i - 1 > -1)) {
 				continue;
 			}
 
 			for(int64_t l=k; l<j; l++) {
 
-				// If l position is not flanked by a proceding match then can not be a complete insert
-				if(!isMatch(matchesSet, stIntTuple_get(insertStart, 1) + 1, stIntTuple_get(insertStart, 2) + l - i + 1)) {
+				// If l position is not flanked by a proceeding match or the end then can not be a complete insert
+				if(!isMatch(matchesSet, stIntTuple_get(insertStart, 1) + 1, stIntTuple_get(insertStart, 2) + l - i + 1) ||
+						(stIntTuple_get(insertStart, 1) + 1 < refLength || stIntTuple_get(insertStart, 2) + l - i + 1 < readLength)) {
 					continue;
 				}
 
@@ -215,6 +218,7 @@ void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList 
 				}
 
 				// Get the leftmost node in the poa graph to which the insert will connect
+				assert(stIntTuple_get(insertStart, 1) >= -1);
 				PoaNode *leftNode = stList_get(poa->nodes, stIntTuple_get(insertStart, 1)+1); // Get POA node with same reference coordinate
 
 				// Check if the complete insert is already in the poa graph:
@@ -243,8 +247,8 @@ void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList 
 	stList_sort(deletes, cmpAlignedPairsByInvertedCoordinates);
 
 	// Analogous to a complete-insert, let a complete-delete be a sequence of deletes with the same read coordinate j
-	// and consecutive reference coordinates i, i+1, ..., i+m, such that the i-1,j is a match
-	// in the alignment subgraph and i+m+1,j+1 is similarly a match.
+	// and consecutive reference coordinates i, i+1, ..., i+m, such that the i-1,j is a match or equal to (-1,-1) (the beginning)
+	// in the alignment subgraph and i+m+1,j+1 is similarly a match or (N, M) (the alignment end).
 
 	// Enumerate set of complete-deletes, adding them to the graph
 	for(int64_t i=0; i<stList_length(deletes);) {
@@ -272,15 +276,17 @@ void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList 
 
 		for(int64_t k=i; k<j; k++) {
 
-			// If k position is not flanked by a preceding match then can not be a complete-delete
-			if(!isMatch(matchesSet, stIntTuple_get(deleteStart, 1) + k - i - 1, stIntTuple_get(deleteStart, 2))) {
+			// If k position is not flanked by a preceding match or alignment beginning then can not be a complete-delete
+			if(!isMatch(matchesSet, stIntTuple_get(deleteStart, 1) + k - i - 1, stIntTuple_get(deleteStart, 2)) &&
+					((stIntTuple_get(deleteStart, 1) + k - i - 1 > -1 || stIntTuple_get(deleteStart, 2) > -1))) {
 				continue;
 			}
 
 			for(int64_t l=k; l<j; l++) {
 
-				// If l position is not flanked by a proceding match then can not be a complete-delete
-				if(!isMatch(matchesSet, stIntTuple_get(deleteStart, 1) + l - i + 1, stIntTuple_get(deleteStart, 2) + 1)) {
+				// If l position is not flanked by a proceeding match or alignment end then can not be a complete-delete
+				if(!isMatch(matchesSet, stIntTuple_get(deleteStart, 1) + l - i + 1, stIntTuple_get(deleteStart, 2) + 1) &&
+					(stIntTuple_get(deleteStart, 1) + l - i + 1 < refLength || stIntTuple_get(deleteStart, 2) + 1 < readLength)) {
 					continue;
 				}
 
@@ -294,6 +300,7 @@ void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList 
 				}
 
 				// Get the leftmost node in the poa graph to which the delete will connect
+				assert(stIntTuple_get(deleteStart, 1) >= 0);
 				PoaNode *leftNode = stList_get(poa->nodes, stIntTuple_get(deleteStart, 1)); // Get POA node preceding delete
 
 				// Check if the delete is already in the poa graph:
@@ -331,7 +338,7 @@ Poa *poa_realign(stList *reads, char *reference,
 
 		// Generate set of posterior probabilities for matches, deletes and inserts with respect to reference.
 		stList *matches = NULL, *inserts = NULL, *deletes = NULL;
-		getAlignedPairsWithIndels(sM, reference, read, p, &matches, &inserts, &deletes, 0, 0);
+		getAlignedPairsWithIndels(sM, reference, read, p, &matches, &deletes, &inserts, 0, 0);
 
 		// Add weights, edges and nodes to the poa
 		poa_augment(poa, read, matches, inserts, deletes);
