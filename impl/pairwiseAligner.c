@@ -669,7 +669,7 @@ void diagonalCalculationPosteriorProbs(StateMachine *sM, int64_t xay, DpMatrix *
 
         if(y > 0) {
             double posteriorProbability = exp(
-                                (cellForward[sM->matchState] + cellBackward[sM->matchState]) - totalProbability);
+                                (cellForward[sM->gapYState] + cellBackward[sM->gapYState]) - totalProbability);
             addPosteriorProb(x, y, posteriorProbability, gapYPairs, p);
         }
 

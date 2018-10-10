@@ -35,6 +35,32 @@ static void test_poa_getReferenceGraph(CuTest *testCase) {
 	poa_destruct(poa);
 }
 
+static void checkInserts(CuTest *testCase, Poa *poa, int64_t nodeIndex,
+					     int64_t insertNumber, const char **inserts, const double *insertWeights, bool divideWeights) {
+	PoaNode *node = stList_get(poa->nodes, nodeIndex);
+
+	CuAssertIntEquals(testCase, stList_length(node->inserts), insertNumber);
+
+	for(int64_t i=0; i<insertNumber; i++) {
+		PoaInsert *poaInsert = stList_get(node->inserts, i);
+		CuAssertStrEquals(testCase, inserts[i], poaInsert->insert);
+		CuAssertDblEquals(testCase, insertWeights[i], poaInsert->weight / (divideWeights ? PAIR_ALIGNMENT_PROB_1 : 1.0), 0.001);
+	}
+}
+
+static void checkDeletes(CuTest *testCase, Poa *poa, int64_t nodeIndex,
+					     int64_t deleteNumber, const int64_t *deleteLengths, const double *deleteWeights, bool divideWeights) {
+	PoaNode *node = stList_get(poa->nodes, nodeIndex);
+
+	CuAssertIntEquals(testCase, stList_length(node->deletes), deleteNumber);
+
+	for(int64_t i=0; i<deleteNumber; i++) {
+		PoaDelete *poaDelete = stList_get(node->deletes, i);
+		CuAssertIntEquals(testCase, deleteLengths[i], poaDelete->length);
+		CuAssertDblEquals(testCase, deleteWeights[i], poaDelete->weight / (divideWeights ? PAIR_ALIGNMENT_PROB_1 : 1.0), 0.001);
+	}
+}
+
 static void checkNode(CuTest *testCase, Poa *poa, int64_t nodeIndex, char base, const double *baseWeights,
 		int64_t insertNumber, const char **inserts, const double *insertWeights,
 		int64_t deleteNumber, const int64_t *deleteLengths, const double *deleteWeights) {
@@ -48,20 +74,10 @@ static void checkNode(CuTest *testCase, Poa *poa, int64_t nodeIndex, char base, 
 	}
 
 	// Inserts
-	CuAssertTrue(testCase, stList_length(node->inserts) == insertNumber);
-	for(int64_t i=0; i<stList_length(node->inserts); i++) {
-		PoaInsert *insert = stList_get(node->inserts, i);
-		CuAssertTrue(testCase, stString_eq(inserts[i], insert->insert));
-		CuAssertTrue(testCase, insert->weight == insertWeights[i]);
-	}
+	checkInserts(testCase, poa, nodeIndex, insertNumber, inserts, insertWeights, 0);
 
 	// Deletes
-	CuAssertTrue(testCase, stList_length(node->deletes) == deleteNumber);
-	for(int64_t i=0; i<stList_length(node->deletes); i++) {
-		PoaDelete *delete = stList_get(node->deletes, i);
-		CuAssertTrue(testCase, delete->length == deleteLengths[i]);
-		CuAssertTrue(testCase, delete->weight == deleteWeights[i]);
-	}
+	checkDeletes(testCase, poa, nodeIndex, deleteNumber, deleteLengths, deleteWeights, 0);
 }
 
 static void test_poa_augment_example(CuTest *testCase) {
@@ -128,34 +144,205 @@ static void test_poa_augment_example(CuTest *testCase) {
 					0, (const int64_t[]){ 0 }, (const double[]){ 0.0 });
 
 	checkNode(testCase, poa, 7, 'A', (const double[]){ 0.0, 0.0, 75.0, 25.0, 0.0 },
-					2, (const char *[]){ "G", "GT" }, (const double[]){ 50.0, 50.0 },
+					2, (const char *[]){ "GT", "T" }, (const double[]){ 50.0, 75.0 },
 					0, (const int64_t[]){ 0 }, (const double[]){ 0.0 });
 }
 
-static void test_poa_realign_mini_example1(CuTest *testCase) {
-	const char *readArray[] = {
-		"CATTTTTCTCCTCCACCTGCAACAGAAGATAAAAACGCGCATCACAAACTACTTTATTG",
-		"CATTTTTCTCTCCGTCACGTAATAGGAAAACAGATGAAAATGTGCACCATAAAACGCATTTTTATTT",
-		"CATTTTCTCTCTCCGTCACGACAGGAAACAGATGAAAATGGGCACAAGACCACAAACGCATTTTGAT" };
-	char *reference = "CATTTTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAATGCAGGGCAATAATGACCATAAAACGCATTTTTATTT";
-	char *trueReference = "CATTTTTCTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAAATGCGGGGCATGTGACCATAAAACGCATTTTTTATTT";
+static void test_poa_realign(CuTest *testCase) {
+	for (int64_t test = 0; test < 100; test++) {
+
+		//Make true reference
+		char *trueReference = getRandomSequence(st_randomInt(1, 100));
+
+		// Make starting reference
+		char *reference = evolveSequence(trueReference);
+
+		// Reads
+		int64_t readNumber = st_randomInt(0, 20);
+		stList *reads = stList_construct3(0, free);
+		for(int64_t i=0; i<readNumber; i++) {
+			stList_append(reads, evolveSequence(trueReference));
+		}
+
+		PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+		StateMachine *sM = stateMachine3_construct(threeState);
+
+		Poa *poa = poa_realign(reads, reference, sM, p);
+
+		// Generate the read alignments and check the matches
+		// Currently don't check the insert and deletes
+
+		double *baseWeights = st_calloc(SYMBOL_NUMBER*strlen(reference), sizeof(double));
+
+		for(int64_t i=0; i<readNumber; i++) {
+			char *read = stList_get(reads, i);
+
+			// Generate set of posterior probabilities for matches, deletes and inserts with respect to reference.
+			stList *matches = NULL, *inserts = NULL, *deletes = NULL;
+			getAlignedPairsWithIndels(sM, reference, read, p, &matches, &deletes, &inserts, 0, 0);
+
+			// Collate matches
+			for(int64_t j=0; j<stList_length(matches); j++) {
+				stIntTuple *match = stList_get(matches, j);
+				baseWeights[stIntTuple_get(match, 1) * SYMBOL_NUMBER + symbol_convertCharToSymbol(read[stIntTuple_get(match, 2)])] += stIntTuple_get(match, 0);
+			}
+
+			// Cleanup
+			stList_destruct(matches);
+			stList_destruct(inserts);
+			stList_destruct(deletes);
+		}
+
+		// Check match weights tally
+		for(int64_t i=0; i<strlen(reference); i++) {
+			PoaNode *poaNode = stList_get(poa->nodes, i+1);
+			for(int64_t j=0; j<SYMBOL_NUMBER; j++) {
+				CuAssertDblEquals(testCase, poaNode->baseWeights[j], baseWeights[i*SYMBOL_NUMBER + j], 0.0001);
+			}
+		}
+
+		st_logInfo("True-reference:%s\n", trueReference);
+		if (st_getLogLevel() >= info) {
+			poa_print(poa, stderr);
+		}
+
+		//Cleanup
+		free(baseWeights);
+		stateMachine_destruct(sM);
+		free(trueReference);
+		free(reference);
+		stList_destruct(reads);
+		pairwiseAlignmentBandingParameters_destruct(p);
+		poa_destruct(poa);
+	}
+}
+
+static void test_poa_realign_tiny_example1(CuTest *testCase) {
+
+	char *reference = "GATACAGCGGG";
+	char *read = "GATTACAGCG";
 
 	stList *reads = stList_construct();
-	for(int64_t i=0; i<45; i++) {
-		stList_append(reads, (char *)readArray[i]);
-	}
+	stList_append(reads, read);
 
 	PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 	StateMachine *sM = stateMachine3_construct(threeState);
 
+	/*
+	// Generate set of posterior probabilities for matches, deletes and inserts with respect to reference.
+	stList *matches = NULL, *inserts = NULL, *deletes = NULL;
+	getAlignedPairsWithIndels(sM, reference, read, p, &matches, &deletes, &inserts, 0, 0);
+
+	for(int64_t i=0; i<stList_length(matches); i++) {
+		stIntTuple *alignedPair = stList_get(matches, i);
+		fprintf(stderr, "Match: (x:%i) (y:%i) (weight:%f)\n", stIntTuple_get(alignedPair, 1),
+				stIntTuple_get(alignedPair, 2), ((float)stIntTuple_get(alignedPair, 0))/PAIR_ALIGNMENT_PROB_1);
+	}
+
+	for(int64_t i=0; i<stList_length(inserts); i++) {
+		stIntTuple *alignedPair = stList_get(inserts, i);
+		fprintf(stderr, "Insert: (x:%i) (y:%i) (weight:%f)\n", stIntTuple_get(alignedPair, 1),
+				stIntTuple_get(alignedPair, 2), ((float)stIntTuple_get(alignedPair, 0))/PAIR_ALIGNMENT_PROB_1);
+	}
+
+	for(int64_t i=0; i<stList_length(deletes); i++) {
+		stIntTuple *alignedPair = stList_get(deletes, i);
+		fprintf(stderr, "Delete: (x:%i) (y:%i) (weight:%f)\n", stIntTuple_get(alignedPair, 1),
+					stIntTuple_get(alignedPair, 2), ((float)stIntTuple_get(alignedPair, 0))/PAIR_ALIGNMENT_PROB_1);
+	}*/
+
 	Poa *poa = poa_realign(reads, reference, sM, p);
 
-	fprintf(stderr, "True-reference:%s\n", trueReference);
-	poa_print(poa, stderr);
+	// Check we get the set of inserts and deletes we expect
+
+	// . = match
+	// | = insert
+	// - = delete
+	// : = insert and match
+	// % = delete and match
+
+	//     Reference
+	//     -1 0 1 2 3 4 5 6 7 8 9 10
+	//      N G A T A C A G C G G G
+	// -1 N .
+	//  0 G   .
+	//  1 A   | .
+	//  2 T     : . -
+	//  3 T       : . %
+	//  4 A         :   .
+	//  5 C           .   .
+	//  6 A             . - %
+	//  7 G               . - %
+	//  8 C                 . - %
+	//  9 G                   . - %
+
+	// Check inserts
+
+	// A after ref 0
+	checkInserts(testCase, poa, 1, 1, (const char *[]){ "A" }, (const double[]){ 0.038656 }, 1);
+	// T after ref 1
+	checkInserts(testCase, poa, 2, 1, (const char *[]){ "T" }, (const double[]){ 0.436572 }, 1);
+	// T after ref 2
+	checkInserts(testCase, poa, 3, 1, (const char *[]){ "T" }, (const double[]){ 0.437963 }, 1);
+	// A after ref 3
+	checkInserts(testCase, poa, 4, 1, (const char *[]){ "A" }, (const double[]){ 0.038831 }, 1);
+
+	checkInserts(testCase, poa, 0, 0, (const char *[]){ "" }, (const double[]){ 1 }, 1);
+	checkInserts(testCase, poa, 5, 0, (const char *[]){ "" }, (const double[]){ 1 }, 1);
+	checkInserts(testCase, poa, 6, 0, (const char *[]){ "" }, (const double[]){ 1 }, 1);
+	checkInserts(testCase, poa, 7, 0, (const char *[]){ "" }, (const double[]){ 1 }, 1);
+	checkInserts(testCase, poa, 8, 0, (const char *[]){ "" }, (const double[]){ 1 }, 1);
+	checkInserts(testCase, poa, 9, 0, (const char *[]){ "" }, (const double[]){ 1 }, 1);
+	checkInserts(testCase, poa, 10, 0, (const char *[]){ "" }, (const double[]){ 1 }, 1);
+
+	// Check deletes
+
+	/*
+	Delete: (x:3) (y:2) (weight:0.021429)
+	Delete: (x:4) (y:3) (weight:0.011958)
+
+	Delete: (x:6) (y:6) (weight:0.039542)
+	Delete: (x:7) (y:6) (weight:0.041150)
+
+	Delete: (x:7) (y:7) (weight:0.039140)
+	Delete: (x:8) (y:7) (weight:0.038841)
+
+	Delete: (x:8) (y:8) (weight:0.440979)
+	Delete: (x:9) (y:8) (weight:0.438735)
+
+	Delete: (x:9) (y:9) (weight:0.437247)
+	Delete: (x:10) (y:9) (weight:0.440302)*/
+
+	// No deletes first three positions
+	checkDeletes(testCase, poa, 0, 0, (const int64_t[]){ 1 }, (const double[]){ 1 }, 1);
+	checkDeletes(testCase, poa, 1, 0, (const int64_t[]){ 1 }, (const double[]){ 1 }, 1);
+	checkDeletes(testCase, poa, 2, 0, (const int64_t[]){ 1 }, (const double[]){ 1 }, 1);
+	checkDeletes(testCase, poa, 5, 0, (const int64_t[]){ 1 }, (const double[]){ 1 }, 1);
+	checkDeletes(testCase, poa, 10, 0, (const int64_t[]){ 1 }, (const double[]){ 1 }, 1);
+
+	// L1 after ref 2
+	checkDeletes(testCase, poa, 3, 1, (const int64_t[]){ 1 }, (const double[]){ 0.021429 }, 1);
+	// L1 after ref 3
+	checkDeletes(testCase, poa, 4, 1, (const int64_t[]){ 1 }, (const double[]){ 0.011958 }, 1);
+	// L2 after ref 5
+	checkDeletes(testCase, poa, 6, 1, (const int64_t[]){ 2 }, (const double[]){ 0.039542 }, 1);
+	// L2 after ref 6
+	checkDeletes(testCase, poa, 7, 1, (const int64_t[]){ 2 }, (const double[]){ 0.038841 }, 1);
+	// L2 after ref 7
+	checkDeletes(testCase, poa, 8, 1, (const int64_t[]){ 2 }, (const double[]){ 0.438735 }, 1);
+	// L2 after ref 8
+	checkDeletes(testCase, poa, 9, 1, (const int64_t[]){ 2 }, (const double[]){ 0.437247 }, 1);
+
+	st_logInfo("Read:%s\n", read);
+	st_logInfo("Reference:%s\n", reference);
+	if (st_getLogLevel() >= info) {
+		poa_print(poa, stderr);
+	}
 
 	stateMachine_destruct(sM);
 	pairwiseAlignmentBandingParameters_destruct(p);
 	poa_destruct(poa);
+	stList_destruct(reads);
 }
 
 static void test_poa_realign_example1(CuTest *testCase) {
@@ -218,12 +405,15 @@ static void test_poa_realign_example1(CuTest *testCase) {
 
 	Poa *poa = poa_realign(reads, reference, sM, p);
 
-	fprintf(stderr, "True-reference:%s\n", trueReference);
-	poa_print(poa, stderr);
+	st_logInfo("True-reference:%s\n", trueReference);
+	if (st_getLogLevel() >= info) {
+		poa_print(poa, stderr);
+	}
 
 	stateMachine_destruct(sM);
 	pairwiseAlignmentBandingParameters_destruct(p);
 	poa_destruct(poa);
+	stList_destruct(reads);
 }
 
 static void test_poa_realign_example2(CuTest *testCase) {
@@ -274,7 +464,7 @@ static void test_poa_realign_example2(CuTest *testCase) {
 	char *trueReference = "GATGTAAAAAAAAAGAAATGACGGAAGTTAGAACAGAGCATAAATACACATCTGT";
 
 	stList *reads = stList_construct();
-	for(int64_t i=0; i<42; i++) {
+	for(int64_t i=0; i<41; i++) {
 		stList_append(reads, (char *)readArray[i]);
 	}
 
@@ -283,54 +473,25 @@ static void test_poa_realign_example2(CuTest *testCase) {
 
 	Poa *poa = poa_realign(reads, reference, sM, p);
 
-	fprintf(stderr, "True-reference:%s\n", trueReference);
-	poa_print(poa, stderr);
+	st_logInfo("True-reference:%s\n", trueReference);
+	if (st_getLogLevel() >= info) {
+		poa_print(poa, stderr);
+	}
 
 	stateMachine_destruct(sM);
 	pairwiseAlignmentBandingParameters_destruct(p);
 	poa_destruct(poa);
-}
-
-static void test_poa_realign(CuTest *testCase) {
-	for (int64_t test = 0; test < 100; test++) {
-
-		//Make true reference
-		char *trueReference = getRandomSequence(st_randomInt(0, 100));
-
-		// Make starting reference
-		char *reference = evolveSequence(reference);
-
-		// Reads
-		int64_t readNumber = st_randomInt(0, 20);
-		stList *reads = stList_construct3(0, free);
-		for(int64_t i=0; i<readNumber; i++) {
-			stList_append(reads, evolveSequence(trueReference));
-		}
-
-		PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-		StateMachine *sM = stateMachine3_construct(threeState);
-
-		Poa *poa = poa_realign(reads, reference, sM, p);
-
-		fprintf(stderr, "True-reference:%s\n", trueReference);
-		poa_print(poa, stderr);
-
-		//Cleanup
-		stateMachine_destruct(sM);
-		free(trueReference);
-		free(reference);
-		stList_destruct(reads);
-		pairwiseAlignmentBandingParameters_destruct(p);
-		poa_destruct(poa);
-	}
+	stList_destruct(reads);
 }
 
 CuSuite* realignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
 
+    //SUITE_ADD_TEST(suite, test_poa_realign_tiny_example1);
+
     SUITE_ADD_TEST(suite, test_poa_getReferenceGraph);
     SUITE_ADD_TEST(suite, test_poa_augment_example);
-    SUITE_ADD_TEST(suite, test_poa_realign_mini_example1);
+    SUITE_ADD_TEST(suite, test_poa_realign_tiny_example1);
     SUITE_ADD_TEST(suite, test_poa_realign_example1);
     SUITE_ADD_TEST(suite, test_poa_realign_example2);
     SUITE_ADD_TEST(suite, test_poa_realign);

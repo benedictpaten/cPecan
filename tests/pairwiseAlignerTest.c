@@ -688,6 +688,7 @@ static void test_getAlignedPairsWithIndels(CuTest *testCase) {
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(0, 100));
         char *sY = evolveSequence(sX); //stString_copy(seqX);
+
         int64_t lX = strlen(sX);
         int64_t lY = strlen(sY);
         st_logInfo("Sequence X to align: %s END\n", sX);
@@ -695,15 +696,11 @@ static void test_getAlignedPairsWithIndels(CuTest *testCase) {
 
         //Now do alignment
         PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-        StateMachine *sM = stateMachine5_construct(threeState);
+        StateMachine *sM = stateMachine3_construct(threeState);
 
         stList *alignedPairs = NULL, *gapXPairs = NULL, *gapYPairs = NULL;
 
-        //void getAlignedPairsWithIndels(StateMachine *sM, const char *string1, const char *string2, PairwiseAlignmentParameters *p,
-        //							   stList **alignedPairs, stList **gapXPairs, stList **gapYPairs,
-        //							   bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
-
-        getAlignedPairsWithIndels(sM, sX, sY, p, &alignedPairs, &gapXPairs, &gapYPairs, 0, 0);
+        getAlignedPairsWithIndels(sM, sX, sY, p, &alignedPairs, &gapXPairs, &gapYPairs, st_random() > 0.5, st_random() > 0.5);
 
         //Check the aligned pairs.
         checkAlignedPairs(testCase, alignedPairs, lX, lY, 0, 0);
@@ -887,6 +884,7 @@ static void test_em_3State(CuTest *testCase) {
 
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
+
     SUITE_ADD_TEST(suite, test_diagonal);
     SUITE_ADD_TEST(suite, test_bands);
     SUITE_ADD_TEST(suite, test_logAdd);
@@ -896,7 +894,6 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_dpMatrix);
     SUITE_ADD_TEST(suite, test_diagonalDPCalculations);
     SUITE_ADD_TEST(suite, test_getAlignedPairsWithBanding);
-    SUITE_ADD_TEST(suite, test_getAlignedPairsWithIndels);
     SUITE_ADD_TEST(suite, test_getBlastPairs);
     SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
     SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);

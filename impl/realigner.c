@@ -11,6 +11,7 @@
 #include <math.h>
 #include "stGraph.h"
 #include <inttypes.h>
+#include <ctype.h>
 
 /*
  * Basic overview of realigner algorithm:
@@ -52,7 +53,7 @@ void poaDelete_destruct(PoaDelete *poaDelete) {
 }
 
 PoaNode *poaNode_construct(char base) {
-	PoaNode *poaNode = st_calloc(1, sizeof(poaNode));
+	PoaNode *poaNode = st_calloc(1, sizeof(PoaNode));
 
 	poaNode->inserts = stList_construct3(0, (void(*)(void *)) poaInsert_destruct);
 	poaNode->deletes = stList_construct3(0, (void(*)(void *)) poaDelete_destruct);
@@ -70,7 +71,7 @@ void poaNode_destruct(PoaNode *poaNode) {
 }
 
 Poa *poa_getEmptyGraph() {
-	Poa *poa = st_calloc(1, sizeof(poa));
+	Poa *poa = st_calloc(1, sizeof(Poa));
 
 	poa->nodes = stList_construct3(0, (void (*)(void *))poaNode_destruct);
 
@@ -88,7 +89,7 @@ Poa *poa_getReferenceGraph(char *reference) {
 	int64_t refLength = strlen(reference);
 	stList_append(poa->nodes, poaNode_construct('N')); // Add empty prefix node
 	for(int64_t i=0; i<refLength; i++) {
-		stList_append(poa->nodes, poaNode_construct(reference[i]));
+		stList_append(poa->nodes, poaNode_construct(toupper(reference[i])));
 	}
 
 	return poa;
@@ -124,9 +125,10 @@ int cmpAlignedPairsByInvertedCoordinates(const void *a, const void *b) {
 }
 
 bool isMatch(stSortedSet *matchesSet, int64_t x, int64_t y) {
-	stIntTuple pair[3];
-	pair[1] = x;
-	pair[2] = y;
+	stIntTuple pair[4];
+	pair[0] = 3;
+	pair[2] = x;
+	pair[3] = y;
 	return stSortedSet_search(matchesSet, &pair) != NULL;
 }
 
@@ -200,7 +202,7 @@ void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList 
 			for(int64_t l=k; l<j; l++) {
 
 				// If l position is not flanked by a proceeding match or the end then can not be a complete insert
-				if(!isMatch(matchesSet, stIntTuple_get(insertStart, 1) + 1, stIntTuple_get(insertStart, 2) + l - i + 1) ||
+				if(!isMatch(matchesSet, stIntTuple_get(insertStart, 1) + 1, stIntTuple_get(insertStart, 2) + l - i + 1) &&
 						(stIntTuple_get(insertStart, 1) + 1 < refLength || stIntTuple_get(insertStart, 2) + l - i + 1 < readLength)) {
 					continue;
 				}
@@ -208,12 +210,12 @@ void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList 
 				// At this point k (inclusive) and l (inclusive) represent a complete-insert
 
 				// Calculate weight and label
-				double insertWeight = 1.0;
+				double insertWeight = UINT_MAX;
 				char insertLabel[l+2-k];
 				insertLabel[l+1-k] = '\0';
 				for(int64_t m=k; m<l+1; m++) {
 					stIntTuple *insert = stList_get(inserts, m);
-					insertLabel[m-k] = read[stIntTuple_get(insert, 2)];
+					insertLabel[m-k] = toupper(read[stIntTuple_get(insert, 2)]);
 					insertWeight = insertWeight < stIntTuple_get(insert, 0) ? insertWeight : stIntTuple_get(insert, 0);
 				}
 
@@ -252,7 +254,7 @@ void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList 
 
 	// Enumerate set of complete-deletes, adding them to the graph
 	for(int64_t i=0; i<stList_length(deletes);) {
-		stIntTuple *deleteStart = stList_get(inserts, i); // Start of putative complete-delete
+		stIntTuple *deleteStart = stList_get(deletes, i); // Start of putative complete-delete
 
 		int64_t j=i+1;
 		for(;j<stList_length(deletes); j++) {
@@ -293,7 +295,7 @@ void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList 
 				// At this point k (inclusive) and l (inclusive) represent a complete-delete
 
 				// Calculate weight
-				double deleteWeight = 1.0;
+				double deleteWeight = UINT_MAX;
 				for(int64_t m=k; m<l+1; m++) {
 					stIntTuple *delete = stList_get(deletes, m);
 					deleteWeight = deleteWeight < stIntTuple_get(delete, 0) ? deleteWeight : stIntTuple_get(delete, 0);
@@ -361,21 +363,23 @@ void poa_print(Poa *poa, FILE *fH) {
 		// Bases
 		double totalWeight = 0.0;
 		for(int64_t j=0; j<SYMBOL_NUMBER; j++) {
-			fprintf(fH, "\t%c:%f", symbol_convertSymbolToChar(j), node->baseWeights[j]);
 			totalWeight += node->baseWeights[j];
 		}
-		fprintf(fH, "\tTotal-weight:%f\n", totalWeight);
+		for(int64_t j=0; j<SYMBOL_NUMBER; j++) {
+			fprintf(fH, "\t%c:%f (%f)", symbol_convertSymbolToChar(j), (float)node->baseWeights[j]/PAIR_ALIGNMENT_PROB_1, node->baseWeights[j]/totalWeight);
+		}
+		fprintf(fH, "\tTotal-weight:%f\n", (float)totalWeight/PAIR_ALIGNMENT_PROB_1);
 
 		// Inserts
 		for(int64_t j=0; j<stList_length(node->inserts); j++) {
 			PoaInsert *insert = stList_get(node->inserts, j);
-			fprintf(fH, "Insert\tSeq:%s\tWeight:%f\n", insert->insert, insert->weight);
+			fprintf(fH, "Insert\tSeq:%s\tWeight:%f\n", insert->insert, (float)insert->weight/PAIR_ALIGNMENT_PROB_1);
 		}
 
 		// Deletes
 		for(int64_t j=0; j<stList_length(node->deletes); j++) {
 			PoaDelete *delete = stList_get(node->deletes, j);
-			fprintf(fH, "Delete\tLength:%" PRIi64 "\tWeight:%f\n", delete->length, delete->weight);
+			fprintf(fH, "Delete\tLength:%" PRIi64 "\tWeight:%f\n", delete->length, (float)delete->weight/PAIR_ALIGNMENT_PROB_1);
 		}
 	}
 }
