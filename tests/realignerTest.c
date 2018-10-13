@@ -405,8 +405,26 @@ static void test_poa_realign_tiny_example1(CuTest *testCase) {
 	stList_destruct(reads);
 }
 
-static void test_poa_realign_example1(CuTest *testCase) {
-	const char *readArray[] = {
+static char * runLengthEncode(char *str) {
+	/*
+	 * Returns a run length encoded version of the string str.
+	 */
+
+	int64_t length = strlen(str);
+	char *rleStr = st_calloc(length+1, sizeof(char));
+
+	int64_t j=0;
+	for(int64_t i=0; i<length; i++) {
+		if(i==0 || str[i] != str[i-1]) {
+			rleStr[j++] = str[i];
+		}
+	}
+	rleStr[j] = '\0';
+
+	return rleStr;
+}
+
+static const char *readArrayExample1[] = {
 		"CATTTTTCTCCTCCACCTGCAACAGAAGATAAAAACGCGCATCACAAACTACTTTATTG",
 		"CATTTTTCTCTCCGTCACGTAATAGGAAAACAGATGAAAATGTGCACCATAAAACGCATTTTTATTT",
 		"CATTTTCTCTCTCCGTCACGACAGGAAACAGATGAAAATGGGCACAAGACCACAAACGCATTTTGAT",
@@ -452,17 +470,18 @@ static void test_poa_realign_example1(CuTest *testCase) {
 		"CATTTTCTCTCTCCCTCAAAATCATTTGCACAGGAAAACAGATAGAAAAATGCAACGGGGCATGTGATATAAAACGCATTTTTTATTT",
 		"CATTTTCTACTCTCTCCCTCCGTCATTGCAGGAAAACAGATGAAAATGCAGGGAACATATATGACCATAAAACGCATTTTTTTTTATTT",
 		"CATTTTCTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAAAAGAGCTGGCATGCGGGGCATGTGACCATAAAACGCATTTTTTTGT" };
-	char *reference =     "CATTTTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAATGCAGGGCAATAATGACCATAAAACGCATTTTTATTT";
-	char *trueReference = "CATTTTTCTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAAATGCGGGGCATGTGACCATAAAACGCATTTTTTATTT";
+static char *referenceExample1 =     "CATTTTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAATGCAGGGCAATAATGACCATAAAACGCATTTTTATTT";
+static char *trueReferenceExample1 = "CATTTTTCTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAAATGCGGGGCATGTGACCATAAAACGCATTTTTTATTT";
 
-	//                 000000   0000111111111122222222223333333333444 444444455555555556666666666777777 7777
-	//                 012345   6789012345678901234567890123456789012 345678901234567890123456789012345 6789
-	//reference =     "CATTTT   CTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAA TGCAGGGCAATAATGACCATAAAACGCATTTTT ATTT";
-	//trueReference = "CATTTTTCTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAAATGCGGGGCATG  TGACCATAAAACGCATTTTTTATTT";
+//                 000000   0000111111111122222222223333333333444 444444455555555556666666666777777 7777
+//                 012345   6789012345678901234567890123456789012 345678901234567890123456789012345 6789
+//reference =     "CATTTT   CTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAA TGCAGGGCAATAATGACCATAAAACGCATTTTT ATTT";
+//trueReference = "CATTTTTCTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAAATGCGGGGCATG  TGACCATAAAACGCATTTTTTATTT";
 
+static void test_poa_realign_example1(CuTest *testCase) {
 	stList *reads = stList_construct();
 	for(int64_t i=0; i<45; i++) {
-		stList_append(reads, (char *)readArray[i]);
+		stList_append(reads, (char *)readArrayExample1[i]);
 	}
 
 	PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -471,7 +490,7 @@ static void test_poa_realign_example1(CuTest *testCase) {
 
 	StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
 
-	Poa *poa = poa_realign(reads, reference, sM, p);
+	Poa *poa = poa_realign(reads, referenceExample1, sM, p);
 
 	poa_leftAlignIndels(poa); // Shift all the indels
 
@@ -480,8 +499,8 @@ static void test_poa_realign_example1(CuTest *testCase) {
 		poa_print(poa, stderr);
 	}
 
-	st_logInfo("True-reference:%s\n", trueReference);
-	st_logInfo("Reference:%s\n", reference);
+	st_logInfo("True-reference:%s\n", trueReferenceExample1);
+	st_logInfo("Reference:%s\n", referenceExample1);
 
 	stateMachine_destruct(sM);
 	pairwiseAlignmentBandingParameters_destruct(p);
@@ -490,8 +509,48 @@ static void test_poa_realign_example1(CuTest *testCase) {
 	hmm_destruct(hmm);
 }
 
-static void test_poa_realign_example2(CuTest *testCase) {
-	const char *readArray[] = {
+static void test_poa_realign_rle_example1(CuTest *testCase) {
+	stList *reads = stList_construct3(0, free);
+	for(int64_t i=0; i<45; i++) {
+		stList_append(reads, runLengthEncode((char *)readArrayExample1[i]));
+	}
+	char *referenceExample1RLE = runLengthEncode(referenceExample1);
+	char *trueReferenceExample1RLE = runLengthEncode(trueReferenceExample1);
+
+	PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+
+	Hmm *hmm = hmm_loadFromFile(nanoporeHmmFile);
+
+	StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
+
+	Poa *poa = poa_realign(reads, referenceExample1RLE, sM, p);
+
+	poa_leftAlignIndels(poa); // Shift all the indels
+
+	//st_logInfo("True-reference:%s\n", trueReference);
+	if (st_getLogLevel() >= info) {
+		poa_print(poa, stderr);
+	}
+
+	//               00  00000000111111111122222222223333333333444444444455
+	//               01  23456789012345678901234567890123456789012345678901
+	//Reference:     CA  TCTCTCTCGTCATGCACAGACAGATGATGCAGCATATGACATACGCATAT
+	//True-reference:CATCTCTCTCTCGTCATGCACAGACAGATGATGC GCATGTGACATACGCATAT
+
+
+	st_logInfo("True-reference:%s\n", trueReferenceExample1RLE);
+	st_logInfo("Reference:%s\n", referenceExample1RLE);
+
+	stateMachine_destruct(sM);
+	pairwiseAlignmentBandingParameters_destruct(p);
+	poa_destruct(poa);
+	stList_destruct(reads);
+	hmm_destruct(hmm);
+	free(referenceExample1RLE);
+	free(trueReferenceExample1RLE);
+}
+
+static const char *readArrayExample2[] = {
 			"GATGTAAAAATGACTGAGTTAGAACAGGCATAAATACATCTGT",
 			"GATGTAAAAAAAAATGACAGAGAATAAAACTATCCTTATCTATT",
 			"GATGTAAAAAGAAGCGGAAGTTAGAACAGGCATAAATACATCTGT",
@@ -535,15 +594,15 @@ static void test_poa_realign_example2(CuTest *testCase) {
 			"GATGCCAAAAAAAAAAAGAAATGGCCAGAGTTAGAACAGAGCATAAATACACATCTGT",
 			"GATGTAAAAAAAAAGAAATGCGGATTTGGAAGTTAGAACAGTATATAAAGCACACATCCGT" };
 
-	//reference =      GATGTAAAAAA   GAAATGATTT     GCTAGAACAGAGCATAAATACACATCTGT
-	//trueReference =  GATGTAAAAAAAAAGAAATGA   CGGAAGTTAGAACAGAGCATAAATACACATCTGT
+//reference =      GATGTAAAAAA   GAAATGATTT     GCTAGAACAGAGCATAAATACACATCTGT
+//trueReference =  GATGTAAAAAAAAAGAAATGA   CGGAAGTTAGAACAGAGCATAAATACACATCTGT
+static char *referenceExample2 =     "GATGTAAAAAAGAAATGATTTGCTAGAACAGAGCATAAATACACATCTGT";
+static char *trueReferenceExample2 = "GATGTAAAAAAAAAGAAATGACGGAAGTTAGAACAGAGCATAAATACACATCTGT";
 
-	char *reference =     "GATGTAAAAAAGAAATGATTTGCTAGAACAGAGCATAAATACACATCTGT";
-	char *trueReference = "GATGTAAAAAAAAAGAAATGACGGAAGTTAGAACAGAGCATAAATACACATCTGT";
-
+static void test_poa_realign_example2(CuTest *testCase) {
 	stList *reads = stList_construct();
 	for(int64_t i=0; i<41; i++) {
-		stList_append(reads, (char *)readArray[i]);
+		stList_append(reads, (char *)readArrayExample2[i]);
 	}
 
 	PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -552,7 +611,7 @@ static void test_poa_realign_example2(CuTest *testCase) {
 
 	StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
 
-	Poa *poa = poa_realign(reads, reference, sM, p);
+	Poa *poa = poa_realign(reads, referenceExample2, sM, p);
 
 	poa_leftAlignIndels(poa);
 
@@ -561,14 +620,54 @@ static void test_poa_realign_example2(CuTest *testCase) {
 		poa_print(poa, stderr);
 	}
 
-	st_logInfo("True-reference:%s\n", trueReference);
-	st_logInfo("Reference:%s\n", reference);
+	st_logInfo("True-reference:%s\n", trueReferenceExample2);
+	st_logInfo("Reference:%s\n", referenceExample2);
 
 	stateMachine_destruct(sM);
 	pairwiseAlignmentBandingParameters_destruct(p);
 	poa_destruct(poa);
 	stList_destruct(reads);
 	hmm_destruct(hmm);
+}
+
+static void test_poa_realign_rle_example2(CuTest *testCase) {
+	stList *reads = stList_construct3(0, free);
+	for(int64_t i=0; i<41; i++) {
+		stList_append(reads, runLengthEncode((char *)readArrayExample2[i]));
+	}
+	char *referenceExample2RLE = runLengthEncode(referenceExample2);
+	char *trueReferenceExample2RLE = runLengthEncode(trueReferenceExample2);
+
+	PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+
+	Hmm *hmm = hmm_loadFromFile(nanoporeHmmFile);
+
+	StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
+
+	Poa *poa = poa_realign(reads, referenceExample2RLE, sM, p);
+
+	poa_leftAlignIndels(poa);
+
+	//st_logInfo("True-reference:%s\n", trueReference);
+	if (st_getLogLevel() >= info) {
+		poa_print(poa, stderr);
+	}
+
+	//                000000000011111111112222222222333333333
+	//                012345678901234567890123456789012345678
+	//True-reference: GATGTAGATGACGAGTAGACAGAGCATATACACATCTGT
+	//Reference:      GATGTAGATGATG CTAGACAGAGCATATACACATCTGT
+
+	st_logInfo("True-reference:%s\n", trueReferenceExample2RLE);
+	st_logInfo("Reference:%s\n", referenceExample2RLE);
+
+	stateMachine_destruct(sM);
+	pairwiseAlignmentBandingParameters_destruct(p);
+	poa_destruct(poa);
+	stList_destruct(reads);
+	hmm_destruct(hmm);
+	free(referenceExample2RLE);
+	free(trueReferenceExample2RLE);
 }
 
 /*
@@ -644,6 +743,8 @@ CuSuite* realignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_poa_realign_tiny_example1);
     SUITE_ADD_TEST(suite, test_poa_realign_example1);
     SUITE_ADD_TEST(suite, test_poa_realign_example2);
+    SUITE_ADD_TEST(suite, test_poa_realign_rle_example1);
+    SUITE_ADD_TEST(suite, test_poa_realign_rle_example2);
     SUITE_ADD_TEST(suite, test_poa_realign);
     SUITE_ADD_TEST(suite, test_getShift);
 
