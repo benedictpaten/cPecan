@@ -132,6 +132,46 @@ bool isMatch(stSortedSet *matchesSet, int64_t x, int64_t y) {
 	return stSortedSet_search(matchesSet, &pair) != NULL;
 }
 
+static void addToInserts(PoaNode *node, char *insert, double weight) {
+	/*
+	 * Add given insert to node.
+	 */
+
+	// Check if the complete insert is already in the poa graph:
+	bool found = 0;
+	for(int64_t m=0; m<stList_length(node->inserts); m++) {
+		PoaInsert *poaInsert = stList_get(node->inserts, m);
+		if(stString_eq(poaInsert->insert, insert)) {
+			poaInsert->weight += weight;
+			found = 1; break;
+		}
+	}
+	// otherwise add the insert to the poa graph
+	if(!found) {
+		stList_append(node->inserts, poaInsert_construct(stString_copy(insert), weight));
+	}
+}
+
+static void addToDeletes(PoaNode *node, int64_t length, double weight) {
+	/*
+	 * Add given deletion to node.
+	 */
+
+	// Check if the delete is already in the poa graph:
+	bool found = 0;
+	for(int64_t m=0; m<stList_length(node->deletes); m++) {
+		PoaDelete *poaDelete = stList_get(node->deletes, m);
+		if(poaDelete->length == length) {
+			poaDelete->weight += weight;
+			found = 1; break;
+		}
+	}
+	// otherwise add the delete to the poa graph
+	if(!found) {
+		stList_append(node->deletes, poaDelete_construct(length, weight));
+	}
+}
+
 void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList *deletes) {
 	// Add weights of matches to the POA graph
 
@@ -223,19 +263,8 @@ void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList 
 				assert(stIntTuple_get(insertStart, 1) >= -1);
 				PoaNode *leftNode = stList_get(poa->nodes, stIntTuple_get(insertStart, 1)+1); // Get POA node with same reference coordinate
 
-				// Check if the complete insert is already in the poa graph:
-				bool found = 0;
-				for(int64_t m=0; m<stList_length(leftNode->inserts); m++) {
-					PoaInsert *poaInsert = stList_get(leftNode->inserts, m);
-					if(stString_eq(poaInsert->insert, insertLabel)) {
-						poaInsert->weight += insertWeight;
-						found = 1; break;
-					}
-				}
-				// otherwise add the insert to the poa graph
-				if(!found) {
-					stList_append(leftNode->inserts, poaInsert_construct(stString_copy(insertLabel), insertWeight));
-				}
+				// Add insert to graph
+				addToInserts(leftNode, insertLabel, insertWeight);
 			}
 		}
 
@@ -305,19 +334,8 @@ void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList 
 				assert(stIntTuple_get(deleteStart, 1) >= 0);
 				PoaNode *leftNode = stList_get(poa->nodes, stIntTuple_get(deleteStart, 1)); // Get POA node preceding delete
 
-				// Check if the delete is already in the poa graph:
-				bool found = 0;
-				for(int64_t m=0; m<stList_length(leftNode->deletes); m++) {
-					PoaDelete *poaDelete = stList_get(leftNode->deletes, m);
-					if(poaDelete->length == l-k+1) {
-						poaDelete->weight += deleteWeight;
-						found = 1; break;
-					}
-				}
-				// otherwise add the delete to the poa graph
-				if(!found) {
-					stList_append(leftNode->deletes, poaDelete_construct(l-k+1, deleteWeight));
-				}
+				// Add deletion to graph
+				addToDeletes(leftNode, l-k+1, deleteWeight);
 			}
 		}
 
@@ -354,6 +372,176 @@ Poa *poa_realign(stList *reads, char *reference,
 	return poa;
 }
 
+char *poa_getReferenceSubstring(Poa *poa, int64_t startIndex, int64_t length) {
+	/*
+	 * Get substring of the reference, starting from given node.
+	 */
+	char *refSubString = st_malloc(sizeof(char) * (1 + length));
+	refSubString[length] = '\0';
+	for(int64_t j=0; j<length; j++) {
+		PoaNode *node = stList_get(poa->nodes, startIndex+j);
+		refSubString[j] = node->base;
+	}
+	return refSubString;
+}
+
+static bool matchesReferenceSubstring(char *refString, int64_t refStart, char *str, int64_t length) {
+	/*
+	 * Returns true if the given string str matches the given reference substring starting
+	 * from the given reference position, refStart
+	 */
+	for(int64_t l=0; l<length; l++) {
+		if(refString[refStart+l] != str[l]) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+static bool hasInternalRepeat(char *str, int64_t length, int64_t repeatLength) {
+	/*
+	 * Establishes if str has an internal repeat of length repeatLength.
+	 * e.g. if ATATAT, internal repeat AT (length 2) is an internal repeat, but ATA is not.
+	 */
+	if(length % repeatLength != 0) { // If not divisible by repeatLength then can not be repeat
+		return 0;
+	}
+	for(int64_t i=repeatLength; i<length; i+=repeatLength) {
+		for(int64_t j=0; j<repeatLength; j++) {
+			if(str[j] != str[j+i]) {
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+
+int64_t getShift(char *refString, int64_t refStart, char *str, int64_t length) {
+	// Walk back over reference sequence and see if indel can be shifted
+
+	// Establish minimal internal repeat length
+	// if ATATAT, minimal internal repeat is AT,
+	// similarly if AAAAAAA then minimal internal repeat is A
+	int64_t minRepeatLength = 0;
+	while(minRepeatLength++ < length) {
+		if(hasInternalRepeat(str, length, minRepeatLength)) {
+			break;
+		}
+	}
+
+	// Now walk back by multiples of minimal internal repeat length
+	for(int64_t k=refStart-minRepeatLength; k>=0; k-=minRepeatLength) {
+		if(!matchesReferenceSubstring(refString, k, str, minRepeatLength)) {
+			break;
+		}
+		refStart = k;
+	}
+
+	return refStart;
+}
+
+void poa_leftAlignIndels(Poa *poa) {
+	char *refString = poa_getReferenceSubstring(poa, 1, stList_length(poa->nodes)-1); // Could avoid this if
+	// we store the reference string in the poa struct
+
+	// For each poa node that is not the leftmost (because those indels can't be shifted further, by definition)
+	for(int64_t i=1; i<stList_length(poa->nodes); i++) {
+		PoaNode *node = stList_get(poa->nodes, i);
+
+		// Shift inserts
+
+		// Process replaces old list of inserts
+		stList *inserts = node->inserts;
+		node->inserts = stList_construct3(0, (void (*)(void *))poaInsert_destruct);
+
+		while(stList_length(inserts) > 0) {
+			PoaInsert *insert = stList_pop(inserts);
+
+			// Walk back over reference sequence and see if insert can be shifted
+			int64_t insertPosition = getShift(refString, i, insert->insert, strlen(insert->insert));
+
+			if(insertPosition < i) { // There is a left shift
+				addToInserts(stList_get(poa->nodes, insertPosition), insert->insert, insert->weight);
+				poaInsert_destruct(insert); // Cleanup old insert
+			}
+			else { // No left shift, just add back to filtered inserts list
+				stList_append(node->inserts, insert);
+			}
+		}
+		stList_destruct(inserts);
+
+		// Shift deletes
+
+		// Process replaces old list of deletes
+		stList *deletes = node->deletes;
+		node->deletes = stList_construct3(0, (void (*)(void *))poaDelete_destruct);
+
+		while(stList_length(deletes) > 0) {
+			PoaDelete *delete = stList_pop(deletes);
+
+			// Get string being deleted
+			char *deleteString = poa_getReferenceSubstring(poa, i+1, delete->length);
+
+			// Walk back over reference sequence and see if delete can be shifted
+			int64_t insertPosition = getShift(refString, i, deleteString, delete->length);
+
+			free(deleteString); // Cleanup
+
+			if(insertPosition < i) { // There is a left shift
+				addToDeletes(stList_get(poa->nodes, insertPosition), delete->length, delete->weight);
+				poaDelete_destruct(delete); // Cleanup old delete
+			}
+			else { // No left shift, just add back to filtered deletes list
+				stList_append(node->deletes, delete);
+			}
+		}
+		stList_destruct(deletes);
+	}
+
+	// Cleanup
+	free(refString);
+}
+
+static int cmpInsertsByWeight(const void *a, const void *b) {
+	/*
+	 * Compares PoaInserts by weight in ascending order.
+	 */
+	PoaInsert *one = (PoaInsert *)a, *two = (PoaInsert *)b;
+	return one->weight < two->weight ? -1 : one->weight > two->weight ? 1 : 0;
+}
+
+stList *poa_rankInserts(Poa *poa) {
+	stList *allInserts = stList_construct();
+	for(int64_t i=0; i<stList_length(poa->nodes); i++) {
+		PoaNode *node = stList_get(poa->nodes, i);
+		for(int64_t j=0; j<stList_length(node->inserts); j++) {
+			stList_append(allInserts, stList_get(node->inserts, j));
+		}
+	}
+	stList_sort(allInserts, cmpInsertsByWeight);
+	return allInserts;
+}
+
+static int cmpDeletesByWeight(const void *a, const void *b) {
+	/*
+	 * Compares PoaDelete by weight in ascending order.
+	 */
+	PoaDelete *one = (PoaDelete *)a, *two = (PoaDelete *)b;
+	return one->weight < two->weight ? -1 : one->weight > two->weight ? 1 : 0;
+}
+
+stList *poa_rankDeletes(Poa *poa) {
+	stList *allDeletes = stList_construct();
+	for(int64_t i=0; i<stList_length(poa->nodes); i++) {
+		PoaNode *node = stList_get(poa->nodes, i);
+		for(int64_t j=0; j<stList_length(node->deletes); j++) {
+			stList_append(allDeletes, stList_get(node->deletes, j));
+		}
+	}
+	stList_sort(allDeletes, cmpDeletesByWeight);
+	return allDeletes;
+}
+
 void poa_print(Poa *poa, FILE *fH) {
 	// Print info for each base in reference in turn
 	for(int64_t i=0; i<stList_length(poa->nodes); i++) {
@@ -366,22 +554,45 @@ void poa_print(Poa *poa, FILE *fH) {
 			totalWeight += node->baseWeights[j];
 		}
 		for(int64_t j=0; j<SYMBOL_NUMBER; j++) {
-			fprintf(fH, "\t%c:%f (%f)", symbol_convertSymbolToChar(j), (float)node->baseWeights[j]/PAIR_ALIGNMENT_PROB_1, node->baseWeights[j]/totalWeight);
+			if(node->baseWeights[j]/totalWeight > 0.25) {
+				fprintf(fH, "\t%c:%f (%f)", symbol_convertSymbolToChar(j), (float)node->baseWeights[j]/PAIR_ALIGNMENT_PROB_1, node->baseWeights[j]/totalWeight);
+			}
 		}
 		fprintf(fH, "\tTotal-weight:%f\n", (float)totalWeight/PAIR_ALIGNMENT_PROB_1);
 
 		// Inserts
 		for(int64_t j=0; j<stList_length(node->inserts); j++) {
 			PoaInsert *insert = stList_get(node->inserts, j);
-			fprintf(fH, "Insert\tSeq:%s\tWeight:%f\n", insert->insert, (float)insert->weight/PAIR_ALIGNMENT_PROB_1);
+			if(insert->weight/PAIR_ALIGNMENT_PROB_1 >= 4.0) {
+				fprintf(fH, "Insert\tSeq:%s\tWeight:%f\n", insert->insert, (float)insert->weight/PAIR_ALIGNMENT_PROB_1);
+			}
 		}
 
 		// Deletes
 		for(int64_t j=0; j<stList_length(node->deletes); j++) {
 			PoaDelete *delete = stList_get(node->deletes, j);
-			fprintf(fH, "Delete\tLength:%" PRIi64 "\tWeight:%f\n", delete->length, (float)delete->weight/PAIR_ALIGNMENT_PROB_1);
+			if(delete->weight/PAIR_ALIGNMENT_PROB_1 >= 4.0) {
+				fprintf(fH, "Delete\tLength:%" PRIi64 "\tWeight:%f\n", delete->length, (float)delete->weight/PAIR_ALIGNMENT_PROB_1);
+			}
 		}
 	}
+
+	// Print top events
+	fprintf(fH, "Top ranked insert events\n");
+	stList *inserts = poa_rankInserts(poa);
+	int64_t i=0;
+	while(stList_length(inserts) > 0 && i++ < 10) {
+		PoaInsert *insert = stList_pop(inserts);
+		fprintf(fH, "INSERT %s %f\n", insert->insert, (float)insert->weight/PAIR_ALIGNMENT_PROB_1);
+	}
+	stList *deletes = poa_rankDeletes(poa);
+	i=0;
+	while(stList_length(deletes) > 0 && i++ < 10) {
+		PoaDelete *delete = stList_pop(deletes);
+		fprintf(fH, "DELETE %" PRIi64 " %f\n", delete->length, (float)delete->weight/PAIR_ALIGNMENT_PROB_1);
+	}
+	stList_destruct(inserts);
+	stList_destruct(deletes);
 }
 
 char *poa_getConsensus(Poa *poa) {

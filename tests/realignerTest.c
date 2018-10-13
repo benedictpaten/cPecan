@@ -12,6 +12,9 @@
 #include <string.h>
 #include <math.h>
 #include "randomSequences.h"
+#include "stateMachine.h"
+
+static char *nanoporeHmmFile = "./threeStateNanopore.hmm";
 
 static void test_poa_getReferenceGraph(CuTest *testCase) {
 	char *reference = "GATTACA";
@@ -34,6 +37,57 @@ static void test_poa_getReferenceGraph(CuTest *testCase) {
 
 	poa_destruct(poa);
 }
+
+static char *makeShiftedString(char *str, char *insert, int64_t insertPoint) {
+	char *suffix = stString_copy(&str[insertPoint]);
+	char *prefix = stString_copy(str);
+	prefix[insertPoint] = '\0';
+	char *shiftedStr = stString_print("%s%s%s", prefix, insert, suffix);
+	free(suffix);
+	free(prefix);
+	return shiftedStr;
+}
+
+static void test_getShift(CuTest *testCase) {
+	for(int64_t test=0; test<10000; test++) {
+		// Make random string
+		int64_t length = st_randomInt(1, 20);
+		char *str = getRandomACGTSequence(length);
+
+		// Make random insert of length m
+		int64_t m = st_randomInt(1, 4);
+		char *insert = getRandomACGTSequence(m);
+
+		// Run get shift
+		int64_t i = getShift(str, length, insert, m);
+
+		//if(i + 2 < length) {
+		//	fprintf(stderr, "Str: %s, str-length:%" PRIi64 " insert: %s, insert:%" PRIi64 "\n", str, length, insert, i);
+		//}
+
+		// Test resulting transplanted string is same as concatenated str+insert
+		char *shiftedStr = makeShiftedString(str, insert, i);
+		char *concatenatedStr = stString_print("%s%s", str, insert);
+
+		CuAssertStrEquals(testCase, concatenatedStr, shiftedStr);
+
+		// Cleanup
+		free(shiftedStr);
+
+		// Test no further left shift would work
+		for(int64_t j=0; j<i; j++) {
+			shiftedStr = makeShiftedString(str, insert, j);
+			CuAssertTrue(testCase, !stString_eq(shiftedStr, concatenatedStr));
+			free(shiftedStr);
+		}
+
+		// Cleanup
+		free(concatenatedStr);
+		free(str);
+		free(insert);
+	}
+}
+
 
 static void checkInserts(CuTest *testCase, Poa *poa, int64_t nodeIndex,
 					     int64_t insertNumber, const char **inserts, const double *insertWeights, bool divideWeights) {
@@ -165,9 +219,14 @@ static void test_poa_realign(CuTest *testCase) {
 		}
 
 		PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-		StateMachine *sM = stateMachine3_construct(threeState);
+
+		Hmm *hmm = hmm_loadFromFile(nanoporeHmmFile);
+
+		StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
 
 		Poa *poa = poa_realign(reads, reference, sM, p);
+
+		poa_leftAlignIndels(poa); // Shift all the indels
 
 		// Generate the read alignments and check the matches
 		// Currently don't check the insert and deletes
@@ -214,6 +273,7 @@ static void test_poa_realign(CuTest *testCase) {
 		stList_destruct(reads);
 		pairwiseAlignmentBandingParameters_destruct(p);
 		poa_destruct(poa);
+		hmm_destruct(hmm);
 	}
 }
 
@@ -392,8 +452,13 @@ static void test_poa_realign_example1(CuTest *testCase) {
 		"CATTTTCTCTCTCCCTCAAAATCATTTGCACAGGAAAACAGATAGAAAAATGCAACGGGGCATGTGATATAAAACGCATTTTTTATTT",
 		"CATTTTCTACTCTCTCCCTCCGTCATTGCAGGAAAACAGATGAAAATGCAGGGAACATATATGACCATAAAACGCATTTTTTTTTATTT",
 		"CATTTTCTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAAAAGAGCTGGCATGCGGGGCATGTGACCATAAAACGCATTTTTTTGT" };
-	char *reference = "CATTTTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAATGCAGGGCAATAATGACCATAAAACGCATTTTTATTT";
+	char *reference =     "CATTTTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAATGCAGGGCAATAATGACCATAAAACGCATTTTTATTT";
 	char *trueReference = "CATTTTTCTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAAATGCGGGGCATGTGACCATAAAACGCATTTTTTATTT";
+
+	//                 000000   0000111111111122222222223333333333444 444444455555555556666666666777777 7777
+	//                 012345   6789012345678901234567890123456789012 345678901234567890123456789012345 6789
+	//reference =     "CATTTT   CTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAA TGCAGGGCAATAATGACCATAAAACGCATTTTT ATTT";
+	//trueReference = "CATTTTTCTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAAATGCGGGGCATG  TGACCATAAAACGCATTTTTTATTT";
 
 	stList *reads = stList_construct();
 	for(int64_t i=0; i<45; i++) {
@@ -401,19 +466,28 @@ static void test_poa_realign_example1(CuTest *testCase) {
 	}
 
 	PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-	StateMachine *sM = stateMachine3_construct(threeState);
+
+	Hmm *hmm = hmm_loadFromFile(nanoporeHmmFile);
+
+	StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
 
 	Poa *poa = poa_realign(reads, reference, sM, p);
 
-	st_logInfo("True-reference:%s\n", trueReference);
+	poa_leftAlignIndels(poa); // Shift all the indels
+
+	//st_logInfo("True-reference:%s\n", trueReference);
 	if (st_getLogLevel() >= info) {
 		poa_print(poa, stderr);
 	}
+
+	st_logInfo("True-reference:%s\n", trueReference);
+	st_logInfo("Reference:%s\n", reference);
 
 	stateMachine_destruct(sM);
 	pairwiseAlignmentBandingParameters_destruct(p);
 	poa_destruct(poa);
 	stList_destruct(reads);
+	hmm_destruct(hmm);
 }
 
 static void test_poa_realign_example2(CuTest *testCase) {
@@ -460,7 +534,11 @@ static void test_poa_realign_example2(CuTest *testCase) {
 			"GATGTAAAAAAAAAAAAGAAATGACGGAAGTTGAACTAGGCTTATAAATACATCTGT",
 			"GATGCCAAAAAAAAAAAGAAATGGCCAGAGTTAGAACAGAGCATAAATACACATCTGT",
 			"GATGTAAAAAAAAAGAAATGCGGATTTGGAAGTTAGAACAGTATATAAAGCACACATCCGT" };
-	char *reference = "GATGTAAAAAAGAAATGATTTGCTAGAACAGAGCATAAATACACATCTGT";
+
+	//reference =      GATGTAAAAAA   GAAATGATTT     GCTAGAACAGAGCATAAATACACATCTGT
+	//trueReference =  GATGTAAAAAAAAAGAAATGA   CGGAAGTTAGAACAGAGCATAAATACACATCTGT
+
+	char *reference =     "GATGTAAAAAAGAAATGATTTGCTAGAACAGAGCATAAATACACATCTGT";
 	char *trueReference = "GATGTAAAAAAAAAGAAATGACGGAAGTTAGAACAGAGCATAAATACACATCTGT";
 
 	stList *reads = stList_construct();
@@ -469,25 +547,97 @@ static void test_poa_realign_example2(CuTest *testCase) {
 	}
 
 	PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-	StateMachine *sM = stateMachine3_construct(threeState);
+
+	Hmm *hmm = hmm_loadFromFile(nanoporeHmmFile);
+
+	StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
 
 	Poa *poa = poa_realign(reads, reference, sM, p);
 
-	st_logInfo("True-reference:%s\n", trueReference);
+	poa_leftAlignIndels(poa);
+
+	//st_logInfo("True-reference:%s\n", trueReference);
 	if (st_getLogLevel() >= info) {
 		poa_print(poa, stderr);
 	}
+
+	st_logInfo("True-reference:%s\n", trueReference);
+	st_logInfo("Reference:%s\n", reference);
 
 	stateMachine_destruct(sM);
 	pairwiseAlignmentBandingParameters_destruct(p);
 	poa_destruct(poa);
 	stList_destruct(reads);
+	hmm_destruct(hmm);
 }
+
+/*
+ // Crufty code used to generate an initial model for nanopore alignment
+
+typedef enum {
+    match = 0, shortGapX = 1, shortGapY = 2, longGapX = 3, longGapY = 4
+} State;
+
+static inline double *hmm_getTransition2(Hmm *hmm, int64_t from, int64_t to) {
+    return &(hmm->transitions[from * hmm->stateNumber + to]);
+}
+
+static inline double *hmm_getEmissionsExpectation2(Hmm *hmm, int64_t state, Symbol x, Symbol y) {
+    return &(hmm->emissions[state * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N + x * SYMBOL_NUMBER_NO_N + y]);
+}
+
+static void test_hmm(CuTest *testCase) {
+	Hmm *hmm = hmm_constructEmpty(0.0, threeState);
+
+	//                 000000   0000111111111122222222223333333333444 444444455555555556666666666777777 7777
+	//                 012345   6789012345678901234567890123456789012 345678901234567890123456789012345 6789
+	//reference =     "CATTTT   CTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAA TGCAGGGCAATAATGACCATAAAACGCATTTTT ATTT";
+	//trueReference = "CATTTTTCTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAAATGCGGGGCATG  TGACCATAAAACGCATTTTTTATTT";
+
+	//reference =      GATGTAAAAAA   GAAATGATTT     GCTAGAACAGAGCATAAATACACATCTGT
+	//trueReference =  GATGTAAAAAAAAAGAAATGA   CGGAAGTTAGAACAGAGCATAAATACACATCTGT
+
+	hmm_getTransition2(hmm, match, match)[0] = 0.9;
+	hmm_getTransition2(hmm, match, shortGapX)[0] = 0.05;
+	hmm_getTransition2(hmm, match, shortGapY)[0] = 0.05;
+
+	hmm_getTransition2(hmm, shortGapX, match)[0] = 0.5;
+	hmm_getTransition2(hmm, shortGapX, shortGapX)[0] = 0.5;
+	hmm_getTransition2(hmm, shortGapX, shortGapY)[0] = 0.0;
+
+	hmm_getTransition2(hmm, shortGapY, match)[0] = 0.5;
+	hmm_getTransition2(hmm, shortGapY, shortGapX)[0] = 0.0;
+	hmm_getTransition2(hmm, shortGapY, shortGapY)[0] = 0.5;
+
+	for(int64_t i=0; i<SYMBOL_NUMBER_NO_N; i++) {
+		hmm_getEmissionsExpectation2(hmm, match, i, i)[0] = 0.98;
+		for(int64_t j=0; j<SYMBOL_NUMBER_NO_N; j++) {
+			if(j != i) {
+				hmm_getEmissionsExpectation2(hmm, match, i, j)[0] = 0.02/3;
+			}
+		}
+	}
+
+	// Gaps
+	for(int64_t i=0; i<SYMBOL_NUMBER_NO_N; i++) {
+		for(int64_t j=0; j<SYMBOL_NUMBER_NO_N; j++) {
+			hmm_getEmissionsExpectation2(hmm, shortGapX, i, j)[0] = 0.025;
+		}
+	}
+
+	for(int64_t i=0; i<SYMBOL_NUMBER_NO_N; i++) {
+		for(int64_t j=0; j<SYMBOL_NUMBER_NO_N; j++) {
+			hmm_getEmissionsExpectation2(hmm, shortGapY, i, j)[0] = 0.025;
+		}
+	}
+
+	FILE *fH = fopen("./threeStateNanopore.hmm", "w");
+	hmm_write(hmm, fH);
+	fclose(fH);
+}*/
 
 CuSuite* realignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
-
-    //SUITE_ADD_TEST(suite, test_poa_realign_tiny_example1);
 
     SUITE_ADD_TEST(suite, test_poa_getReferenceGraph);
     SUITE_ADD_TEST(suite, test_poa_augment_example);
@@ -495,6 +645,9 @@ CuSuite* realignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_poa_realign_example1);
     SUITE_ADD_TEST(suite, test_poa_realign_example2);
     SUITE_ADD_TEST(suite, test_poa_realign);
+    SUITE_ADD_TEST(suite, test_getShift);
+
+    //SUITE_ADD_TEST(suite, test_hmm);
 
     return suite;
 }

@@ -54,9 +54,24 @@ Poa *poa_realign(stList *reads, char *reference,
 			  	 StateMachine *sM, PairwiseAlignmentParameters *p);
 
 /*
+ * Left aligns indels.
+ */
+void poa_leftAlignIndels(Poa *poa);
+
+/*
  * Prints representation of the POA.
  */
 void poa_print(Poa *poa, FILE *fH);
+
+/*
+ * Ranks all poa deletes by weight in ascending order.
+ */
+stList *poa_rankDeletes(Poa *poa);
+
+/*
+ * Ranks all poa inserts by weight in ascending order.
+ */
+stList *poa_rankInserts(Poa *poa);
 
 /*
  * Creates a consensus reference sequence from the POA
@@ -72,5 +87,11 @@ Poa *poa_realignIterative(stList *reads, char *reference,
 				 uint64_t iterations);
 				 
 void poa_destruct(Poa *poa);
+
+/*
+ * Finds shift, expressed as a reference coordinate, that the given substring str can
+ * be shifted left in the refString, starting from a match at refStart.
+ */
+int64_t getShift(char *refString, int64_t refStart, char *str, int64_t length);
 
 #endif /* REALIGNER_H_ */
