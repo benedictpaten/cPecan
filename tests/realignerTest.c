@@ -532,11 +532,11 @@ static void test_poa_realign_rle_example1(CuTest *testCase) {
 		poa_print(poa, stderr);
 	}
 
+	//                 **                              *    *
 	//               00  00000000111111111122222222223333333333444444444455
 	//               01  23456789012345678901234567890123456789012345678901
 	//Reference:     CA  TCTCTCTCGTCATGCACAGACAGATGATGCAGCATATGACATACGCATAT
 	//True-reference:CATCTCTCTCTCGTCATGCACAGACAGATGATGC GCATGTGACATACGCATAT
-
 
 	st_logInfo("True-reference:%s\n", trueReferenceExample1RLE);
 	st_logInfo("Reference:%s\n", referenceExample1RLE);
@@ -653,6 +653,7 @@ static void test_poa_realign_rle_example2(CuTest *testCase) {
 		poa_print(poa, stderr);
 	}
 
+	//                           * **
 	//                000000000011111111112222222222333333333
 	//                012345678901234567890123456789012345678
 	//True-reference: GATGTAGATGACGAGTAGACAGAGCATATACACATCTGT
@@ -660,6 +661,9 @@ static void test_poa_realign_rle_example2(CuTest *testCase) {
 
 	st_logInfo("True-reference:%s\n", trueReferenceExample2RLE);
 	st_logInfo("Reference:%s\n", referenceExample2RLE);
+
+	// Get alignments between true reference and original and consensus references
+	// TODO
 
 	stateMachine_destruct(sM);
 	pairwiseAlignmentBandingParameters_destruct(p);
@@ -738,15 +742,15 @@ static void test_hmm(CuTest *testCase) {
 CuSuite* realignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
 
-    SUITE_ADD_TEST(suite, test_poa_getReferenceGraph);
-    SUITE_ADD_TEST(suite, test_poa_augment_example);
-    SUITE_ADD_TEST(suite, test_poa_realign_tiny_example1);
-    SUITE_ADD_TEST(suite, test_poa_realign_example1);
-    SUITE_ADD_TEST(suite, test_poa_realign_example2);
+    //SUITE_ADD_TEST(suite, test_poa_getReferenceGraph);
+    //SUITE_ADD_TEST(suite, test_poa_augment_example);
+    //SUITE_ADD_TEST(suite, test_poa_realign_tiny_example1);
+    //SUITE_ADD_TEST(suite, test_poa_realign_example1);
+    //SUITE_ADD_TEST(suite, test_poa_realign_example2);
     SUITE_ADD_TEST(suite, test_poa_realign_rle_example1);
-    SUITE_ADD_TEST(suite, test_poa_realign_rle_example2);
-    SUITE_ADD_TEST(suite, test_poa_realign);
-    SUITE_ADD_TEST(suite, test_getShift);
+    //SUITE_ADD_TEST(suite, test_poa_realign_rle_example2);
+    //SUITE_ADD_TEST(suite, test_poa_realign);
+    //SUITE_ADD_TEST(suite, test_getShift);
 
     //SUITE_ADD_TEST(suite, test_hmm);
 

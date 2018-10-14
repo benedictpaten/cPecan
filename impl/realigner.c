@@ -440,6 +440,38 @@ int64_t getShift(char *refString, int64_t refStart, char *str, int64_t length) {
 	return refStart;
 }
 
+int64_t getMaxCommonSuffixLength(char *str1, int64_t length1, char *str2, int64_t length2) {
+	/*
+	 * Returns the length of the maximum suffix of the reference string ending at refStart (inclusive)
+	 * that is the same as a suffix of str.
+	 */
+	int64_t i=0;
+	while(length1-i-1 >= 0 && length2-i+1 >= 0) {
+		if(str1[length1-1-i] != str2[length2-1-i]) {
+			break;
+		}
+		i++;
+	}
+
+	return i;
+}
+
+char *rotateString(char *str, int64_t length, int64_t rotationLength) {
+	/*
+	 * Cyclic rotates the string so that the reverse suffix of str of rotationLength is removed and made the prefix
+	 * of the returned string.
+	 */
+	char *str2 = st_calloc(length, sizeof(char));
+	for(int64_t i=0; i<rotationLength; i++) {
+		str2[i] = str[length-1-i];
+	}
+	for(int64_t i=0; i<length-rotationLength; i++) {
+		str2[i+rotationLength] = str[i];
+	}
+
+	return str2;
+}
+
 void poa_leftAlignIndels(Poa *poa) {
 	char *refString = poa_getReferenceSubstring(poa, 1, stList_length(poa->nodes)-1); // Could avoid this if
 	// we store the reference string in the poa struct
@@ -456,9 +488,18 @@ void poa_leftAlignIndels(Poa *poa) {
 
 		while(stList_length(inserts) > 0) {
 			PoaInsert *insert = stList_pop(inserts);
+			int64_t insertLength = strlen(insert->insert);
 
 			// Walk back over reference sequence and see if insert can be shifted
-			int64_t insertPosition = getShift(refString, i, insert->insert, strlen(insert->insert));
+			int64_t insertPosition = getShift(refString, i, insert->insert, insertLength);
+
+			int64_t commonSuffixLength = getMaxCommonSuffixLength(refString, insertPosition, insert->insert, insertLength);
+			if(commonSuffixLength > 0) {
+				char *newInsertStr = rotateString(insert->insert, insertLength, commonSuffixLength);
+				free(insert->insert);
+				insert->insert = newInsertStr;
+				insertPosition -= commonSuffixLength;
+			}
 
 			if(insertPosition < i) { // There is a left shift
 				addToInserts(stList_get(poa->nodes, insertPosition), insert->insert, insert->weight);
@@ -484,6 +525,9 @@ void poa_leftAlignIndels(Poa *poa) {
 
 			// Walk back over reference sequence and see if delete can be shifted
 			int64_t insertPosition = getShift(refString, i, deleteString, delete->length);
+
+			// Shift by moving boundary of deletion according to common suffixes
+			insertPosition -= getMaxCommonSuffixLength(refString, insertPosition, deleteString, delete->length);
 
 			free(deleteString); // Cleanup
 
