@@ -223,12 +223,29 @@ def wrapped_run_pecan(read, reference_map, alignment_file, args):
 
 
 def run_pecan(read, reference_map, alignment_file, args):
+    #sanity check
+    if read['query_alignment_sequence'] is None: # is secondary
+        return False
+    if read['is_unmapped']:
+        return False
+
     #prep
     workdir = args.workdir
 
     # read
     read_id = read['query_name']
     read_str = read['query_alignment_sequence'].upper()
+
+    # if secondary alignments are found, only save primary
+    out_loc = os.path.join(args.out, "{}.tsv".format(read_id))
+    if os.path.isfile(out_loc):
+        if read['is_secondary'] or read['is_supplementary']:
+            return False
+        else:
+            os.remove(out_loc)
+    # the poor man's lock
+    with open(out_loc, 'w') as lock:
+        pass
 
     # reference
     contig = read['reference_name']
@@ -297,7 +314,6 @@ def run_pecan(read, reference_map, alignment_file, args):
         nucleotide_probs = calculate_nucleotide_probs(aln_loc, read_str, args)
 
         # write it out
-        out_loc = os.path.join(args.out, "{}.tsv".format(read_id))
         metadata = {META_READ_ID: read_id, META_ALIGN_FILE: alignment_file, META_REFERNCE_FILE: args.ref,
                     META_CONTIG: contig, META_PECAN_CMD: cmd, META_REF_START: ref_start,
                     META_DATE_GENERATED: str(datetime.now()),
@@ -454,6 +470,9 @@ def realign_alignments(alignment_filename, args):
         # run service (for multithreading)
         iterable_arguments = {"args":args, "alignment_file":alignment_filename}
         iterable = map(lambda read: {
+            'is_secondary':read.is_secondary,
+            'is_supplementary':read.is_supplementary,
+            'is_unmapped':read.is_unmapped,
             'is_reverse':read.is_reverse,
             'reference_name':read.reference_name,
             'reference_start':read.reference_start,
