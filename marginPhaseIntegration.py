@@ -229,23 +229,38 @@ def run_pecan(read, reference_map, alignment_file, args):
     if read['is_unmapped']:
         return False
 
-    #prep
-    workdir = args.workdir
-
     # read
     read_id = read['query_name']
+    read_flag = read['flag']
     read_str = read['query_alignment_sequence'].upper()
+    read_is_primary = not (read['is_secondary'] or read['is_supplementary'])
+
+    #prep
+    workdir = args.workdir
+    out_filename = "{}.tsv".format(read_id)
+    ref_filename = "{}_{}_ref.fa".format(read_id, read_flag)
+    read_filename = "{}_{}_read.fa".format(read_id, read_flag)
+    cigar_filename = "{}_{}_cig.txt".format(read_id, read_flag)
+    aln_filename = '{}_{}_out.txt'.format(read_id, read_flag)
+    out_loc = os.path.join(args.out, out_filename)
+    ref_loc = os.path.join(workdir, ref_filename)
+    read_loc = os.path.join(workdir, read_filename)
+    cigar_loc = os.path.join(workdir, cigar_filename)
+    aln_loc = os.path.join(workdir, aln_filename)
+
+    # may need to make a directory (for tmp and real) if read_id has '/' character in it
+    if '/' in read_id:
+        for dir in [os.path.dirname(ref_loc), os.path.dirname(out_loc)]:
+            if not os.path.isdir(dir):
+                os.makedirs(dir)
 
     # if secondary alignments are found, only save primary
-    out_loc = os.path.join(args.out, "{}.tsv".format(read_id))
-    if os.path.isfile(out_loc):
-        if read['is_secondary'] or read['is_supplementary']:
-            return False
-        else:
-            os.remove(out_loc)
-    # the poor man's lock
-    with open(out_loc, 'w') as lock:
-        pass
+    if not read_is_primary and os.path.isfile(out_loc):
+        return False
+    # the poor man's lock (for primary reads)
+    if read_is_primary:
+        with open(out_loc, 'w') as lock:
+            pass
 
     # reference
     contig = read['reference_name']
@@ -266,18 +281,6 @@ def run_pecan(read, reference_map, alignment_file, args):
         read_id, 0, query_end - query_start, ref_id, 0, reference_end - reference_start, cigar_string)
 
     # write files
-    ref_filename = "{}_ref.fa".format(read_id)
-    read_filename = "{}_read.fa".format(read_id)
-    cigar_filename = "{}_cig.txt".format(read_id)
-    ref_loc = os.path.join(workdir, ref_filename)
-    read_loc = os.path.join(workdir, read_filename)
-    cigar_loc = os.path.join(workdir, cigar_filename)
-    aln_loc = os.path.join(workdir, '{}_out.txt'.format(read_id))
-    # may need to make a directory (for tmp and real) if read_id has '/' character in it
-    if '/' in read_id:
-        for dir in [os.path.dirname(ref_loc), os.path.dirname(os.path.join(args.out, "{}.tsv".format(read_id)))]:
-            if not os.path.isdir(dir):
-                os.makedirs(dir)
     with open(ref_loc, 'w') as ref_out:
         ref_out.write(">{}\n{}\n".format(ref_id, ref_str))
     with open(read_loc, 'w') as read_out:
@@ -318,8 +321,10 @@ def run_pecan(read, reference_map, alignment_file, args):
                     META_CONTIG: contig, META_PECAN_CMD: cmd, META_REF_START: ref_start,
                     META_DATE_GENERATED: str(datetime.now()),
                     META_FORWARD: None if read['is_reverse'] is None else not read['is_reverse']}
-        write_probabilities_out(out_loc, nucleotide_probs, contig, ref_start, metadata, args)
-        assert os.path.isfile(out_loc), "Output file {} not created".format(out_loc)
+
+        # race condition for primary read finishing while this (secondary) read is still in progress
+        if read_is_primary or not os.path.isfile(out_loc):
+            write_probabilities_out(out_loc, nucleotide_probs, contig, ref_start, metadata, args)
 
     # cleanup
     if not args.keep_temp:
@@ -470,6 +475,7 @@ def realign_alignments(alignment_filename, args):
         # run service (for multithreading)
         iterable_arguments = {"args":args, "alignment_file":alignment_filename}
         iterable = map(lambda read: {
+            'flag':read.flag,
             'is_secondary':read.is_secondary,
             'is_supplementary':read.is_supplementary,
             'is_unmapped':read.is_unmapped,
