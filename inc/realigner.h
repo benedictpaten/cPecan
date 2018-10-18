@@ -15,6 +15,7 @@
  */
  
 typedef struct _Poa {
+	char *refString; // The reference string
 	stList *nodes; 
 } Poa;
 
@@ -43,6 +44,7 @@ Poa *poa_getReferenceGraph(char *reference);
 
 /*
  * Adds to given POA the matches, inserts and deletes from the alignment of the given read to the reference.
+ * Adds the inserts and deletes so that they are left aligned.
  */
 void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList *deletes);
 
@@ -54,24 +56,14 @@ Poa *poa_realign(stList *reads, char *reference,
 			  	 StateMachine *sM, PairwiseAlignmentParameters *p);
 
 /*
- * Left aligns indels.
- */
-void poa_leftAlignIndels(Poa *poa);
-
-/*
  * Prints representation of the POA.
  */
-void poa_print(Poa *poa, FILE *fH);
+void poa_print(Poa *poa, FILE *fH, float indelSignificanceThreshold);
 
 /*
- * Ranks all poa deletes by weight in ascending order.
+ * Left align indels and then sorts them by character
  */
-stList *poa_rankDeletes(Poa *poa);
-
-/*
- * Ranks all poa inserts by weight in ascending order.
- */
-stList *poa_rankInserts(Poa *poa);
+void poa_normalize(Poa *poa);
 
 /*
  * Creates a consensus reference sequence from the POA
@@ -93,5 +85,29 @@ void poa_destruct(Poa *poa);
  * be shifted left in the refString, starting from a match at refStart.
  */
 int64_t getShift(char *refString, int64_t refStart, char *str, int64_t length);
+
+/*
+ * Get sum of weights for reference bases in poa - proxy to agreement of reads
+ * with reference.
+ */
+double poa_getReferenceNodeTotalMatchWeight(Poa *poa);
+
+/*
+ * Get sum of weights for non-reference bases in poa - proxy to disagreement of read positions
+ * aligned with reference.
+ */
+double poa_getReferenceNodeTotalDisagreementWeight(Poa *poa);
+
+/*
+ * Get sum of weights for delete in poa - proxy to delete disagreement of reads
+ * with reference.
+ */
+double poa_getDeleteTotalWeight(Poa *poa);
+
+/*
+ * Get sum of weights for inserts in poa - proxy to insert disagreement of reads
+ * with reference.
+ */
+double poa_getInsertTotalWeight(Poa *poa);
 
 #endif /* REALIGNER_H_ */

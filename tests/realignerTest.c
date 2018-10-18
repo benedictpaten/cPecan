@@ -88,7 +88,6 @@ static void test_getShift(CuTest *testCase) {
 	}
 }
 
-
 static void checkInserts(CuTest *testCase, Poa *poa, int64_t nodeIndex,
 					     int64_t insertNumber, const char **inserts, const double *insertWeights, bool divideWeights) {
 	PoaNode *node = stList_get(poa->nodes, nodeIndex);
@@ -165,6 +164,10 @@ static void test_poa_augment_example(CuTest *testCase) {
 
 	poa_augment(poa, read, matches, inserts, deletes);
 
+	if (st_getLogLevel() >= info) {
+		poa_print(poa, stderr, 0.0);
+	}
+
 	// Check POA graph is what we expect
 
 	CuAssertTrue(testCase, stList_length(poa->nodes) == 8); // Length + prefix node
@@ -179,11 +182,11 @@ static void test_poa_augment_example(CuTest *testCase) {
 
 	checkNode(testCase, poa, 2, 'A', (const double[]){ 100.0, 0.0, 0.0, 0.0, 0.0 },
 					0, (const char *[]){ "" }, (const double[]){ 0.0 },
-					1, (const int64_t[]){ 1 }, (const double[]){ 50.0 });
+					1, (const int64_t[]){ 1 }, (const double[]){ 100.0 });
 
 	checkNode(testCase, poa, 3, 'T', (const double[]){ 0.0, 0.0, 0.0, 50.0, 0.0 },
 					0, (const char *[]){ "" }, (const double[]){ 0.0 },
-					1, (const int64_t[]){ 1 }, (const double[]){ 50.0 });
+					0, (const int64_t[]){ 0 }, (const double[]){ 0.0 });
 
 	checkNode(testCase, poa, 4, 'T', (const double[]){ 0.0, 0.0, 0.0, 50.0, 0.0 },
 					0, (const char *[]){ "" }, (const double[]){ 0.0 },
@@ -225,8 +228,9 @@ static void test_poa_realign(CuTest *testCase) {
 		StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
 
 		Poa *poa = poa_realign(reads, reference, sM, p);
+		//Poa *poa = poa_realignIterative(reads, reference, sM, p, 2);
 
-		poa_leftAlignIndels(poa); // Shift all the indels
+		poa_normalize(poa); // Shift all the indels
 
 		// Generate the read alignments and check the matches
 		// Currently don't check the insert and deletes
@@ -262,7 +266,7 @@ static void test_poa_realign(CuTest *testCase) {
 
 		st_logInfo("True-reference:%s\n", trueReference);
 		if (st_getLogLevel() >= info) {
-			poa_print(poa, stderr);
+			poa_print(poa, stderr, 5);
 		}
 
 		//Cleanup
@@ -336,16 +340,22 @@ static void test_poa_realign_tiny_example1(CuTest *testCase) {
 	//  8 C                 . - %
 	//  9 G                   . - %
 
+	st_logInfo("Read:%s\n", read);
+	st_logInfo("Reference:%s\n", reference);
+	if (st_getLogLevel() >= info) {
+		poa_print(poa, stderr, 0.0);
+	}
+
 	// Check inserts
 
 	// A after ref 0
 	checkInserts(testCase, poa, 1, 1, (const char *[]){ "A" }, (const double[]){ 0.038656 }, 1);
 	// T after ref 1
-	checkInserts(testCase, poa, 2, 1, (const char *[]){ "T" }, (const double[]){ 0.436572 }, 1);
+	checkInserts(testCase, poa, 2, 1, (const char *[]){ "T" }, (const double[]){ 0.874535 }, 1);
 	// T after ref 2
-	checkInserts(testCase, poa, 3, 1, (const char *[]){ "T" }, (const double[]){ 0.437963 }, 1);
+	checkInserts(testCase, poa, 3, 1, (const char *[]){ "A" }, (const double[]){ 0.038831 }, 1);
 	// A after ref 3
-	checkInserts(testCase, poa, 4, 1, (const char *[]){ "A" }, (const double[]){ 0.038831 }, 1);
+	checkInserts(testCase, poa, 4, 0, (const char *[]){ "" }, (const double[]){ 1 }, 1);
 
 	checkInserts(testCase, poa, 0, 0, (const char *[]){ "" }, (const double[]){ 1 }, 1);
 	checkInserts(testCase, poa, 5, 0, (const char *[]){ "" }, (const double[]){ 1 }, 1);
@@ -378,6 +388,8 @@ static void test_poa_realign_tiny_example1(CuTest *testCase) {
 	checkDeletes(testCase, poa, 1, 0, (const int64_t[]){ 1 }, (const double[]){ 1 }, 1);
 	checkDeletes(testCase, poa, 2, 0, (const int64_t[]){ 1 }, (const double[]){ 1 }, 1);
 	checkDeletes(testCase, poa, 5, 0, (const int64_t[]){ 1 }, (const double[]){ 1 }, 1);
+	checkDeletes(testCase, poa, 7, 0, (const int64_t[]){ 1 }, (const double[]){ 1 }, 1);
+	checkDeletes(testCase, poa, 9, 0, (const int64_t[]){ 1 }, (const double[]){ 1 }, 1);
 	checkDeletes(testCase, poa, 10, 0, (const int64_t[]){ 1 }, (const double[]){ 1 }, 1);
 
 	// L1 after ref 2
@@ -385,19 +397,9 @@ static void test_poa_realign_tiny_example1(CuTest *testCase) {
 	// L1 after ref 3
 	checkDeletes(testCase, poa, 4, 1, (const int64_t[]){ 1 }, (const double[]){ 0.011958 }, 1);
 	// L2 after ref 5
-	checkDeletes(testCase, poa, 6, 1, (const int64_t[]){ 2 }, (const double[]){ 0.039542 }, 1);
-	// L2 after ref 6
-	checkDeletes(testCase, poa, 7, 1, (const int64_t[]){ 2 }, (const double[]){ 0.038841 }, 1);
+	checkDeletes(testCase, poa, 6, 1, (const int64_t[]){ 2 }, (const double[]){ 0.078383 }, 1);
 	// L2 after ref 7
-	checkDeletes(testCase, poa, 8, 1, (const int64_t[]){ 2 }, (const double[]){ 0.438735 }, 1);
-	// L2 after ref 8
-	checkDeletes(testCase, poa, 9, 1, (const int64_t[]){ 2 }, (const double[]){ 0.437247 }, 1);
-
-	st_logInfo("Read:%s\n", read);
-	st_logInfo("Reference:%s\n", reference);
-	if (st_getLogLevel() >= info) {
-		poa_print(poa, stderr);
-	}
+	checkDeletes(testCase, poa, 8, 1, (const int64_t[]){ 2 }, (const double[]){ 0.87598 }, 1);
 
 	stateMachine_destruct(sM);
 	pairwiseAlignmentBandingParameters_destruct(p);
@@ -492,11 +494,11 @@ static void test_poa_realign_example1(CuTest *testCase) {
 
 	Poa *poa = poa_realign(reads, referenceExample1, sM, p);
 
-	poa_leftAlignIndels(poa); // Shift all the indels
+	poa_normalize(poa); // Shift all the indels
 
 	//st_logInfo("True-reference:%s\n", trueReference);
 	if (st_getLogLevel() >= info) {
-		poa_print(poa, stderr);
+		poa_print(poa, stderr, 5);
 	}
 
 	st_logInfo("True-reference:%s\n", trueReferenceExample1);
@@ -511,8 +513,10 @@ static void test_poa_realign_example1(CuTest *testCase) {
 
 static void test_poa_realign_rle_example1(CuTest *testCase) {
 	stList *reads = stList_construct3(0, free);
+	int64_t totalReadLength = 0;
 	for(int64_t i=0; i<45; i++) {
 		stList_append(reads, runLengthEncode((char *)readArrayExample1[i]));
+		totalReadLength += strlen(stList_peek(reads));
 	}
 	char *referenceExample1RLE = runLengthEncode(referenceExample1);
 	char *trueReferenceExample1RLE = runLengthEncode(trueReferenceExample1);
@@ -523,14 +527,18 @@ static void test_poa_realign_rle_example1(CuTest *testCase) {
 
 	StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
 
-	Poa *poa = poa_realign(reads, referenceExample1RLE, sM, p);
+	//Poa *poa = poa_realign(reads, referenceExample1RLE, sM, p);
 
-	poa_leftAlignIndels(poa); // Shift all the indels
+	Poa *poa = poa_realignIterative(reads, referenceExample1RLE, sM, p, 2);
+
+	poa_normalize(poa); // Shift all the indels
 
 	//st_logInfo("True-reference:%s\n", trueReference);
 	if (st_getLogLevel() >= info) {
-		poa_print(poa, stderr);
+		poa_print(poa, stderr, 5);
 	}
+
+	char *consensusString = poa_getConsensus(poa);
 
 	//                 **                              *    *
 	//               00  00000000111111111122222222223333333333444444444455
@@ -538,8 +546,9 @@ static void test_poa_realign_rle_example1(CuTest *testCase) {
 	//Reference:     CA  TCTCTCTCGTCATGCACAGACAGATGATGCAGCATATGACATACGCATAT
 	//True-reference:CATCTCTCTCTCGTCATGCACAGACAGATGATGC GCATGTGACATACGCATAT
 
-	st_logInfo("True-reference:%s\n", trueReferenceExample1RLE);
-	st_logInfo("Reference:%s\n", referenceExample1RLE);
+	st_logInfo("True-reference:\t\t%s\n", trueReferenceExample1RLE);
+	st_logInfo("Reference:\t\t%s\n", referenceExample1RLE);
+	st_logInfo("Consensus:\t\t%s\n", consensusString);
 
 	stateMachine_destruct(sM);
 	pairwiseAlignmentBandingParameters_destruct(p);
@@ -548,6 +557,7 @@ static void test_poa_realign_rle_example1(CuTest *testCase) {
 	hmm_destruct(hmm);
 	free(referenceExample1RLE);
 	free(trueReferenceExample1RLE);
+	free(consensusString);
 }
 
 static const char *readArrayExample2[] = {
@@ -613,11 +623,11 @@ static void test_poa_realign_example2(CuTest *testCase) {
 
 	Poa *poa = poa_realign(reads, referenceExample2, sM, p);
 
-	poa_leftAlignIndels(poa);
+	poa_normalize(poa);
 
 	//st_logInfo("True-reference:%s\n", trueReference);
 	if (st_getLogLevel() >= info) {
-		poa_print(poa, stderr);
+		poa_print(poa, stderr, 5);
 	}
 
 	st_logInfo("True-reference:%s\n", trueReferenceExample2);
@@ -635,7 +645,7 @@ static void test_poa_realign_rle_example2(CuTest *testCase) {
 	for(int64_t i=0; i<41; i++) {
 		stList_append(reads, runLengthEncode((char *)readArrayExample2[i]));
 	}
-	char *referenceExample2RLE = runLengthEncode(referenceExample2);
+	char *referenceExample2RLE = runLengthEncode(trueReferenceExample2); //referenceExample2);
 	char *trueReferenceExample2RLE = runLengthEncode(trueReferenceExample2);
 
 	PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -646,11 +656,11 @@ static void test_poa_realign_rle_example2(CuTest *testCase) {
 
 	Poa *poa = poa_realign(reads, referenceExample2RLE, sM, p);
 
-	poa_leftAlignIndels(poa);
+	poa_normalize(poa);
 
 	//st_logInfo("True-reference:%s\n", trueReference);
 	if (st_getLogLevel() >= info) {
-		poa_print(poa, stderr);
+		poa_print(poa, stderr, 4);
 	}
 
 	//                           * **
@@ -672,6 +682,46 @@ static void test_poa_realign_rle_example2(CuTest *testCase) {
 	hmm_destruct(hmm);
 	free(referenceExample2RLE);
 	free(trueReferenceExample2RLE);
+}
+
+static void test_poa_realignIterative(CuTest *testCase) {
+	for (int64_t test = 0; test < 100; test++) {
+
+		//Make true reference
+		char *trueReference = getRandomSequence(st_randomInt(1, 100));
+
+		// Make starting reference
+		char *reference = evolveSequence(trueReference);
+
+		// Reads
+		int64_t readNumber = st_randomInt(0, 20);
+		stList *reads = stList_construct3(0, free);
+		for(int64_t i=0; i<readNumber; i++) {
+			stList_append(reads, evolveSequence(trueReference));
+		}
+
+		PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+
+		Hmm *hmm = hmm_loadFromFile(nanoporeHmmFile);
+
+		StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
+
+		Poa *poa = poa_realignIterative(reads, reference, sM, p, 2);
+
+		st_logInfo("True-reference:%s\n", trueReference);
+		if (st_getLogLevel() >= info) {
+			poa_print(poa, stderr, 5);
+		}
+
+		//Cleanup
+		stateMachine_destruct(sM);
+		free(trueReference);
+		free(reference);
+		stList_destruct(reads);
+		pairwiseAlignmentBandingParameters_destruct(p);
+		poa_destruct(poa);
+		hmm_destruct(hmm);
+	}
 }
 
 /*
@@ -750,6 +800,7 @@ CuSuite* realignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_poa_realign_rle_example1);
     //SUITE_ADD_TEST(suite, test_poa_realign_rle_example2);
     //SUITE_ADD_TEST(suite, test_poa_realign);
+    SUITE_ADD_TEST(suite, test_poa_realignIterative);
     //SUITE_ADD_TEST(suite, test_getShift);
 
     //SUITE_ADD_TEST(suite, test_hmm);

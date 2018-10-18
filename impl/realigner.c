@@ -70,21 +70,11 @@ void poaNode_destruct(PoaNode *poaNode) {
 	free(poaNode);
 }
 
-Poa *poa_getEmptyGraph() {
+Poa *poa_getReferenceGraph(char *reference) {
 	Poa *poa = st_calloc(1, sizeof(Poa));
 
 	poa->nodes = stList_construct3(0, (void (*)(void *))poaNode_destruct);
-
-	return poa;
-}
-
-void poa_destruct(Poa *poa) {
-	stList_destruct(poa->nodes);
-	free(poa);
-}
-
-Poa *poa_getReferenceGraph(char *reference) {
-	Poa *poa = poa_getEmptyGraph();
+	poa->refString = stString_copy(reference);
 
 	int64_t refLength = strlen(reference);
 	stList_append(poa->nodes, poaNode_construct('N')); // Add empty prefix node
@@ -93,6 +83,12 @@ Poa *poa_getReferenceGraph(char *reference) {
 	}
 
 	return poa;
+}
+
+void poa_destruct(Poa *poa) {
+	free(poa->refString);
+	stList_destruct(poa->nodes);
+	free(poa);
 }
 
 int cmpAlignedPairsByCoordinates(const void *a, const void *b) {
@@ -170,206 +166,6 @@ static void addToDeletes(PoaNode *node, int64_t length, double weight) {
 	if(!found) {
 		stList_append(node->deletes, poaDelete_construct(length, weight));
 	}
-}
-
-void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList *deletes) {
-	// Add weights of matches to the POA graph
-
-	// For each match in alignment subgraph identify its corresponding node in the POA graph
-	// add the weight of the match to the POA node
-	for(int64_t i=0; i<stList_length(matches); i++) {
-		stIntTuple *match = stList_get(matches, i);
-
-		PoaNode *node = stList_get(poa->nodes, stIntTuple_get(match, 1)+1); // Get corresponding POA node
-
-		// Add base weight to POA node
-		node->baseWeights[symbol_convertCharToSymbol(read[stIntTuple_get(match, 2)])] += stIntTuple_get(match, 0);
-	}
-
-	// Create a set of match coordinates
-
-	stSortedSet *matchesSet = stSortedSet_construct3(cmpAlignedPairsByCoordinates, NULL);
-	for(int64_t i=0; i<stList_length(matches); i++) {
-		stIntTuple *match = stList_get(matches, i);
-
-		assert(stSortedSet_search(matchesSet, match) == NULL);
-		stSortedSet_insert(matchesSet, match); // Add to matches
-	}
-	
-	// Add inserts to the POA graph
-
-	// Sort the inserts first by the reference coordinate and then by read coordinate
-	stList_sort(inserts, cmpAlignedPairsByCoordinates);
-
-	// Let a complete-insert be a sequence of inserts with the same reference coordinate i
-	// and consecutive read coordinates j, j+1, ..., j+n, such that the i,j-1 is a match or equal to (-1,-1) (the beginning)
-	// in the alignment subgraph and i+1,j+n+1 is similarly a match or equal to (N, M) (the end of the alignment).
-
-	// Enumerate set of complete inserts
-	int64_t readLength = strlen(read), refLength = stList_length(poa->nodes)-1;
-	for(int64_t i=0; i<stList_length(inserts);) {
-
-		stIntTuple *insertStart = stList_get(inserts, i); // Start of putative complete-insert
-
-		int64_t j=i+1;
-		for(;j<stList_length(inserts); j++) {
-			stIntTuple *insertEnd = stList_get(inserts, j); // End of putative complete-insert
-
-			// If they don't have the same reference coordinate then not part of same complete-insert
-			if(stIntTuple_get(insertStart, 1) != stIntTuple_get(insertEnd, 1)) {
-				break;
-			}
-
-			// If they don't form a contiguous sequence of read coordinates then not part of same complete-insert
-			if(stIntTuple_get(insertStart, 2) + j - i != stIntTuple_get(insertEnd, 2)) {
-				break;
-			}
-		}
-
-		// At this point i (inclusive) and j (exclusive) form the start and end of a maximal putative
-		// complete insert sequence in inserts
-
-		// Now enumerate complete-inserts in this interval
-
-		for(int64_t k=i; k<j; k++) {
-
-			// If k position is not flanked by a preceding match or the beginning then can not be a complete insert
-			if(!isMatch(matchesSet, stIntTuple_get(insertStart, 1), stIntTuple_get(insertStart, 2) + k - i - 1) &&
-					(stIntTuple_get(insertStart, 1) > -1 || stIntTuple_get(insertStart, 2) + k - i - 1 > -1)) {
-				continue;
-			}
-
-			for(int64_t l=k; l<j; l++) {
-
-				// If l position is not flanked by a proceeding match or the end then can not be a complete insert
-				if(!isMatch(matchesSet, stIntTuple_get(insertStart, 1) + 1, stIntTuple_get(insertStart, 2) + l - i + 1) &&
-						(stIntTuple_get(insertStart, 1) + 1 < refLength || stIntTuple_get(insertStart, 2) + l - i + 1 < readLength)) {
-					continue;
-				}
-
-				// At this point k (inclusive) and l (inclusive) represent a complete-insert
-
-				// Calculate weight and label
-				double insertWeight = UINT_MAX;
-				char insertLabel[l+2-k];
-				insertLabel[l+1-k] = '\0';
-				for(int64_t m=k; m<l+1; m++) {
-					stIntTuple *insert = stList_get(inserts, m);
-					insertLabel[m-k] = toupper(read[stIntTuple_get(insert, 2)]);
-					insertWeight = insertWeight < stIntTuple_get(insert, 0) ? insertWeight : stIntTuple_get(insert, 0);
-				}
-
-				// Get the leftmost node in the poa graph to which the insert will connect
-				assert(stIntTuple_get(insertStart, 1) >= -1);
-				PoaNode *leftNode = stList_get(poa->nodes, stIntTuple_get(insertStart, 1)+1); // Get POA node with same reference coordinate
-
-				// Add insert to graph
-				addToInserts(leftNode, insertLabel, insertWeight);
-			}
-		}
-
-		// Increase i to start of next maximal complete-insert
-		i = j;
-	}
-
-	// Add deletes to the POA graph
-
-	// Sort the deletes first by the read coordinate and then by reference coordinate
-	stList_sort(deletes, cmpAlignedPairsByInvertedCoordinates);
-
-	// Analogous to a complete-insert, let a complete-delete be a sequence of deletes with the same read coordinate j
-	// and consecutive reference coordinates i, i+1, ..., i+m, such that the i-1,j is a match or equal to (-1,-1) (the beginning)
-	// in the alignment subgraph and i+m+1,j+1 is similarly a match or (N, M) (the alignment end).
-
-	// Enumerate set of complete-deletes, adding them to the graph
-	for(int64_t i=0; i<stList_length(deletes);) {
-		stIntTuple *deleteStart = stList_get(deletes, i); // Start of putative complete-delete
-
-		int64_t j=i+1;
-		for(;j<stList_length(deletes); j++) {
-			stIntTuple *deleteEnd = stList_get(deletes, j); // End of putative complete-delete
-
-			// If they don't have the same read coordinate then not part of same complete-insert
-			if(stIntTuple_get(deleteStart, 2) != stIntTuple_get(deleteEnd, 2)) {
-				break;
-			}
-
-			// If they don't form a contiguous sequence of read coordinates then not part of same complete-insert
-			if(stIntTuple_get(deleteStart, 1) + j - i != stIntTuple_get(deleteEnd, 1)) {
-				break;
-			}
-		}
-
-		// At this point i (inclusive) and j (exclusive) form the start and end of a putative maximal
-		// complete-delete sequence in deletes
-
-		// Now enumerate complete-deletes in this interval
-
-		for(int64_t k=i; k<j; k++) {
-
-			// If k position is not flanked by a preceding match or alignment beginning then can not be a complete-delete
-			if(!isMatch(matchesSet, stIntTuple_get(deleteStart, 1) + k - i - 1, stIntTuple_get(deleteStart, 2)) &&
-					((stIntTuple_get(deleteStart, 1) + k - i - 1 > -1 || stIntTuple_get(deleteStart, 2) > -1))) {
-				continue;
-			}
-
-			for(int64_t l=k; l<j; l++) {
-
-				// If l position is not flanked by a proceeding match or alignment end then can not be a complete-delete
-				if(!isMatch(matchesSet, stIntTuple_get(deleteStart, 1) + l - i + 1, stIntTuple_get(deleteStart, 2) + 1) &&
-					(stIntTuple_get(deleteStart, 1) + l - i + 1 < refLength || stIntTuple_get(deleteStart, 2) + 1 < readLength)) {
-					continue;
-				}
-
-				// At this point k (inclusive) and l (inclusive) represent a complete-delete
-
-				// Calculate weight
-				double deleteWeight = UINT_MAX;
-				for(int64_t m=k; m<l+1; m++) {
-					stIntTuple *delete = stList_get(deletes, m);
-					deleteWeight = deleteWeight < stIntTuple_get(delete, 0) ? deleteWeight : stIntTuple_get(delete, 0);
-				}
-
-				// Get the leftmost node in the poa graph to which the delete will connect
-				assert(stIntTuple_get(deleteStart, 1) >= 0);
-				PoaNode *leftNode = stList_get(poa->nodes, stIntTuple_get(deleteStart, 1)); // Get POA node preceding delete
-
-				// Add deletion to graph
-				addToDeletes(leftNode, l-k+1, deleteWeight);
-			}
-		}
-
-		// Increase i to start of next maximal complete-delete
-		i = j;
-	}
-
-	// Cleanup
-	stSortedSet_destruct(matchesSet);
-}
-
-Poa *poa_realign(stList *reads, char *reference,
-			  	 StateMachine *sM, PairwiseAlignmentParameters *p) {
-	// Build a reference graph with zero weights
-	Poa *poa = poa_getReferenceGraph(reference);
-
-	// For each read
-	for(int64_t i=0; i<stList_length(reads); i++) {
-		char *read = stList_get(reads, i);
-
-		// Generate set of posterior probabilities for matches, deletes and inserts with respect to reference.
-		stList *matches = NULL, *inserts = NULL, *deletes = NULL;
-		getAlignedPairsWithIndels(sM, reference, read, p, &matches, &deletes, &inserts, 0, 0);
-
-		// Add weights, edges and nodes to the poa
-		poa_augment(poa, read, matches, inserts, deletes);
-
-		// Cleanup
-		stList_destruct(matches);
-		stList_destruct(inserts);
-		stList_destruct(deletes);
-	}
-
-	return poa;
 }
 
 char *poa_getReferenceSubstring(Poa *poa, int64_t startIndex, int64_t length) {
@@ -472,121 +268,315 @@ char *rotateString(char *str, int64_t length, int64_t rotationLength) {
 	return str2;
 }
 
-void poa_leftAlignIndels(Poa *poa) {
-	char *refString = poa_getReferenceSubstring(poa, 1, stList_length(poa->nodes)-1); // Could avoid this if
-	// we store the reference string in the poa struct
+void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList *deletes) {
+	// Add weights of matches to the POA graph
 
-	// For each poa node that is not the leftmost (because those indels can't be shifted further, by definition)
-	for(int64_t i=1; i<stList_length(poa->nodes); i++) {
-		PoaNode *node = stList_get(poa->nodes, i);
+	// For each match in alignment subgraph identify its corresponding node in the POA graph
+	// add the weight of the match to the POA node
+	for(int64_t i=0; i<stList_length(matches); i++) {
+		stIntTuple *match = stList_get(matches, i);
 
-		// Shift inserts
+		PoaNode *node = stList_get(poa->nodes, stIntTuple_get(match, 1)+1); // Get corresponding POA node
 
-		// Process replaces old list of inserts
-		stList *inserts = node->inserts;
-		node->inserts = stList_construct3(0, (void (*)(void *))poaInsert_destruct);
+		// Add base weight to POA node
+		node->baseWeights[symbol_convertCharToSymbol(read[stIntTuple_get(match, 2)])] += stIntTuple_get(match, 0);
+	}
 
-		while(stList_length(inserts) > 0) {
-			PoaInsert *insert = stList_pop(inserts);
-			int64_t insertLength = strlen(insert->insert);
+	// Create a set of match coordinates
 
-			// Walk back over reference sequence and see if insert can be shifted
-			int64_t insertPosition = getShift(refString, i, insert->insert, insertLength);
+	stSortedSet *matchesSet = stSortedSet_construct3(cmpAlignedPairsByCoordinates, NULL);
+	for(int64_t i=0; i<stList_length(matches); i++) {
+		stIntTuple *match = stList_get(matches, i);
 
-			int64_t commonSuffixLength = getMaxCommonSuffixLength(refString, insertPosition, insert->insert, insertLength);
-			if(commonSuffixLength > 0) {
-				char *newInsertStr = rotateString(insert->insert, insertLength, commonSuffixLength);
-				free(insert->insert);
-				insert->insert = newInsertStr;
-				insertPosition -= commonSuffixLength;
+		assert(stSortedSet_search(matchesSet, match) == NULL);
+		stSortedSet_insert(matchesSet, match); // Add to matches
+	}
+	
+	// Add inserts to the POA graph
+
+	// Sort the inserts first by the reference coordinate and then by read coordinate
+	stList_sort(inserts, cmpAlignedPairsByCoordinates);
+
+	// Let a complete-insert be a sequence of inserts with the same reference coordinate i
+	// and consecutive read coordinates j, j+1, ..., j+n, such that the i,j-1 is a match or equal to (-1,-1) (the beginning)
+	// in the alignment subgraph and i+1,j+n+1 is similarly a match or equal to (N, M) (the end of the alignment).
+
+	// Enumerate set of complete inserts
+	int64_t readLength = strlen(read), refLength = stList_length(poa->nodes)-1;
+	for(int64_t i=0; i<stList_length(inserts);) {
+
+		stIntTuple *insertStart = stList_get(inserts, i); // Start of putative complete-insert
+
+		int64_t j=i+1;
+		for(;j<stList_length(inserts); j++) {
+			stIntTuple *insertEnd = stList_get(inserts, j); // End of putative complete-insert
+
+			// If they don't have the same reference coordinate then not part of same complete-insert
+			if(stIntTuple_get(insertStart, 1) != stIntTuple_get(insertEnd, 1)) {
+				break;
 			}
 
-			if(insertPosition < i) { // There is a left shift
-				addToInserts(stList_get(poa->nodes, insertPosition), insert->insert, insert->weight);
-				poaInsert_destruct(insert); // Cleanup old insert
-			}
-			else { // No left shift, just add back to filtered inserts list
-				stList_append(node->inserts, insert);
-			}
-		}
-		stList_destruct(inserts);
-
-		// Shift deletes
-
-		// Process replaces old list of deletes
-		stList *deletes = node->deletes;
-		node->deletes = stList_construct3(0, (void (*)(void *))poaDelete_destruct);
-
-		while(stList_length(deletes) > 0) {
-			PoaDelete *delete = stList_pop(deletes);
-
-			// Get string being deleted
-			char *deleteString = poa_getReferenceSubstring(poa, i+1, delete->length);
-
-			// Walk back over reference sequence and see if delete can be shifted
-			int64_t insertPosition = getShift(refString, i, deleteString, delete->length);
-
-			// Shift by moving boundary of deletion according to common suffixes
-			insertPosition -= getMaxCommonSuffixLength(refString, insertPosition, deleteString, delete->length);
-
-			free(deleteString); // Cleanup
-
-			if(insertPosition < i) { // There is a left shift
-				addToDeletes(stList_get(poa->nodes, insertPosition), delete->length, delete->weight);
-				poaDelete_destruct(delete); // Cleanup old delete
-			}
-			else { // No left shift, just add back to filtered deletes list
-				stList_append(node->deletes, delete);
+			// If they don't form a contiguous sequence of read coordinates then not part of same complete-insert
+			if(stIntTuple_get(insertStart, 2) + j - i != stIntTuple_get(insertEnd, 2)) {
+				break;
 			}
 		}
-		stList_destruct(deletes);
+
+		// At this point i (inclusive) and j (exclusive) form the start and end of a maximal putative
+		// complete insert sequence in inserts
+
+		// Now enumerate complete-inserts in this interval
+
+		for(int64_t k=i; k<j; k++) {
+
+			// If k position is not flanked by a preceding match or the beginning then can not be a complete insert
+			if(!isMatch(matchesSet, stIntTuple_get(insertStart, 1), stIntTuple_get(insertStart, 2) + k - i - 1) &&
+					(stIntTuple_get(insertStart, 1) > -1 || stIntTuple_get(insertStart, 2) + k - i - 1 > -1)) {
+				continue;
+			}
+
+			for(int64_t l=k; l<j; l++) {
+
+				// If l position is not flanked by a proceeding match or the end then can not be a complete insert
+				if(!isMatch(matchesSet, stIntTuple_get(insertStart, 1) + 1, stIntTuple_get(insertStart, 2) + l - i + 1) &&
+						(stIntTuple_get(insertStart, 1) + 1 < refLength || stIntTuple_get(insertStart, 2) + l - i + 1 < readLength)) {
+					continue;
+				}
+
+				// At this point k (inclusive) and l (inclusive) represent a complete-insert
+
+				// Calculate weight and label
+				double insertWeight = UINT_MAX;
+				int64_t insertLength = l+1-k;
+				char insertLabel[insertLength+1];
+				insertLabel[insertLength] = '\0';
+				for(int64_t m=k; m<l+1; m++) {
+					stIntTuple *insert = stList_get(inserts, m);
+					insertLabel[m-k] = toupper(read[stIntTuple_get(insert, 2)]);
+					insertWeight = insertWeight < stIntTuple_get(insert, 0) ? insertWeight : stIntTuple_get(insert, 0);
+				}
+
+				// Get the leftmost node in the poa graph to which the insert will connect
+
+				// First find the left point to which the insert will be connected
+				assert(stIntTuple_get(insertStart, 1) >= -1);
+				int64_t insertPosition = stIntTuple_get(insertStart, 1)+1;
+
+				// Now walk back over reference sequence and see if insert can be left-shifted
+				insertPosition = getShift(poa->refString, insertPosition, insertLabel, insertLength);
+
+				// Finally see if can be shifted by common suffix
+				int64_t commonSuffixLength = getMaxCommonSuffixLength(poa->refString, insertPosition, insertLabel, insertLength);
+				if(commonSuffixLength > 0) {
+					char *newInsertStr = rotateString(insertLabel, insertLength, commonSuffixLength);
+					memcpy(insertLabel, newInsertStr, insertLength);
+					free(newInsertStr);
+					insertPosition -= commonSuffixLength;
+				}
+
+				// Add insert to graph at leftmost position
+				addToInserts(stList_get(poa->nodes, insertPosition), insertLabel, insertWeight);
+			}
+		}
+
+		// Increase i to start of next maximal complete-insert
+		i = j;
+	}
+
+	// Add deletes to the POA graph
+
+	// Sort the deletes first by the read coordinate and then by reference coordinate
+	stList_sort(deletes, cmpAlignedPairsByInvertedCoordinates);
+
+	// Analogous to a complete-insert, let a complete-delete be a sequence of deletes with the same read coordinate j
+	// and consecutive reference coordinates i, i+1, ..., i+m, such that the i-1,j is a match or equal to (-1,-1) (the beginning)
+	// in the alignment subgraph and i+m+1,j+1 is similarly a match or (N, M) (the alignment end).
+
+	// Enumerate set of complete-deletes, adding them to the graph
+	for(int64_t i=0; i<stList_length(deletes);) {
+		stIntTuple *deleteStart = stList_get(deletes, i); // Start of putative complete-delete
+
+		int64_t j=i+1;
+		for(;j<stList_length(deletes); j++) {
+			stIntTuple *deleteEnd = stList_get(deletes, j); // End of putative complete-delete
+
+			// If they don't have the same read coordinate then not part of same complete-insert
+			if(stIntTuple_get(deleteStart, 2) != stIntTuple_get(deleteEnd, 2)) {
+				break;
+			}
+
+			// If they don't form a contiguous sequence of read coordinates then not part of same complete-insert
+			if(stIntTuple_get(deleteStart, 1) + j - i != stIntTuple_get(deleteEnd, 1)) {
+				break;
+			}
+		}
+
+		// At this point i (inclusive) and j (exclusive) form the start and end of a putative maximal
+		// complete-delete sequence in deletes
+
+		// Now enumerate complete-deletes in this interval
+
+		for(int64_t k=i; k<j; k++) {
+
+			// If k position is not flanked by a preceding match or alignment beginning then can not be a complete-delete
+			if(!isMatch(matchesSet, stIntTuple_get(deleteStart, 1) + k - i - 1, stIntTuple_get(deleteStart, 2)) &&
+					((stIntTuple_get(deleteStart, 1) + k - i - 1 > -1 || stIntTuple_get(deleteStart, 2) > -1))) {
+				continue;
+			}
+
+			for(int64_t l=k; l<j; l++) {
+
+				// If l position is not flanked by a proceeding match or alignment end then can not be a complete-delete
+				if(!isMatch(matchesSet, stIntTuple_get(deleteStart, 1) + l - i + 1, stIntTuple_get(deleteStart, 2) + 1) &&
+					(stIntTuple_get(deleteStart, 1) + l - i + 1 < refLength || stIntTuple_get(deleteStart, 2) + 1 < readLength)) {
+					continue;
+				}
+
+				// At this point k (inclusive) and l (inclusive) represent a complete-delete
+
+				// Delete length
+				int64_t deleteLength = l-k+1;
+
+				// Calculate weight
+				double deleteWeight = UINT_MAX;
+				for(int64_t m=k; m<l+1; m++) {
+					stIntTuple *delete = stList_get(deletes, m);
+					deleteWeight = deleteWeight < stIntTuple_get(delete, 0) ? deleteWeight : stIntTuple_get(delete, 0);
+				}
+
+				// Get the leftmost node in the poa graph to which the delete will connect
+
+				// First find the left point to which the delete would be connected
+				assert(stIntTuple_get(deleteStart, 1) >= 0);
+				int64_t insertPosition = stIntTuple_get(deleteStart, 1);
+
+				// Get string being deleted
+				char *deleteLabel = poa_getReferenceSubstring(poa, insertPosition+1, deleteLength);
+
+				// Now walk back over reference sequence and see if insert can be left-shifted
+				insertPosition = getShift(poa->refString, insertPosition, deleteLabel, deleteLength);
+
+				// Finally see if can be shifted by common suffix
+				insertPosition -= getMaxCommonSuffixLength(poa->refString, insertPosition, deleteLabel, deleteLength);
+				free(deleteLabel);
+
+				// Add delete to graph at leftmost position
+				addToDeletes(stList_get(poa->nodes, insertPosition), deleteLength, deleteWeight);
+			}
+		}
+
+		// Increase i to start of next maximal complete-delete
+		i = j;
 	}
 
 	// Cleanup
-	free(refString);
+	stSortedSet_destruct(matchesSet);
 }
 
-static int cmpInsertsByWeight(const void *a, const void *b) {
+Poa *poa_realign(stList *reads, char *reference,
+			  	 StateMachine *sM, PairwiseAlignmentParameters *p) {
+	// Build a reference graph with zero weights
+	Poa *poa = poa_getReferenceGraph(reference);
+
+	// For each read
+	for(int64_t i=0; i<stList_length(reads); i++) {
+		char *read = stList_get(reads, i);
+
+		// Generate set of posterior probabilities for matches, deletes and inserts with respect to reference.
+		stList *matches = NULL, *inserts = NULL, *deletes = NULL;
+		getAlignedPairsWithIndels(sM, reference, read, p, &matches, &deletes, &inserts, 0, 0);
+
+		// Add weights, edges and nodes to the poa
+		poa_augment(poa, read, matches, inserts, deletes);
+
+		// Cleanup
+		stList_destruct(matches);
+		stList_destruct(inserts);
+		stList_destruct(deletes);
+	}
+
+	return poa;
+}
+
+static int cmpInsertsBySequence(const void *a, const void *b) {
 	/*
 	 * Compares PoaInserts by weight in ascending order.
 	 */
 	PoaInsert *one = (PoaInsert *)a, *two = (PoaInsert *)b;
-	return one->weight < two->weight ? -1 : one->weight > two->weight ? 1 : 0;
+	return strcmp(one->insert, two->insert);
 }
 
-stList *poa_rankInserts(Poa *poa) {
-	stList *allInserts = stList_construct();
-	for(int64_t i=0; i<stList_length(poa->nodes); i++) {
-		PoaNode *node = stList_get(poa->nodes, i);
-		for(int64_t j=0; j<stList_length(node->inserts); j++) {
-			stList_append(allInserts, stList_get(node->inserts, j));
-		}
-	}
-	stList_sort(allInserts, cmpInsertsByWeight);
-	return allInserts;
-}
-
-static int cmpDeletesByWeight(const void *a, const void *b) {
+static int cmpDeletesByLength(const void *a, const void *b) {
 	/*
 	 * Compares PoaDelete by weight in ascending order.
 	 */
 	PoaDelete *one = (PoaDelete *)a, *two = (PoaDelete *)b;
-	return one->weight < two->weight ? -1 : one->weight > two->weight ? 1 : 0;
+	return one->length < two->length ? -1 : one->length > two->length ? 1 : 0;
 }
 
-stList *poa_rankDeletes(Poa *poa) {
-	stList *allDeletes = stList_construct();
+void poa_sortIndels(Poa *poa) {
+	for(int64_t i=0; i<stList_length(poa->nodes); i++) {
+		PoaNode *node = stList_get(poa->nodes, i);
+		stList_sort(node->inserts, cmpInsertsBySequence);
+		stList_sort(node->deletes, cmpDeletesByLength);
+	}
+}
+
+void poa_normalize(Poa *poa) {
+	poa_sortIndels(poa);
+}
+
+double poa_getReferenceNodeTotalMatchWeight(Poa *poa) {
+	double weight = 0.0;
+	for(int64_t i=0; i<stList_length(poa->nodes); i++) {
+		PoaNode *node = stList_get(poa->nodes, i);
+		weight += node->baseWeights[symbol_convertCharToSymbol(node->base)];
+		//for(int64_t j=0; j<SYMBOL_NUMBER; j++) {
+		//	weight += node->baseWeights[j];
+		//}
+	}
+	return weight;
+}
+
+double poa_getReferenceNodeTotalDisagreementWeight(Poa *poa) {
+	double weight = 0.0;
+	for(int64_t i=0; i<stList_length(poa->nodes); i++) {
+		PoaNode *node = stList_get(poa->nodes, i);
+		int64_t refSymbol = symbol_convertCharToSymbol(node->base);
+		for(int64_t j=0; j<SYMBOL_NUMBER; j++) {
+			if(j != refSymbol) {
+				weight += node->baseWeights[j];
+			}
+		}
+	}
+	return weight;
+}
+
+double poa_getInsertTotalWeight(Poa *poa) {
+	double weight = 0.0;
+	for(int64_t i=0; i<stList_length(poa->nodes); i++) {
+		PoaNode *node = stList_get(poa->nodes, i);
+		for(int64_t j=0; j<stList_length(node->inserts); j++) {
+			PoaInsert *insert = stList_get(node->inserts, j);
+			weight += insert->weight * strlen(insert->insert);
+		}
+	}
+	return weight;
+}
+
+double poa_getDeleteTotalWeight(Poa *poa) {
+	double weight = 0.0;
 	for(int64_t i=0; i<stList_length(poa->nodes); i++) {
 		PoaNode *node = stList_get(poa->nodes, i);
 		for(int64_t j=0; j<stList_length(node->deletes); j++) {
-			stList_append(allDeletes, stList_get(node->deletes, j));
+			PoaDelete *delete = stList_get(node->deletes, j);
+			weight += delete->weight * delete->length;
 		}
 	}
-	stList_sort(allDeletes, cmpDeletesByWeight);
-	return allDeletes;
+	return weight;
 }
 
-void poa_print(Poa *poa, FILE *fH) {
+void poa_print(Poa *poa, FILE *fH, float indelSignificanceThreshold) {
 	// Print info for each base in reference in turn
 	for(int64_t i=0; i<stList_length(poa->nodes); i++) {
 		PoaNode *node = stList_get(poa->nodes, i);
@@ -607,7 +597,7 @@ void poa_print(Poa *poa, FILE *fH) {
 		// Inserts
 		for(int64_t j=0; j<stList_length(node->inserts); j++) {
 			PoaInsert *insert = stList_get(node->inserts, j);
-			if(insert->weight/PAIR_ALIGNMENT_PROB_1 >= 4.0) {
+			if(insert->weight/PAIR_ALIGNMENT_PROB_1 >= indelSignificanceThreshold) {
 				fprintf(fH, "Insert\tSeq:%s\tWeight:%f\n", insert->insert, (float)insert->weight/PAIR_ALIGNMENT_PROB_1);
 			}
 		}
@@ -615,32 +605,213 @@ void poa_print(Poa *poa, FILE *fH) {
 		// Deletes
 		for(int64_t j=0; j<stList_length(node->deletes); j++) {
 			PoaDelete *delete = stList_get(node->deletes, j);
-			if(delete->weight/PAIR_ALIGNMENT_PROB_1 >= 4.0) {
+			if(delete->weight/PAIR_ALIGNMENT_PROB_1 >= indelSignificanceThreshold) {
 				fprintf(fH, "Delete\tLength:%" PRIi64 "\tWeight:%f\n", delete->length, (float)delete->weight/PAIR_ALIGNMENT_PROB_1);
 			}
 		}
 	}
 
-	// Print top events
-	fprintf(fH, "Top ranked insert events\n");
-	stList *inserts = poa_rankInserts(poa);
-	int64_t i=0;
-	while(stList_length(inserts) > 0 && i++ < 10) {
-		PoaInsert *insert = stList_pop(inserts);
-		fprintf(fH, "INSERT %s %f\n", insert->insert, (float)insert->weight/PAIR_ALIGNMENT_PROB_1);
-	}
-	stList *deletes = poa_rankDeletes(poa);
-	i=0;
-	while(stList_length(deletes) > 0 && i++ < 10) {
-		PoaDelete *delete = stList_pop(deletes);
-		fprintf(fH, "DELETE %" PRIi64 " %f\n", delete->length, (float)delete->weight/PAIR_ALIGNMENT_PROB_1);
-	}
-	stList_destruct(inserts);
-	stList_destruct(deletes);
+	double totalReferenceMatchWeight = poa_getReferenceNodeTotalMatchWeight(poa)/PAIR_ALIGNMENT_PROB_1;
+	double totalReferenceMismatchWeight = poa_getReferenceNodeTotalDisagreementWeight(poa)/PAIR_ALIGNMENT_PROB_1;
+	double totalInsertWeight = poa_getInsertTotalWeight(poa)/PAIR_ALIGNMENT_PROB_1;
+	double totalDeleteWeight = poa_getDeleteTotalWeight(poa)/PAIR_ALIGNMENT_PROB_1;
+
+	fprintf(fH, "Totals, reference match weight: %f reference mismatch weight: %f insert weight: %f delete weight: %f indel weight: %f\n",
+			totalReferenceMatchWeight, totalReferenceMismatchWeight,
+			totalInsertWeight, totalDeleteWeight, totalInsertWeight + totalDeleteWeight);
+}
+
+
+double getBaseLogProbability(PoaNode *node) {
+	/*
+	 * Calculates the probabilty of observing the given bases
+	 */
+	return 0;
 }
 
 char *poa_getConsensus(Poa *poa) {
-	return NULL;
+	// Cheesy profile HMM like algorithm
+	// Calculates forward probabilities through model, then
+	// traces back through max prob local path, greedily
+
+	// Probabilities/weights we keep track of.
+
+	// Total weight of outgoing transitions
+	double *totalOutgoingWeights = st_calloc(stList_length(poa->nodes), sizeof(double));
+
+	// Forward probabilities
+	double *nodeForwardLogProbs = st_calloc(stList_length(poa->nodes)+1, sizeof(double));
+	// Initialize, only start state has log(1) = 0 prob
+	for(int64_t i=1; i<stList_length(poa->nodes)+1; i++) {
+		nodeForwardLogProbs[i] = LOG_ZERO;
+	}
+
+	// Forward probabilities of transitioning from a node to the its successor without
+	// an indel
+	double *matchTransitionForwardLogProbs = st_calloc(stList_length(poa->nodes), sizeof(double));
+
+	// Calculate incoming deletions for each node
+
+	stList *incomingDeletions = stList_construct3(0, (void (*)(void *))stList_destruct);
+	for(int64_t i=0; i<stList_length(poa->nodes) + 1; i++) {
+		stList_append(incomingDeletions, stList_construct());
+	}
+	for(int64_t i=0; i<stList_length(poa->nodes); i++) {
+		PoaNode *node = stList_get(poa->nodes, i);
+		for(int64_t j=0; j<stList_length(node->deletes); j++) {
+			PoaDelete *delete = stList_get(node->deletes, j);
+			stList_append(stList_get(incomingDeletions, i + delete->length + 1), delete);
+		}
+	}
+
+	// Walk through the graph left-to-right calculating forward probabilities
+
+	for(int64_t i=0; i<stList_length(poa->nodes); i++) {
+		PoaNode *node = stList_get(poa->nodes, i);
+
+		// For all reference positions (barring the "N" prefix, calculate the base probability
+		if(i > 0) {
+			nodeForwardLogProbs[i] += getBaseLogProbability(node);
+		}
+
+		// Calculate total weight of indels connecting from this node
+
+		double totalIndelWeight = 0.0;
+
+		for(int64_t j=0; j<stList_length(node->inserts); j++) {
+			PoaInsert *insert = stList_get(node->inserts, j);
+			totalIndelWeight += insert->weight;
+		}
+		for(int64_t j=0; j<stList_length(node->deletes); j++) {
+			PoaDelete *delete = stList_get(node->deletes, j);
+			totalIndelWeight += delete->weight;
+		}
+
+		// Calculate the match transition weight of node
+		// that is, we make an estimate of the weight/expectation
+		// of transitioning from this node to the next node without an indel
+
+		double matchTransitionWeight = 0.0;
+		if(i == 0) {
+			// Set the initiation probability according to the average base weight
+			for(int64_t j=1; j<stList_length(poa->nodes); j++) {
+				PoaNode *nNode = stList_get(poa->nodes, j);
+				for(int64_t k=0; k<SYMBOL_NUMBER_NO_N; k++) {
+					matchTransitionWeight += nNode->baseWeights[k];
+				}
+			}
+			matchTransitionWeight /= stList_length(poa->nodes)-1;
+		}
+		else {
+			for(int64_t j=0; j<SYMBOL_NUMBER; j++) {
+				matchTransitionWeight += node->baseWeights[j];
+			}
+			matchTransitionWeight -= totalIndelWeight;
+			// Hack to stop zero weights
+			matchTransitionWeight = matchTransitionWeight < 0 ? 0.0 : matchTransitionWeight;
+		}
+		// Calculate the total weight of outgoing transitions
+		totalOutgoingWeights[i] = matchTransitionWeight + totalIndelWeight;
+
+		// Update the probabilities of nodes that connect by to this node
+
+		// Inserts
+		for(int64_t j=0; j<stList_length(node->inserts); j++) {
+			PoaInsert *insert = stList_get(node->inserts, j);
+			nodeForwardLogProbs[i+1] = logAdd(nodeForwardLogProbs[i+1],
+					nodeForwardLogProbs[i] + log(insert->weight/totalOutgoingWeights[i]));
+		}
+
+		// Deletes
+		for(int64_t j=0; j<stList_length(node->deletes); j++) {
+			PoaDelete *delete = stList_get(node->deletes, j);
+			nodeForwardLogProbs[i+delete->length+1] = logAdd(nodeForwardLogProbs[i+delete->length+1],
+					nodeForwardLogProbs[i] + log(delete->weight/totalOutgoingWeights[i]));
+		}
+
+		// Match
+		matchTransitionForwardLogProbs[i] = nodeForwardLogProbs[i] + log(matchTransitionWeight/totalOutgoingWeights[i]);
+		nodeForwardLogProbs[i+1] = logAdd(nodeForwardLogProbs[i+1], matchTransitionForwardLogProbs[i]);
+
+		fprintf(stderr, "%i %f %f\n", (int)i, (float)matchTransitionForwardLogProbs[i], (float)matchTransitionWeight);
+	}
+
+	// Now traceback picking consensus greedily
+
+	stList *consensusStrings = stList_construct3(0, free);
+
+	for(int64_t i=stList_length(poa->nodes); i>0;) {
+
+		//  Add base if not at end
+		if(i < stList_length(poa->nodes)) {
+			PoaNode *node = stList_get(poa->nodes, i);
+			double maxBaseWeight = node->baseWeights[0];
+			int64_t maxBaseIndex = 0;
+			for(int64_t j=1; j<SYMBOL_NUMBER; j++) {
+				if(node->baseWeights[j] > maxBaseWeight) {
+					maxBaseWeight = node->baseWeights[j];
+					maxBaseIndex = j;
+				}
+			}
+			stList_append(consensusStrings, stString_print("%c", symbol_convertSymbolToChar(maxBaseIndex)));
+		}
+
+		// Get max insert
+		double maxInsertProb = LOG_ZERO;
+		PoaInsert *maxInsert = NULL;
+		PoaNode *pNode = stList_get(poa->nodes, i-1);
+		for(int64_t j=0; j<stList_length(pNode->inserts); j++) {
+			PoaInsert *insert = stList_get(pNode->inserts, j);
+			double p = log(insert->weight/totalOutgoingWeights[i-1]) + nodeForwardLogProbs[i-1];
+			if(p > maxInsertProb) {
+				maxInsertProb = p;
+				maxInsert = insert;
+			}
+		}
+
+		// Get max delete
+		double maxDeleteProb = LOG_ZERO;
+		PoaDelete *maxDelete = NULL;
+		stList *incidentDeletes = stList_get(incomingDeletions, i);
+		for(int64_t j=0; j<stList_length(incidentDeletes); j++) {
+			PoaDelete *delete = stList_get(incidentDeletes, j);
+			double p = log(delete->weight/totalOutgoingWeights[i-delete->length-1]) + nodeForwardLogProbs[i-delete->length-1];
+			if(p > maxDeleteProb) {
+				maxDeleteProb = p;
+				maxDelete = delete;
+			}
+		}
+
+		fprintf(stderr, "%i Maxinsert: %f Maxdelete %f Match %f\n", (int)i, (float)maxInsertProb, (float)maxDeleteProb, (float)matchTransitionForwardLogProbs[i-1]);
+
+		if(matchTransitionForwardLogProbs[i-1] >= maxDeleteProb && matchTransitionForwardLogProbs[i-1] >= maxInsertProb) {
+			// Is likely a match, move back to previous reference base
+			i--;
+		}
+		else if(maxInsertProb > maxDeleteProb) {
+			// Is likely an insert, append insert to consensus string
+			// and move to a previous reference base
+			stList_append(consensusStrings, stString_copy(maxInsert->insert));
+			i--;
+		}
+		else {
+			// Is likely a delete, jump back to skip deleted bases
+			i -= maxDelete->length+1;
+		}
+	}
+
+	// Concatenate backwards to make consensus string
+	stList_reverse(consensusStrings);
+	char *consensusString = stString_join2("", consensusStrings);
+
+	// Cleanup
+	stList_destruct(consensusStrings);
+	stList_destruct(incomingDeletions);
+	free(nodeForwardLogProbs);
+	free(matchTransitionForwardLogProbs);
+	free(totalOutgoingWeights);
+
+	return consensusString;
 }
 
 Poa *poa_realignIterative(stList *reads, char *reference,
