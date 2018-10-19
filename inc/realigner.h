@@ -61,6 +61,11 @@ Poa *poa_realign(stList *reads, char *reference,
 void poa_print(Poa *poa, FILE *fH, float indelSignificanceThreshold);
 
 /*
+ * Prints some summary stats on the POA.
+ */
+void poa_printSummaryStats(Poa *poa, FILE *fH);
+
+/*
  * Left align indels and then sorts them by character
  */
 void poa_normalize(Poa *poa);

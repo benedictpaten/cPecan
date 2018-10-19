@@ -26,6 +26,9 @@ int stBaseAlignerRunAllTests(void) {
 	CuSuiteSummary(suite, output);
 	CuSuiteDetails(suite, output);
 	printf("%s\n", output->buffer);
+
+	//while(1);
+
 	return suite->failCount > 0;
 }
 

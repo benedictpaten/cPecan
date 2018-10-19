@@ -610,21 +610,24 @@ void poa_print(Poa *poa, FILE *fH, float indelSignificanceThreshold) {
 			}
 		}
 	}
+}
 
+void poa_printSummaryStats(Poa *poa, FILE *fH) {
 	double totalReferenceMatchWeight = poa_getReferenceNodeTotalMatchWeight(poa)/PAIR_ALIGNMENT_PROB_1;
 	double totalReferenceMismatchWeight = poa_getReferenceNodeTotalDisagreementWeight(poa)/PAIR_ALIGNMENT_PROB_1;
 	double totalInsertWeight = poa_getInsertTotalWeight(poa)/PAIR_ALIGNMENT_PROB_1;
 	double totalDeleteWeight = poa_getDeleteTotalWeight(poa)/PAIR_ALIGNMENT_PROB_1;
 
-	fprintf(fH, "Totals, reference match weight: %f reference mismatch weight: %f insert weight: %f delete weight: %f indel weight: %f\n",
+	fprintf(fH, "Totals, reference match weight: %f reference mismatch weight: %f insert weight: %f delete weight: %f indel weight: %f, sum error: %f\n",
 			totalReferenceMatchWeight, totalReferenceMismatchWeight,
-			totalInsertWeight, totalDeleteWeight, totalInsertWeight + totalDeleteWeight);
+			totalInsertWeight, totalDeleteWeight, totalInsertWeight + totalDeleteWeight, totalInsertWeight + totalDeleteWeight + totalReferenceMismatchWeight);
+
 }
 
 
 double getBaseLogProbability(PoaNode *node) {
 	/*
-	 * Calculates the probabilty of observing the given bases
+	 * Calculates the probability of observing the given bases
 	 */
 	return 0;
 }
@@ -707,9 +710,11 @@ char *poa_getConsensus(Poa *poa) {
 				matchTransitionWeight += node->baseWeights[j];
 			}
 			matchTransitionWeight -= totalIndelWeight;
-			// Hack to stop zero weights
-			matchTransitionWeight = matchTransitionWeight < 0 ? 0.0 : matchTransitionWeight;
 		}
+
+		// Hack to stop zero weights
+		matchTransitionWeight = matchTransitionWeight <= 0 ? 0.0001 : matchTransitionWeight; // Make a small value
+
 		// Calculate the total weight of outgoing transitions
 		totalOutgoingWeights[i] = matchTransitionWeight + totalIndelWeight;
 
@@ -732,8 +737,6 @@ char *poa_getConsensus(Poa *poa) {
 		// Match
 		matchTransitionForwardLogProbs[i] = nodeForwardLogProbs[i] + log(matchTransitionWeight/totalOutgoingWeights[i]);
 		nodeForwardLogProbs[i+1] = logAdd(nodeForwardLogProbs[i+1], matchTransitionForwardLogProbs[i]);
-
-		fprintf(stderr, "%i %f %f\n", (int)i, (float)matchTransitionForwardLogProbs[i], (float)matchTransitionWeight);
 	}
 
 	// Now traceback picking consensus greedily
@@ -758,6 +761,7 @@ char *poa_getConsensus(Poa *poa) {
 
 		// Get max insert
 		double maxInsertProb = LOG_ZERO;
+		double totalInsertProb = LOG_ZERO;
 		PoaInsert *maxInsert = NULL;
 		PoaNode *pNode = stList_get(poa->nodes, i-1);
 		for(int64_t j=0; j<stList_length(pNode->inserts); j++) {
@@ -767,10 +771,12 @@ char *poa_getConsensus(Poa *poa) {
 				maxInsertProb = p;
 				maxInsert = insert;
 			}
+			totalInsertProb = logAdd(totalInsertProb, p);
 		}
 
 		// Get max delete
 		double maxDeleteProb = LOG_ZERO;
+		double totalDeleteProb = LOG_ZERO;
 		PoaDelete *maxDelete = NULL;
 		stList *incidentDeletes = stList_get(incomingDeletions, i);
 		for(int64_t j=0; j<stList_length(incidentDeletes); j++) {
@@ -780,15 +786,16 @@ char *poa_getConsensus(Poa *poa) {
 				maxDeleteProb = p;
 				maxDelete = delete;
 			}
+			totalDeleteProb = logAdd(totalDeleteProb, p);
 		}
 
-		fprintf(stderr, "%i Maxinsert: %f Maxdelete %f Match %f\n", (int)i, (float)maxInsertProb, (float)maxDeleteProb, (float)matchTransitionForwardLogProbs[i-1]);
+		//fprintf(stderr, "%i Maxinsert: %f Maxdelete %f Match %f\n", (int)i, (float)maxInsertProb, (float)maxDeleteProb, (float)matchTransitionForwardLogProbs[i-1]);
 
-		if(matchTransitionForwardLogProbs[i-1] >= maxDeleteProb && matchTransitionForwardLogProbs[i-1] >= maxInsertProb) {
+		if(matchTransitionForwardLogProbs[i-1] >= totalDeleteProb && matchTransitionForwardLogProbs[i-1] >= totalInsertProb) {
 			// Is likely a match, move back to previous reference base
 			i--;
 		}
-		else if(maxInsertProb > maxDeleteProb) {
+		else if(totalInsertProb > totalDeleteProb) {
 			// Is likely an insert, append insert to consensus string
 			// and move to a previous reference base
 			stList_append(consensusStrings, stString_copy(maxInsert->insert));
@@ -829,6 +836,6 @@ Poa *poa_realignIterative(stList *reads, char *reference,
 			return poa;
 		}
 		reference = poa_getConsensus(poa);
-		free(poa);
+		poa_destruct(poa);
 	}
 }
