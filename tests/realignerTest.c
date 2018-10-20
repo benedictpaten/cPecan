@@ -575,14 +575,15 @@ static double calcSequenceMatches(char *seq1, char *seq2) {
 	//Get identity
 	stList *allAlignedPairs = getAlignedPairs(sM, seq1, seq2, p, 0, 0);
 	stList *alignedPairs = filterPairwiseAlignmentToMakePairsOrdered(allAlignedPairs, seq1, seq2, 0.0);
-	double matches = stList_length(alignedPairs);
+
+	double matches = getNumberOfMatchingAlignedPairs(seq1, seq2, alignedPairs);
 
 	// Cleanup
 	stateMachine_destruct(sM);
 	pairwiseAlignmentBandingParameters_destruct(p);
 	hmm_destruct(hmm);
 	//stList_destruct(allAlignedPairs);
-	//stList_destruct(alignedPairs);
+	stList_destruct(alignedPairs);
 
 	return matches;
 }
@@ -611,7 +612,7 @@ static void test_poa_realign_example(CuTest *testCase, char *trueReference, char
 	StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
 
 	Poa *poa = poa_realign(reads, reference, sM, p);
-	Poa *poaRefined = poa_realignIterative(reads, reference, sM, p, 3);
+	Poa *poaRefined = poa_realignIterative(reads, reference, sM, p, 4);
 
 	poa_normalize(poa); // Shift all the indels
 
@@ -789,7 +790,8 @@ static void test_poa_realign_examples(CuTest *testCase, const char **examples, i
 
 		// Run poa iterative realign
 		test_poa_realign_example(testCase, trueReferenceList->list[0], reads->list[0],
-				(char **)(&reads->list[1]), reads->length-1, rle, alignmentMetrics);
+				//(char **)(&reads->list[1]), reads->length-1 > 20 ? 20 : reads->length-1, rle, alignmentMetrics);
+				(const char **)(&reads->list[1]), reads->length-1, rle, alignmentMetrics);
 
 		// Cleanup
 		destructList(reads);
@@ -819,6 +821,29 @@ static void test_poa_realign_messy_examples_no_rle(CuTest *testCase) {
 
 static void test_poa_realign_messy_examples_rle(CuTest *testCase) {
 	test_poa_realign_examples(testCase, messyExamples, messyExampleNo, 1);
+}
+
+static void test_poa_realign_examples_large(CuTest *testCase, bool rle) {
+	int64_t exampleNo = 200;
+	const char *examples[400];
+	for(int64_t i=0; i<exampleNo; i++) {
+		examples[2*i] = stString_print("tests/testExamples/200_random_windows_chr1_celegans_guppy/%i.fasta", (int)i);
+		examples[2*i+1] = stString_print("tests/testExamples/200_random_windows_chr1_celegans_guppy/%i.ref.fasta", (int)i);
+	}
+
+	test_poa_realign_examples(testCase, examples, exampleNo, rle);
+
+	for(int64_t i=0; i<exampleNo*2; i++) {
+		free((char *)examples[i]);
+	}
+}
+
+static void test_poa_realign_examples_large_rle(CuTest *testCase) {
+	test_poa_realign_examples_large(testCase, 1);
+}
+
+static void test_poa_realign_examples_large_no_rle(CuTest *testCase) {
+	test_poa_realign_examples_large(testCase, 0);
 }
 
 /*
@@ -889,7 +914,7 @@ static void test_hmm(CuTest *testCase) {
 CuSuite* realignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
 
-    /*SUITE_ADD_TEST(suite, test_poa_getReferenceGraph);
+    SUITE_ADD_TEST(suite, test_poa_getReferenceGraph);
     SUITE_ADD_TEST(suite, test_poa_augment_example);
     SUITE_ADD_TEST(suite, test_poa_realign_tiny_example1);
     SUITE_ADD_TEST(suite, test_poa_realign_example1);
@@ -898,13 +923,16 @@ CuSuite* realignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_poa_realign_rle_example2);
     SUITE_ADD_TEST(suite, test_poa_realign);
     SUITE_ADD_TEST(suite, test_poa_realignIterative);
-    SUITE_ADD_TEST(suite, test_getShift);*/
+    SUITE_ADD_TEST(suite, test_getShift);
 
-    //SUITE_ADD_TEST(suite, test_poa_realign_examples_no_rle);
-    //SUITE_ADD_TEST(suite, test_poa_realign_examples_rle);
+    SUITE_ADD_TEST(suite, test_poa_realign_examples_no_rle);
+    SUITE_ADD_TEST(suite, test_poa_realign_examples_rle);
 
     SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_no_rle);
-    //SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_rle);
+    SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_rle);
+
+    SUITE_ADD_TEST(suite, test_poa_realign_examples_large_rle);
+    SUITE_ADD_TEST(suite, test_poa_realign_examples_large_no_rle);
 
     return suite;
 }

@@ -621,7 +621,6 @@ void poa_printSummaryStats(Poa *poa, FILE *fH) {
 	fprintf(fH, "Totals, reference match weight: %f reference mismatch weight: %f insert weight: %f delete weight: %f indel weight: %f, sum error: %f\n",
 			totalReferenceMatchWeight, totalReferenceMismatchWeight,
 			totalInsertWeight, totalDeleteWeight, totalInsertWeight + totalDeleteWeight, totalInsertWeight + totalDeleteWeight + totalReferenceMismatchWeight);
-
 }
 
 

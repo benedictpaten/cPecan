@@ -18,9 +18,9 @@ CuSuite* realignmentTestSuite(void);
 int stBaseAlignerRunAllTests(void) {
 	CuString *output = CuStringNew();
 	CuSuite* suite = CuSuiteNew();
-	//CuSuiteAddSuite(suite, pairwiseAlignmentTestSuite());
-	//CuSuiteAddSuite(suite, multipleAlignerTestSuite());
-	//CuSuiteAddSuite(suite, pairwiseAlignmentLongTestSuite());
+	CuSuiteAddSuite(suite, pairwiseAlignmentTestSuite());
+	CuSuiteAddSuite(suite, multipleAlignerTestSuite());
+	CuSuiteAddSuite(suite, pairwiseAlignmentLongTestSuite());
 	CuSuiteAddSuite(suite, realignmentTestSuite());
 	CuSuiteRun(suite);
 	CuSuiteSummary(suite, output);

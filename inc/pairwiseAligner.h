@@ -243,4 +243,33 @@ stList *reweightAlignedPairs(stList *alignedPairs,
 
 stList *reweightAlignedPairs2(stList *alignedPairs, int64_t seqLengthX, int64_t seqLengthY, double gapGamma);
 
+/*
+ * Functions to score an alignment by identity / or some proxy to it.
+ */
+
+/*
+ * Gives the average identity of matches in the alignment, treating indels as mismatches.
+ */
+int64_t getNumberOfMatchingAlignedPairs(char *subSeqX, char *subSeqY, stList *alignedPairs);
+
+/*
+ * Gives the average identity of matches in the alignment, treating indels as mismatches.
+ */
+double scoreByIdentity(char *subSeqX, char *subSeqY, int64_t lX, int64_t lY, stList *alignedPairs);
+
+/*
+ * Gives the average identity of matches in the alignment, ignoring indels.
+ */
+double scoreByIdentityIgnoringGaps(char *subSeqX, char *subSeqY, stList *alignedPairs);
+
+/*
+ * Gives the average posterior match probability per base of the two sequences, treating bases in indels as having 0 match probability.
+ */
+double scoreByPosteriorProbability(int64_t lX, int64_t lY, stList *alignedPairs);
+
+/*
+ * Gives the average posterior match probability per base of the two sequences, ignoring indels.
+ */
+double scoreByPosteriorProbabilityIgnoringGaps(stList *alignedPairs);
+
 #endif /* PAIRWISEALIGNER_H_ */

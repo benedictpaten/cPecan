@@ -937,6 +937,7 @@ MultipleAlignment *makeAlignment(StateMachine *sM, stList *seqFrags, int64_t spa
 
 /*
  * This is a pairwise expected accuracy alignment function that uses the multiple alignment code, kind of odd.
+ * Destroys input list of aligned pairs in process.
  */
 stList *filterPairwiseAlignmentToMakePairsOrdered(stList *alignedPairs, const char *seqX, const char *seqY, float matchGamma) {
     //Convert to multiple alignment pairs
