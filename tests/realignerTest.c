@@ -616,11 +616,6 @@ static void test_poa_realign_example(CuTest *testCase, char *trueReference, char
 
 	poa_normalize(poa); // Shift all the indels
 
-	if (st_getLogLevel() >= debug) {
-		poa_print(poa, stderr, 5);
-		poa_print(poaRefined, stderr, 5);
-	}
-
 	// Calculate alignments between true reference and consensus and starting reference sequences
 	int64_t consensusMatches = calcSequenceMatches(trueReference, poaRefined->refString);
 	int64_t referenceMatches = calcSequenceMatches(trueReference, reference);
@@ -645,6 +640,11 @@ static void test_poa_realign_example(CuTest *testCase, char *trueReference, char
 		poa_printSummaryStats(poaRefined, stderr);
 		st_logInfo("Consensus : true-ref identity: %f\n", 2.0*consensusMatches/(strlen(trueReference) + strlen(poaRefined->refString)));
 		st_logInfo("Start-ref : true-ref identity: %f\n", 2.0*referenceMatches/(strlen(trueReference) + strlen(reference)));
+	}
+
+	if (st_getLogLevel() >= debug && !stString_eq(trueReference, poaRefined->refString)) {
+		//poa_print(poa, stderr, 5);
+		poa_print(poaRefined, stderr, 2);
 	}
 
 	// Cleanup
@@ -914,7 +914,7 @@ static void test_hmm(CuTest *testCase) {
 CuSuite* realignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
 
-    SUITE_ADD_TEST(suite, test_poa_getReferenceGraph);
+    /*SUITE_ADD_TEST(suite, test_poa_getReferenceGraph);
     SUITE_ADD_TEST(suite, test_poa_augment_example);
     SUITE_ADD_TEST(suite, test_poa_realign_tiny_example1);
     SUITE_ADD_TEST(suite, test_poa_realign_example1);
@@ -929,10 +929,10 @@ CuSuite* realignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_poa_realign_examples_rle);
 
     SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_no_rle);
-    SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_rle);
+    SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_rle);*/
 
     SUITE_ADD_TEST(suite, test_poa_realign_examples_large_rle);
-    SUITE_ADD_TEST(suite, test_poa_realign_examples_large_no_rle);
+    //SUITE_ADD_TEST(suite, test_poa_realign_examples_large_no_rle);
 
     return suite;
 }
