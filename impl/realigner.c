@@ -623,7 +623,6 @@ void poa_printSummaryStats(Poa *poa, FILE *fH) {
 			totalInsertWeight, totalDeleteWeight, totalInsertWeight + totalDeleteWeight, totalInsertWeight + totalDeleteWeight + totalReferenceMismatchWeight);
 }
 
-
 double getBaseLogProbability(PoaNode *node) {
 	/*
 	 * Calculates the probability of observing the given bases
@@ -747,14 +746,27 @@ char *poa_getConsensus(Poa *poa) {
 		//  Add base if not at end
 		if(i < stList_length(poa->nodes)) {
 			PoaNode *node = stList_get(poa->nodes, i);
-			double maxBaseWeight = node->baseWeights[0];
-			int64_t maxBaseIndex = 0;
-			for(int64_t j=1; j<SYMBOL_NUMBER; j++) {
-				if(node->baseWeights[j] > maxBaseWeight) {
+
+			// Picks a base, giving a discount to the reference base,
+			// because the alignment is biased towards it
+
+			int64_t refBaseIndex = symbol_convertCharToSymbol(node->base);
+
+			double maxBaseWeight = 0;
+			int64_t maxBaseIndex = -1;
+			for(int64_t j=0; j<SYMBOL_NUMBER; j++) {
+				if(j != refBaseIndex && node->baseWeights[j] > maxBaseWeight) {
 					maxBaseWeight = node->baseWeights[j];
 					maxBaseIndex = j;
 				}
 			}
+
+			double refBaseWeight = node->baseWeights[refBaseIndex];
+
+			if(refBaseWeight * 0.5 > maxBaseWeight) {
+				maxBaseIndex = refBaseIndex;
+			}
+
 			stList_append(consensusStrings, stString_print("%c", symbol_convertSymbolToChar(maxBaseIndex)));
 		}
 

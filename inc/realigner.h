@@ -36,6 +36,12 @@ typedef struct _poaDelete {
 	double weight;
 } PoaDelete;
 
+typedef struct _poaObservation {
+	char *seq;
+	char *rle;
+	float weight;
+};
+
 /*
  * Creates a POA representing the given reference sequence, with one node for each reference base and a 
  * prefix 'N' base to represent place to add inserts/deletes that precede the first position of the reference.

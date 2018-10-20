@@ -923,16 +923,19 @@ CuSuite* realignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_poa_realign_rle_example2);
     SUITE_ADD_TEST(suite, test_poa_realign);
     SUITE_ADD_TEST(suite, test_poa_realignIterative);
-    SUITE_ADD_TEST(suite, test_getShift);
+    SUITE_ADD_TEST(suite, test_getShift);*/
 
-    SUITE_ADD_TEST(suite, test_poa_realign_examples_no_rle);
-    SUITE_ADD_TEST(suite, test_poa_realign_examples_rle);
+    //SUITE_ADD_TEST(suite, test_poa_realign_examples_no_rle);
+    //SUITE_ADD_TEST(suite, test_poa_realign_examples_rle);
 
-    SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_no_rle);
-    SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_rle);*/
+    //SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_no_rle);
+    //SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_rle);
 
     SUITE_ADD_TEST(suite, test_poa_realign_examples_large_rle);
     //SUITE_ADD_TEST(suite, test_poa_realign_examples_large_no_rle);
 
     return suite;
+
+    //True-reference:		TCGCAGTGCGATGC GAT ATCGCATGCGATGCGT
+    //Consensus:		    TCGCAGTGCGATGCAGATCATCGCATGCGATGCGT
 }
