@@ -13,17 +13,19 @@
 #include <inttypes.h>
 #include <ctype.h>
 
-/*
- * Basic overview of realigner algorithm:
- *
- * Inputs: a reference sequence and set of reads, each with a pairwise alignment to the reference
- * Outputs: a modified reference sequence, for each read a pairwise alignment to the reference
- *
- * Steps:
- * For each read, using its guide alignment, generate posterior match and gap probabilities
- * Construct the posterior graph
- * Pick new reference as path through posterior graph
- */
+PoaBaseObservation *poaBaseObservation_construct(int64_t readNo, int64_t offset, double weight) {
+	PoaBaseObservation *poaBaseObservation = st_calloc(1, sizeof(PoaBaseObservation));
+
+	poaBaseObservation->readNo = readNo;
+	poaBaseObservation->offset = offset;
+	poaBaseObservation->weight = weight;
+
+	return poaBaseObservation;
+}
+
+void poaBaseObservation_destruct(PoaBaseObservation *poaBaseObservation) {
+	free(poaBaseObservation);
+}
 
 PoaInsert *poaInsert_construct(char *insert, double weight) {
 	PoaInsert *poaInsert = st_calloc(1, sizeof(PoaInsert));
@@ -59,6 +61,7 @@ PoaNode *poaNode_construct(char base) {
 	poaNode->deletes = stList_construct3(0, (void(*)(void *)) poaDelete_destruct);
 	poaNode->base = base;
 	poaNode->baseWeights = st_calloc(SYMBOL_NUMBER, sizeof(double)); // Encoded using Symbol enum
+	poaNode->observations = stList_construct3(0, (void (*)(void *))poaBaseObservation_destruct);
 
 	return poaNode;
 }
@@ -66,6 +69,7 @@ PoaNode *poaNode_construct(char base) {
 void poaNode_destruct(PoaNode *poaNode) {
 	stList_destruct(poaNode->inserts);
 	stList_destruct(poaNode->deletes);
+	stList_destruct(poaNode->observations);
 	free(poaNode->baseWeights);
 	free(poaNode);
 }
@@ -133,19 +137,17 @@ static void addToInserts(PoaNode *node, char *insert, double weight) {
 	 * Add given insert to node.
 	 */
 
+	PoaInsert *poaInsert = NULL;
 	// Check if the complete insert is already in the poa graph:
-	bool found = 0;
 	for(int64_t m=0; m<stList_length(node->inserts); m++) {
-		PoaInsert *poaInsert = stList_get(node->inserts, m);
+		poaInsert = stList_get(node->inserts, m);
 		if(stString_eq(poaInsert->insert, insert)) {
 			poaInsert->weight += weight;
-			found = 1; break;
+			return;
 		}
 	}
 	// otherwise add the insert to the poa graph
-	if(!found) {
-		stList_append(node->inserts, poaInsert_construct(stString_copy(insert), weight));
-	}
+	stList_append(node->inserts, poaInsert_construct(stString_copy(insert), weight));
 }
 
 static void addToDeletes(PoaNode *node, int64_t length, double weight) {
@@ -153,19 +155,17 @@ static void addToDeletes(PoaNode *node, int64_t length, double weight) {
 	 * Add given deletion to node.
 	 */
 
+	PoaDelete *poaDelete = NULL;
 	// Check if the delete is already in the poa graph:
-	bool found = 0;
 	for(int64_t m=0; m<stList_length(node->deletes); m++) {
-		PoaDelete *poaDelete = stList_get(node->deletes, m);
+		poaDelete = stList_get(node->deletes, m);
 		if(poaDelete->length == length) {
 			poaDelete->weight += weight;
-			found = 1; break;
+			return;
 		}
 	}
 	// otherwise add the delete to the poa graph
-	if(!found) {
-		stList_append(node->deletes, poaDelete_construct(length, weight));
-	}
+	stList_append(node->deletes, poaDelete_construct(length, weight));
 }
 
 char *poa_getReferenceSubstring(Poa *poa, int64_t startIndex, int64_t length) {
@@ -268,7 +268,7 @@ char *rotateString(char *str, int64_t length, int64_t rotationLength) {
 	return str2;
 }
 
-void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList *deletes) {
+void poa_augment(Poa *poa, char *read, int64_t readNo, stList *matches, stList *inserts, stList *deletes) {
 	// Add weights of matches to the POA graph
 
 	// For each match in alignment subgraph identify its corresponding node in the POA graph
@@ -280,6 +280,9 @@ void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList 
 
 		// Add base weight to POA node
 		node->baseWeights[symbol_convertCharToSymbol(read[stIntTuple_get(match, 2)])] += stIntTuple_get(match, 0);
+
+		// PoaObservation
+		stList_append(node->observations, poaBaseObservation_construct(readNo, stIntTuple_get(match, 2), stIntTuple_get(match, 0)));
 	}
 
 	// Create a set of match coordinates
@@ -487,7 +490,7 @@ Poa *poa_realign(stList *reads, char *reference,
 		getAlignedPairsWithIndels(sM, reference, read, p, &matches, &deletes, &inserts, 0, 0);
 
 		// Add weights, edges and nodes to the poa
-		poa_augment(poa, read, matches, inserts, deletes);
+		poa_augment(poa, read, i, matches, inserts, deletes);
 
 		// Cleanup
 		stList_destruct(matches);
@@ -623,13 +626,6 @@ void poa_printSummaryStats(Poa *poa, FILE *fH) {
 			totalInsertWeight, totalDeleteWeight, totalInsertWeight + totalDeleteWeight, totalInsertWeight + totalDeleteWeight + totalReferenceMismatchWeight);
 }
 
-double getBaseLogProbability(PoaNode *node) {
-	/*
-	 * Calculates the probability of observing the given bases
-	 */
-	return 0;
-}
-
 char *poa_getConsensus(Poa *poa) {
 	// Cheesy profile HMM like algorithm
 	// Calculates forward probabilities through model, then
@@ -669,11 +665,6 @@ char *poa_getConsensus(Poa *poa) {
 
 	for(int64_t i=0; i<stList_length(poa->nodes); i++) {
 		PoaNode *node = stList_get(poa->nodes, i);
-
-		// For all reference positions (barring the "N" prefix, calculate the base probability
-		if(i > 0) {
-			nodeForwardLogProbs[i] += getBaseLogProbability(node);
-		}
 
 		// Calculate total weight of indels connecting from this node
 
@@ -746,7 +737,7 @@ char *poa_getConsensus(Poa *poa) {
 		//  Add base if not at end
 		if(i < stList_length(poa->nodes)) {
 			PoaNode *node = stList_get(poa->nodes, i);
-
+			
 			// Picks a base, giving a discount to the reference base,
 			// because the alignment is biased towards it
 
@@ -806,7 +797,7 @@ char *poa_getConsensus(Poa *poa) {
 			// Is likely a match, move back to previous reference base
 			i--;
 		}
-		else if(totalInsertProb > totalDeleteProb) {
+		else if(totalInsertProb >= totalDeleteProb) {
 			// Is likely an insert, append insert to consensus string
 			// and move to a previous reference base
 			stList_append(consensusStrings, stString_copy(maxInsert->insert));
@@ -833,8 +824,7 @@ char *poa_getConsensus(Poa *poa) {
 }
 
 Poa *poa_realignIterative(stList *reads, char *reference,
-			  	 StateMachine *sM, PairwiseAlignmentParameters *p,
-				 uint64_t iterations) {
+			  	 StateMachine *sM, PairwiseAlignmentParameters *p, uint64_t iterations) {
 	assert(iterations > 0);
 
 	int64_t i=0;
@@ -850,3 +840,200 @@ Poa *poa_realignIterative(stList *reads, char *reference,
 		poa_destruct(poa);
 	}
 }
+
+/*
+ * Functions for run-length encoding/decoding with POAs
+ */
+
+RleString *rleString_construct(char *str) {
+	RleString *rleString = st_calloc(1, sizeof(RleString));
+
+	int64_t strLength = strlen(str);
+
+	// Calc length of rle'd str
+	for(int64_t i=0; i<strLength; i++) {
+		if(i+1 == strLength || str[i] != str[i+1]) {
+			rleString->length++;
+		}
+	}
+
+	// Allocate
+	rleString->rleString = st_calloc(rleString->length+1, sizeof(char));
+	rleString->repeatCounts = st_calloc(rleString->length, sizeof(int64_t));
+
+	// Fill out
+	int64_t j=0, k=1;
+	for(int64_t i=0; i<strLength; i++) {
+		if(i+1 == strLength || str[i] != str[i+1]) {
+			rleString->rleString[j] = str[i];
+			rleString->repeatCounts[j++] = k;
+			k=1;
+		}
+		else {
+			k++;
+		}
+	}
+	assert(j == rleString->length);
+
+	return rleString;
+}
+
+void rleString_destruct(RleString *rleString) {
+	free(rleString->rleString);
+	free(rleString->repeatCounts);
+	free(rleString);
+}
+
+static char *expandRLEConsensus2(PoaNode *node, stList *rleReads, RepeatSubMatrix *repeatSubMatrix) {
+	// Pick the base
+	int64_t refBaseIndex = symbol_convertCharToSymbol(node->base);
+
+	double maxBaseWeight = 0;
+	int64_t maxBaseIndex = -1;
+	for(int64_t j=0; j<SYMBOL_NUMBER; j++) {
+		if(j != refBaseIndex && node->baseWeights[j] > maxBaseWeight) {
+			maxBaseWeight = node->baseWeights[j];
+			maxBaseIndex = j;
+		}
+	}
+	double refBaseWeight = node->baseWeights[refBaseIndex];
+	if(refBaseWeight * 1.0 > maxBaseWeight) {
+		maxBaseIndex = refBaseIndex;
+	}
+	char base = symbol_convertSymbolToChar(maxBaseIndex);
+
+	// Repeat count
+	double logProbability;
+	int64_t repeatCount = repeatSubMatrix_getMLRepeatCount(repeatSubMatrix, maxBaseIndex, node->observations,
+			rleReads, &logProbability);
+
+	/*double totalRepeatCount = 0;
+	double totalWeight = 0;
+	double *repeatCounts = st_calloc(100, sizeof(double));
+	for(int64_t i=0; i<stList_length(node->observations); i++) {
+		PoaBaseObservation *obs = stList_get(node->observations, i);
+
+		RleString *rleString = stList_get(rleReads, obs->readNo);
+
+		char obsBase = rleString->rleString[obs->offset];
+
+		if(obs->weight/PAIR_ALIGNMENT_PROB_1 > 0.95 && obsBase == base) {
+			repeatCounts[rleString->repeatCounts[obs->offset]] += obs->weight;
+		}
+
+		totalRepeatCount += rleString->repeatCounts[obs->offset] * obs->weight;
+		totalWeight += obs->weight;
+	}
+	double maxWeightRepeatCount = repeatCounts[0];
+	int64_t maxRepeatCount = 0;
+	for(int64_t i=1; i<100; i++) {
+		if(repeatCounts[i] > maxWeightRepeatCount) {
+			maxWeightRepeatCount = repeatCounts[i];
+			maxRepeatCount = i;
+		}
+	}
+	int64_t repeatCount = maxRepeatCount; //round(totalRepeatCount/totalWeight);
+	free(repeatCounts);*/
+
+	char *str = st_calloc(repeatCount+1, sizeof(char));
+	for(int64_t j=0; j<repeatCount; j++) {
+		str[j] = base;
+	}
+	str[repeatCount] = '\0';
+	return str;
+}
+
+char *expandRLEConsensus(Poa *poa, stList *rleReads, RepeatSubMatrix *repeatSubMatrix) {
+	stList *consensus = stList_construct3(0, free);
+	for(int64_t i=1; i<stList_length(poa->nodes); i++) {
+		stList_append(consensus, expandRLEConsensus2(stList_get(poa->nodes, i),
+				rleReads, repeatSubMatrix));
+	}
+	char *consensusString = stString_join2("", consensus);
+	stList_destruct(consensus);
+	return consensusString;
+}
+
+/*
+ * Functions for modeling repeat counts
+ */
+
+double *repeatSubMatrix_setLogProb(RepeatSubMatrix *repeatSubMatrix, Symbol base, int64_t observedRepeatCount, int64_t underlyingRepeatCount) {
+	return &(repeatSubMatrix->logProbabilities[base * repeatSubMatrix->maximumRepeatLength * repeatSubMatrix->maximumRepeatLength +
+											 underlyingRepeatCount * repeatSubMatrix->maximumRepeatLength + observedRepeatCount]);
+}
+
+double repeatSubMatrix_getLogProb(RepeatSubMatrix *repeatSubMatrix, Symbol base, int64_t observedRepeatCount, int64_t underlyingRepeatCount) {
+	return *repeatSubMatrix_setLogProb(repeatSubMatrix, base, observedRepeatCount, underlyingRepeatCount);
+}
+
+RepeatSubMatrix *repeatSubMatrix_parse(char *fileName) {
+	RepeatSubMatrix *repeatSubMatrix = st_calloc(1, sizeof(RepeatSubMatrix));
+
+	repeatSubMatrix->maximumRepeatLength = 51;
+	repeatSubMatrix->logProbabilities = st_calloc(SYMBOL_NUMBER_NO_N *
+			repeatSubMatrix->maximumRepeatLength * repeatSubMatrix->maximumRepeatLength, sizeof(double));
+
+	FILE *fh = fopen(fileName, "r");
+
+	for(int64_t i=0; i<SYMBOL_NUMBER_NO_N; i++) {
+		char *header = stFile_getLineFromFile(fh);
+		char base = header[1];
+		Symbol baseIndex = symbol_convertCharToSymbol(header[1]);
+		char *probsStr = stFile_getLineFromFile(fh);
+		stList *tokens = stString_split(probsStr);
+		for(int64_t j=0; j<repeatSubMatrix->maximumRepeatLength; j++) {
+			for(int64_t k=0; k<repeatSubMatrix->maximumRepeatLength; k++) {
+				char *logProbStr = stList_get(tokens, j*repeatSubMatrix->maximumRepeatLength + k);
+
+				double *logProb = repeatSubMatrix_setLogProb(repeatSubMatrix, baseIndex, k, j);
+
+				int l = sscanf(logProbStr, "%lf", logProb);
+				(void)l;
+				assert(l == 1);
+			}
+		}
+		fprintf(stderr, "Header: %i %c %f %f\n", (int)stList_length(tokens), header[1],
+				repeatSubMatrix_getLogProb(repeatSubMatrix, baseIndex, 0, 0),
+				repeatSubMatrix_getLogProb(repeatSubMatrix, baseIndex, 1, 0));
+	}
+
+	fclose(fh);
+
+	return repeatSubMatrix;
+}
+
+void repeatSubMatrix_destruct(RepeatSubMatrix *repeatSubMatrix) {
+	free(repeatSubMatrix->logProbabilities);
+	free(repeatSubMatrix);
+}
+
+double repeatSubMatrix_getLogProbForGivenRepeatCount(RepeatSubMatrix *repeatSubMatrix, Symbol base, stList *observations,
+												     stList *rleReads, int64_t underlyingRepeatCount) {
+	double logProb = LOG_ONE;
+	for(int64_t i=0; i<stList_length(observations); i++) {
+		PoaBaseObservation *observation = stList_get(observations, i);
+		RleString *read = stList_get(rleReads, observation->readNo);
+		int64_t observedRepeatCount = read->repeatCounts[observation->offset];
+		assert(underlyingRepeatCount < repeatSubMatrix->maximumRepeatLength);
+		logProb += repeatSubMatrix_getLogProb(repeatSubMatrix, base, observedRepeatCount, underlyingRepeatCount);
+	}
+
+	return logProb;
+}
+
+int64_t repeatSubMatrix_getMLRepeatCount(RepeatSubMatrix *repeatSubMatrix, Symbol base, stList *observations,
+		stList *rleReads, double *logProbability) {
+	double mlLogProb = repeatSubMatrix_getLogProbForGivenRepeatCount(repeatSubMatrix, base, observations, rleReads, 0);
+	int64_t mlRepeatLength = 0;
+	for(int64_t i=1; i<repeatSubMatrix->maximumRepeatLength; i++) {
+		double p = repeatSubMatrix_getLogProbForGivenRepeatCount(repeatSubMatrix, base, observations, rleReads, i);
+		if(p > mlLogProb) {
+			mlLogProb = p;
+			mlRepeatLength = i;
+		}
+	}
+	*logProbability = mlLogProb;
+	return mlRepeatLength;
+}
+

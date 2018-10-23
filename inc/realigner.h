@@ -24,6 +24,7 @@ typedef struct _poaNode {
 	stList *deletes; // Deletes that happen immediately after this position
 	char base; // Char representing base, e.g. 'A', 'C', etc.
 	double *baseWeights; // Array of length SYMBOL_NUMBER, encoding the weight given go each base, using the Symbol enum
+	stList *observations; // Individual events representing event, a list of PoaObservations
 } PoaNode;
 
 typedef struct _poaInsert {
@@ -36,11 +37,15 @@ typedef struct _poaDelete {
 	double weight;
 } PoaDelete;
 
-typedef struct _poaObservation {
-	char *seq;
-	char *rle;
-	float weight;
-};
+typedef struct _poaBaseObservation {
+	int64_t readNo;
+	int64_t offset;
+	double weight;
+} PoaBaseObservation;
+
+/*
+ * Poa functions.
+ */
 
 /*
  * Creates a POA representing the given reference sequence, with one node for each reference base and a 
@@ -52,7 +57,7 @@ Poa *poa_getReferenceGraph(char *reference);
  * Adds to given POA the matches, inserts and deletes from the alignment of the given read to the reference.
  * Adds the inserts and deletes so that they are left aligned.
  */
-void poa_augment(Poa *poa, char *read, stList *matches, stList *inserts, stList *deletes);
+void poa_augment(Poa *poa, char *read, int64_t readNo, stList *matches, stList *inserts, stList *deletes);
 
 /*
  * Creates a POA representing the reference and the expected inserts / deletes and substitutions from the 
@@ -77,7 +82,7 @@ void poa_printSummaryStats(Poa *poa, FILE *fH);
 void poa_normalize(Poa *poa);
 
 /*
- * Creates a consensus reference sequence from the POA
+ * Creates a consensus reference sequence from the POA.
  */
 char *poa_getConsensus(Poa *poa);
 
@@ -104,12 +109,6 @@ int64_t getShift(char *refString, int64_t refStart, char *str, int64_t length);
 double poa_getReferenceNodeTotalMatchWeight(Poa *poa);
 
 /*
- * Get sum of weights for non-reference bases in poa - proxy to disagreement of read positions
- * aligned with reference.
- */
-double poa_getReferenceNodeTotalDisagreementWeight(Poa *poa);
-
-/*
  * Get sum of weights for delete in poa - proxy to delete disagreement of reads
  * with reference.
  */
@@ -120,5 +119,64 @@ double poa_getDeleteTotalWeight(Poa *poa);
  * with reference.
  */
 double poa_getInsertTotalWeight(Poa *poa);
+
+/*
+ * Get sum of weights for non-reference bases in poa - proxy to disagreement of read positions
+ * aligned with reference.
+ */
+double poa_getReferenceNodeTotalDisagreementWeight(Poa *poa);
+
+/*
+ * Functions for run-length encoding/decoding with POAs
+ */
+
+// Data structure for representing RLE strings
+typedef struct _rleString {
+	char *rleString; //Run-length-encoded (RLE) string
+	int64_t *repeatCounts; // Count of repeat for each position in rleString
+	int64_t length; // Length of the rleSrring
+} RleString;
+
+RleString *rleString_construct(char *string);
+
+void rleString_destruct(RleString *rlString);
+
+// Data structure for storing log-probabilities of observing
+// one repeat count given another
+typedef struct _repeatSubMatrix {
+	double *logProbabilities;
+	int64_t maximumRepeatLength;
+} RepeatSubMatrix;
+
+/*
+ * Reads the repeat count matrix from a given input file.
+ */
+RepeatSubMatrix *repeatSubMatrix_parse(char *fileName);
+
+void repeatSubMatrix_destruct(RepeatSubMatrix *repeatSubMatrix);
+
+/*
+ * Gets the log probability of observing a given repeat conditioned on an underlying repeat count and base.
+ */
+double repeatSubMatrix_getLogProb(RepeatSubMatrix *repeatSubMatrix, Symbol base, int64_t observedRepeatCount, int64_t underlyingRepeatCount);
+
+/*
+ * Gets the log probability of observing a given set of repeat observations conditioned on an underlying repeat count and base.
+ */
+double repeatSubMatrix_getLogProbForGivenRepeatCount(RepeatSubMatrix *repeatSubMatrix, Symbol base, stList *observations,
+												     stList *rleReads, int64_t underlyingRepeatCount);
+
+/*
+ * Gets the maximum likelihood underlying repeat count for a given set of observed read repeat counts.
+ * Puts the ml log probility in *logProbabilty.
+ */
+int64_t repeatSubMatrix_getMLRepeatCount(RepeatSubMatrix *repeatSubMatrix, Symbol base, stList *observations, stList *rleReads, double *logProbability);
+
+/*
+ * Takes a POA done in run-length space and returns an expanded consensus string in
+ * non-run-length space.
+ */
+char *expandRLEConsensus(Poa *poa, stList *rlReads, RepeatSubMatrix *repeatSubMatrix);
+
 
 #endif /* REALIGNER_H_ */

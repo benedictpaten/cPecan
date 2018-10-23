@@ -163,7 +163,7 @@ static void test_poa_augment_example(CuTest *testCase) {
 	stList_append(deletes, stIntTuple_construct3(50, 2, 1));
 	stList_append(deletes, stIntTuple_construct3(50, 3, 2));
 
-	poa_augment(poa, read, matches, inserts, deletes);
+	poa_augment(poa, read, 0, matches, inserts, deletes);
 
 	if (st_getLogLevel() >= info) {
 		poa_print(poa, stderr, 0.0);
@@ -548,25 +548,6 @@ static const char *readArrayExample2[] = {
 static char *referenceExample2 =     "GATGTAAAAAAGAAATGATTTGCTAGAACAGAGCATAAATACACATCTGT";
 static char *trueReferenceExample2 = "GATGTAAAAAAAAAGAAATGACGGAAGTTAGAACAGAGCATAAATACACATCTGT";
 
-static char * runLengthEncode(char *str) {
-	/*
-	 * Returns a run length encoded version of the string str.
-	 */
-
-	int64_t length = strlen(str);
-	char *rleStr = st_calloc(length+1, sizeof(char));
-
-	int64_t j=0;
-	for(int64_t i=0; i<length; i++) {
-		if(i==0 || str[i] != str[i-1]) {
-			rleStr[j++] = str[i];
-		}
-	}
-	rleStr[j] = '\0';
-
-	return rleStr;
-}
-
 static double calcSequenceMatches(char *seq1, char *seq2) {
 	PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 	Hmm *hmm = hmm_loadFromFile(nanoporeHmmFile);
@@ -596,14 +577,101 @@ typedef struct _alignmentMetrics {
 	int64_t totalTrueReferenceLength;
 } AlignmentMetrics;
 
-static void test_poa_realign_example(CuTest *testCase, char *trueReference, char *reference, const char **readArray,
-									int64_t readNo, bool RLE, AlignmentMetrics *alignmentMetrics) {
-	stList *reads = stList_construct3(0, RLE ? free : NULL);
+static void test_poa_realign_example_rle(CuTest *testCase, char *trueReference, char *reference, const char **readArray,
+										 int64_t readNo, AlignmentMetrics *rleAlignmentMetrics, AlignmentMetrics *nonRleAlignmentMetrics) {
+	stList *reads = stList_construct();
+	stList *rleStrings = stList_construct3(0, (void (*)(void *))rleString_destruct);
 	for(int64_t i=0; i<readNo; i++) {
-		stList_append(reads, RLE ? runLengthEncode((char *)readArray[i]) : (char *)readArray[i]);
+		RleString *rleString = rleString_construct((char *)readArray[i]);
+		stList_append(rleStrings, rleString);
+		stList_append(reads, rleString->rleString);
 	}
-	reference = RLE ? runLengthEncode(reference) : reference;
-	trueReference = RLE ? runLengthEncode(trueReference) : trueReference;
+	RleString *rleReference = rleString_construct(reference);
+	RleString *rleTrueReference = rleString_construct(trueReference);
+
+	PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+
+	Hmm *hmm = hmm_loadFromFile(nanoporeHmmFile);
+
+	StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
+
+	Poa *poa = poa_realign(reads, rleReference->rleString, sM, p);
+	Poa *poaRefined = poa_realignIterative(reads, rleReference->rleString, sM, p, 4);
+
+	poa_normalize(poa); // Shift all the indels
+
+	RepeatSubMatrix *repeatSubMatrix = repeatSubMatrix_parse("./log_prob_matrices_fasta_one_liners_2x_pseudocounts.txt");
+
+	// Look at non-rle comparison
+	char *nonRLEConsensusString = expandRLEConsensus(poaRefined, rleStrings, repeatSubMatrix);
+
+	// Calculate alignments between true reference and consensus and starting reference sequences
+	int64_t consensusMatches = calcSequenceMatches(rleTrueReference->rleString, poaRefined->refString);
+	int64_t referenceMatches = calcSequenceMatches(rleTrueReference->rleString, rleReference->rleString);
+	int64_t nonRLEConsensusMatches = calcSequenceMatches(trueReference, nonRLEConsensusString);
+	int64_t nonRLEReferenceMatches = calcSequenceMatches(trueReference, reference);
+
+	// Update the running total alignment metrics
+	if(rleAlignmentMetrics != NULL) {
+		rleAlignmentMetrics->totalConsensusMatches += consensusMatches;
+		rleAlignmentMetrics->totalReferenceMatches += referenceMatches;
+		rleAlignmentMetrics->totalConsensusLength += strlen(poaRefined->refString);
+		rleAlignmentMetrics->totalReferenceLength += rleReference->length;
+		rleAlignmentMetrics->totalTrueReferenceLength += rleTrueReference->length;
+	}
+
+	// Update the running total alignment metrics
+	if(nonRleAlignmentMetrics != NULL) {
+		nonRleAlignmentMetrics->totalConsensusMatches += nonRLEConsensusMatches;
+		nonRleAlignmentMetrics->totalReferenceMatches += nonRLEReferenceMatches;
+		nonRleAlignmentMetrics->totalConsensusLength += strlen(nonRLEConsensusString);
+		nonRleAlignmentMetrics->totalReferenceLength += strlen(reference);
+		nonRleAlignmentMetrics->totalTrueReferenceLength += strlen(trueReference);
+	}
+
+	// Log some stuff
+	if (st_getLogLevel() >= info) {
+		st_logInfo("Reference:\t\t%s\n", rleReference->rleString);
+		st_logInfo("True-reference:\t\t%s\n", rleTrueReference->rleString);
+		st_logInfo("Consensus:\t\t%s\n", poaRefined->refString);
+		st_logInfo("Reference stats\t");
+		poa_printSummaryStats(poa, stderr);
+		st_logInfo("Consensus stats\t");
+		poa_printSummaryStats(poaRefined, stderr);
+		st_logInfo("Consensus : true-ref identity: %f\n", 2.0*consensusMatches/(rleTrueReference->length + strlen(poaRefined->refString)));
+		st_logInfo("Start-ref : true-ref identity: %f\n", 2.0*referenceMatches/(rleTrueReference->length + rleReference->length));
+		// Non-RLE stats
+		st_logInfo("Non-RLE Reference:\t\t%s\n", reference);
+		st_logInfo("Non-RLE True-reference:\t\t%s\n", trueReference);
+		st_logInfo("Non-RLE Consensus:\t\t%s\n", nonRLEConsensusString);
+		st_logInfo("Non-RLE Consensus : true-ref identity: %f\n", 2.0*nonRLEConsensusMatches/(strlen(trueReference) + strlen(nonRLEConsensusString)));
+		st_logInfo("Non-RLE Start-ref : true-ref identity: %f\n", 2.0*nonRLEReferenceMatches/(strlen(trueReference) + strlen(reference)));
+	}
+
+	if (st_getLogLevel() >= debug && !stString_eq(rleTrueReference->rleString, poaRefined->refString)) {
+		//poa_print(poa, stderr, 5);
+		poa_print(poaRefined, stderr, 2);
+	}
+
+	// Cleanup
+	repeatSubMatrix_destruct(repeatSubMatrix);
+	stateMachine_destruct(sM);
+	pairwiseAlignmentBandingParameters_destruct(p);
+	poa_destruct(poa);
+	poa_destruct(poaRefined);
+	stList_destruct(reads);
+	hmm_destruct(hmm);
+	rleString_destruct(rleTrueReference);
+	rleString_destruct(rleReference);
+	stList_destruct(rleStrings);
+}
+
+static void test_poa_realign_example(CuTest *testCase, char *trueReference, char *reference, const char **readArray,
+									int64_t readNo, AlignmentMetrics *alignmentMetrics) {
+	stList *reads = stList_construct();
+	for(int64_t i=0; i<readNo; i++) {
+		stList_append(reads, (char *)readArray[i]);
+	}
 
 	PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
 
@@ -654,10 +722,6 @@ static void test_poa_realign_example(CuTest *testCase, char *trueReference, char
 	poa_destruct(poaRefined);
 	stList_destruct(reads);
 	hmm_destruct(hmm);
-	if(RLE) {
-		free(reference);
-		free(trueReference);
-	}
 }
 
 static void test_poa_realign_example1(CuTest *testCase) {
@@ -667,7 +731,7 @@ static void test_poa_realign_example1(CuTest *testCase) {
 	//Reference:     CA  TCTCTCTCGTCATGCACAGACAGATGATGCAGCATATGACATACGCATAT
 	//True-reference:CATCTCTCTCTCGTCATGCACAGACAGATGATGC GCATGTGACATACGCATAT
 
-	test_poa_realign_example(testCase, trueReferenceExample1, referenceExample1, readArrayExample1, 45, 0, NULL);
+	test_poa_realign_example(testCase, trueReferenceExample1, referenceExample1, readArrayExample1, 45, NULL);
 }
 
 static void test_poa_realign_rle_example1(CuTest *testCase) {
@@ -676,7 +740,7 @@ static void test_poa_realign_rle_example1(CuTest *testCase) {
 	//reference =     "CATTTT   CTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAA TGCAGGGCAATAATGACCATAAAACGCATTTTT ATTT";
 	//trueReference = "CATTTTTCTCTCTCCCTCCGTCATTGCACAGGAAAACAGATGAAAAATGCGGGGCATG  TGACCATAAAACGCATTTTTTATTT";
 
-	test_poa_realign_example(testCase, trueReferenceExample1, referenceExample1, readArrayExample1, 45, 1, NULL);
+	test_poa_realign_example_rle(testCase, trueReferenceExample1, referenceExample1, readArrayExample1, 45, NULL, NULL);
 }
 
 static void test_poa_realign_example2(CuTest *testCase) {
@@ -684,7 +748,7 @@ static void test_poa_realign_example2(CuTest *testCase) {
 	//True-reference:		GATGTAAAAAAAAAGAAATGACGGAAGTTAGAACAGAGCATAAATACACATCTGT
 	//Predicted reference:	GATGTAAAAAAAA GAAATGATGGAAGTTAGAACAGAGCATAAATACACATCTGT
 
-	test_poa_realign_example(testCase, trueReferenceExample2, referenceExample2, readArrayExample2, 41, 0, NULL);
+	test_poa_realign_example(testCase, trueReferenceExample2, referenceExample2, readArrayExample2, 41, NULL);
 }
 
 static void test_poa_realign_rle_example2(CuTest *testCase) {
@@ -694,7 +758,7 @@ static void test_poa_realign_rle_example2(CuTest *testCase) {
 	//True-reference: GATGTAGATGACGAGTAGACAGAGCATATACACATCTGT
 	//Reference:      GATGTAGATGATG CTAGACAGAGCATATACACATCTGT
 
-	test_poa_realign_example(testCase, trueReferenceExample2, referenceExample2, readArrayExample2, 41, 1, NULL);
+	test_poa_realign_example_rle(testCase, trueReferenceExample2, referenceExample2, readArrayExample2, 41, NULL, NULL);
 }
 
 static int64_t exampleNo = 20;
@@ -778,6 +842,7 @@ struct List *readSequences(char *fastaFile) {
 
 static void test_poa_realign_examples(CuTest *testCase, const char **examples, int64_t exampleNo, bool rle) {
 	AlignmentMetrics *alignmentMetrics = st_calloc(1, sizeof(AlignmentMetrics));
+	AlignmentMetrics *rleAlignmentMetrics = st_calloc(1, sizeof(AlignmentMetrics));
 	for(int64_t example=0; example<exampleNo; example++) {
 		const char *readFile = examples[example*2];
 		const char *trueRefFile = examples[example*2+1];
@@ -789,9 +854,16 @@ static void test_poa_realign_examples(CuTest *testCase, const char **examples, i
 		assert(trueReferenceList->length == 1);
 
 		// Run poa iterative realign
-		test_poa_realign_example(testCase, trueReferenceList->list[0], reads->list[0],
-				//(char **)(&reads->list[1]), reads->length-1 > 20 ? 20 : reads->length-1, rle, alignmentMetrics);
-				(const char **)(&reads->list[1]), reads->length-1, rle, alignmentMetrics);
+		if(rle) {
+			test_poa_realign_example_rle(testCase, trueReferenceList->list[0], reads->list[0],
+							//(char **)(&reads->list[1]), reads->length-1 > 20 ? 20 : reads->length-1, rle, alignmentMetrics);
+							(const char **)(&reads->list[1]), reads->length-1, rleAlignmentMetrics, alignmentMetrics);
+		}
+		else {
+			test_poa_realign_example(testCase, trueReferenceList->list[0], reads->list[0],
+					//(char **)(&reads->list[1]), reads->length-1 > 20 ? 20 : reads->length-1, rle, alignmentMetrics);
+					(const char **)(&reads->list[1]), reads->length-1, alignmentMetrics);
+		}
 
 		// Cleanup
 		destructList(reads);
@@ -803,8 +875,15 @@ static void test_poa_realign_examples(CuTest *testCase, const char **examples, i
 			2.0*alignmentMetrics->totalConsensusMatches/(alignmentMetrics->totalConsensusLength+alignmentMetrics->totalTrueReferenceLength),
 			alignmentMetrics->totalConsensusLength,
 			2.0*alignmentMetrics->totalReferenceMatches/(alignmentMetrics->totalReferenceLength+alignmentMetrics->totalTrueReferenceLength));
+	if(rle) {
+		st_logInfo("RLE Space: Total consensus identity: %f for %i bases, vs. %f starting identity\n",
+					2.0*rleAlignmentMetrics->totalConsensusMatches/(rleAlignmentMetrics->totalConsensusLength+rleAlignmentMetrics->totalTrueReferenceLength),
+					rleAlignmentMetrics->totalConsensusLength,
+					2.0*rleAlignmentMetrics->totalReferenceMatches/(rleAlignmentMetrics->totalReferenceLength+rleAlignmentMetrics->totalTrueReferenceLength));
+	}
 
 	free(alignmentMetrics);
+	free(rleAlignmentMetrics);
 }
 
 static void test_poa_realign_examples_no_rle(CuTest *testCase) {
@@ -844,6 +923,28 @@ static void test_poa_realign_examples_large_rle(CuTest *testCase) {
 
 static void test_poa_realign_examples_large_no_rle(CuTest *testCase) {
 	test_poa_realign_examples_large(testCase, 0);
+}
+
+static void test_rleString_example(CuTest *testCase, const char *testStr, int64_t rleLength, const char *testStrRLE, const int64_t *repeatCounts) {
+	RleString *rleString = rleString_construct((char *)testStr);
+
+	CuAssertIntEquals(testCase, rleLength, rleString->length);
+	CuAssertStrEquals(testCase, testStrRLE, rleString->rleString);
+	for(int64_t i=0; i<rleLength; i++) {
+		CuAssertIntEquals(testCase, repeatCounts[i], rleString->repeatCounts[i]);
+	}
+
+	rleString_destruct(rleString);
+}
+
+static void test_rleString_examples(CuTest *testCase) {
+	test_rleString_example(testCase, "GATTACAGGGGTT", 8, "GATACAGT", (const int64_t[]){ 1,1,2,1,1,1,4,2 });
+
+	test_rleString_example(testCase, "TTTTT", 1, "T", (const int64_t[]){ 5 });
+
+	test_rleString_example(testCase, "", 0, "", (const int64_t[]){ 1 });
+
+	test_rleString_example(testCase, "TTTTTCC", 2, "TC", (const int64_t[]){ 5, 2 });
 }
 
 /*
@@ -923,19 +1024,18 @@ CuSuite* realignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_poa_realign_rle_example2);
     SUITE_ADD_TEST(suite, test_poa_realign);
     SUITE_ADD_TEST(suite, test_poa_realignIterative);
-    SUITE_ADD_TEST(suite, test_getShift);*/
+    SUITE_ADD_TEST(suite, test_getShift);
 
-    //SUITE_ADD_TEST(suite, test_poa_realign_examples_no_rle);
-    //SUITE_ADD_TEST(suite, test_poa_realign_examples_rle);
+    SUITE_ADD_TEST(suite, test_poa_realign_examples_no_rle);
+    SUITE_ADD_TEST(suite, test_poa_realign_examples_rle);
 
-    //SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_no_rle);
-    //SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_rle);
+    SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_no_rle);
+    SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_rle);*/
 
     SUITE_ADD_TEST(suite, test_poa_realign_examples_large_rle);
     //SUITE_ADD_TEST(suite, test_poa_realign_examples_large_no_rle);
 
-    return suite;
+    //SUITE_ADD_TEST(suite, test_rleString_examples);
 
-    //True-reference:		TCGCAGTGCGATGC GAT ATCGCATGCGATGCGT
-    //Consensus:		    TCGCAGTGCGATGCAGATCATCGCATGCGATGCGT
+    return suite;
 }
