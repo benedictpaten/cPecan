@@ -12,6 +12,8 @@ char getRandomChar();
 
 char *getRandomSequence(int64_t length);
 
+char *getRandomACGTSequence(int64_t length);
+
 char *evolveSequence(const char *startSequence);
 
 #endif /* RANDOMSEQUENCES_H_ */

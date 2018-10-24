@@ -38,6 +38,8 @@ struct _stateMachine {
     StateMachineType type;
     int64_t stateNumber;
     int64_t matchState;
+    int64_t gapXState; // This is the "primary" gap x state (e.g. short)
+    int64_t gapYState;  // This is the "primary" gap y state (e.g. short)
 
     double (*startStateProb)(StateMachine *sM, int64_t state);
 

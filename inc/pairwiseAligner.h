@@ -45,11 +45,24 @@ void pairwiseAlignmentBandingParameters_destruct(PairwiseAlignmentParameters *p)
 /*
  * Gets the set of posterior match probabilities under a simple HMM model of alignment for two DNA sequences.
  */
-stList *getAlignedPairs(StateMachine *sM, const char *string1, const char *string2, PairwiseAlignmentParameters *p,  bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+stList *getAlignedPairs(StateMachine *sM, const char *string1, const char *string2, PairwiseAlignmentParameters *p,
+						bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+
+/*
+ * As getAlignedPairs, but also gives insert and delete probabilities.
+ * Return value is by initializing the matches, inserts and deletes lists with values.
+ */
+void getAlignedPairsWithIndels(StateMachine *sM, const char *string1, const char *string2, PairwiseAlignmentParameters *p,
+							   stList **alignedPairs, stList **gapXPairs, stList **gapYPairs,
+							   bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignment *pA, int64_t trim);
 
 stList *getAlignedPairsUsingAnchors(StateMachine *sM, const char *sX, const char *sY, stList *anchorPairs, PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+
+void getAlignedPairsWithIndelsUsingAnchors(StateMachine *sM, const char *sX, const char *sY, stList *anchorPairs,
+										   PairwiseAlignmentParameters *p, stList **alignedPairs, stList **gapXPairs, stList **gapYPairs,
+										   bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 /*
  * Expectation calculation functions for EM algorithms.
@@ -122,6 +135,8 @@ double logAdd(double x, double y);
 //Symbols
 
 Symbol symbol_convertCharToSymbol(char i);
+
+char symbol_convertSymbolToChar(Symbol i);
 
 Symbol *symbol_convertStringToSymbols(const char *s, int64_t sL);
 
@@ -227,5 +242,34 @@ stList *reweightAlignedPairs(stList *alignedPairs,
         int64_t *indelProbsX, int64_t *indelProbsY, double gapGamma);
 
 stList *reweightAlignedPairs2(stList *alignedPairs, int64_t seqLengthX, int64_t seqLengthY, double gapGamma);
+
+/*
+ * Functions to score an alignment by identity / or some proxy to it.
+ */
+
+/*
+ * Gives the average identity of matches in the alignment, treating indels as mismatches.
+ */
+int64_t getNumberOfMatchingAlignedPairs(char *subSeqX, char *subSeqY, stList *alignedPairs);
+
+/*
+ * Gives the average identity of matches in the alignment, treating indels as mismatches.
+ */
+double scoreByIdentity(char *subSeqX, char *subSeqY, int64_t lX, int64_t lY, stList *alignedPairs);
+
+/*
+ * Gives the average identity of matches in the alignment, ignoring indels.
+ */
+double scoreByIdentityIgnoringGaps(char *subSeqX, char *subSeqY, stList *alignedPairs);
+
+/*
+ * Gives the average posterior match probability per base of the two sequences, treating bases in indels as having 0 match probability.
+ */
+double scoreByPosteriorProbability(int64_t lX, int64_t lY, stList *alignedPairs);
+
+/*
+ * Gives the average posterior match probability per base of the two sequences, ignoring indels.
+ */
+double scoreByPosteriorProbabilityIgnoringGaps(stList *alignedPairs);
 
 #endif /* PAIRWISEALIGNER_H_ */

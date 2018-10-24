@@ -288,62 +288,6 @@ bool gapGammaFilter(void *aPair, void *gapGamma) {
     return b;
 }
 
-/*
- * Functions to rescore an alignment by identity / or some proxy to it.
- */
-
-static int64_t getNumberOfMatchingAlignedPairs(char *subSeqX, char *subSeqY, stList *alignedPairs) {
-    /*
-     * Gives the average identity of matches in the alignment, treating indels as mismatches.
-     */
-    int64_t matches = 0;
-    for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
-        stIntTuple *aPair = stList_get(alignedPairs, i);
-        int64_t x = stIntTuple_get(aPair, 1), y = stIntTuple_get(aPair, 2);
-        matches += toupper(subSeqX[x]) == toupper(subSeqY[y]) && toupper(subSeqX[x]) != 'N';
-    }
-    return matches;
-}
-
-double scoreByIdentity(char *subSeqX, char *subSeqY, int64_t lX, int64_t lY, stList *alignedPairs) {
-    /*
-     * Gives the average identity of matches in the alignment, treating indels as mismatches.
-     */
-    int64_t matches = getNumberOfMatchingAlignedPairs(subSeqX, subSeqY, alignedPairs);
-    return 100.0 * ((lX + lY) == 0 ? 0 : (2.0 * matches) / (lX + lY));
-}
-
-double scoreByIdentityIgnoringGaps(char *subSeqX, char *subSeqY, stList *alignedPairs) {
-    /*
-     * Gives the average identity of matches in the alignment, ignoring indels.
-     */
-    int64_t matches = getNumberOfMatchingAlignedPairs(subSeqX, subSeqY, alignedPairs);
-    return 100.0 * matches / (double) stList_length(alignedPairs);
-}
-
-static double totalScore(stList *alignedPairs) {
-    double score = 0.0;
-    for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
-        stIntTuple *aPair = stList_get(alignedPairs, i);
-        score += stIntTuple_get(aPair, 0);
-    }
-    return score;
-}
-
-double scoreByPosteriorProbability(int64_t lX, int64_t lY, stList *alignedPairs) {
-    /*
-     * Gives the average posterior match probability per base of the two sequences, treating bases in indels as having 0 match probability.
-     */
-    return 100.0 * ((lX + lY) == 0 ? 0 : (2.0 * totalScore(alignedPairs)) / ((lX + lY) * PAIR_ALIGNMENT_PROB_1));
-}
-
-double scoreByPosteriorProbabilityIgnoringGaps(stList *alignedPairs) {
-    /*
-     * Gives the average posterior match probability per base of the two sequences, ignoring indels.
-     */
-    return 100.0 * totalScore(alignedPairs) / ((double) stList_length(alignedPairs) * PAIR_ALIGNMENT_PROB_1);
-}
-
 int64_t transformCoordinate(int64_t coordinate, int64_t coordinateShift, bool flipStrand, int64_t seqLength) {
     assert(seqLength > 0);
     assert(coordinateShift >= 0);

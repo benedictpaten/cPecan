@@ -15,6 +15,11 @@ char getRandomChar() {
     return positions[st_randomInt(0, strlen(positions))];
 }
 
+char getRandomACGT() {
+    char *positions = "ACGT";
+    return positions[st_randomInt(0, strlen(positions))];
+}
+
 /*
  * Creates a random DNA sequence of the given length.
  */
@@ -22,6 +27,18 @@ char *getRandomSequence(int64_t length) {
     char *seq = st_malloc((length + 1) * sizeof(char));
     for (int64_t i = 0; i < length; i++) {
         seq[i] = getRandomChar();
+    }
+    seq[length] = '\0';
+    return seq;
+}
+
+/*
+ * Creates a random ACGT only DNA sequence of the given length.
+ */
+char *getRandomACGTSequence(int64_t length) {
+    char *seq = st_malloc((length + 1) * sizeof(char));
+    for (int64_t i = 0; i < length; i++) {
+        seq[i] = getRandomACGT();
     }
     seq[length] = '\0';
     return seq;

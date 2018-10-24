@@ -331,7 +331,7 @@ static void columnPair_destruct(ColumnPair *cP) {
         cP->refCount--;
         assert(cP->refCount >= 0);
         if(cP->refCount == 0) {
-            free(cP);
+        	free(cP);
         } else {
             break;
         }
@@ -940,6 +940,7 @@ MultipleAlignment *makeAlignment(StateMachine *sM, stList *seqFrags, int64_t spa
 
 /*
  * This is a pairwise expected accuracy alignment function that uses the multiple alignment code, kind of odd.
+ * Destroys input list of aligned pairs in process.
  */
 stList *filterPairwiseAlignmentToMakePairsOrdered(stList *alignedPairs, const char *seqX, const char *seqY, float matchGamma) {
     //Convert to multiple alignment pairs
