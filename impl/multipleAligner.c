@@ -324,11 +324,13 @@ static ColumnPair *columnPair_construct(int64_t xIndex, int64_t yIndex, double s
 }
 
 static void columnPair_destruct(ColumnPair *cP) {
-    for (; cP != NULL; cP = cP->pPair) {
+	while(cP != NULL) {
         cP->refCount--;
         assert(cP->refCount >= 0);
         if(cP->refCount == 0) {
-            free(cP);
+        	ColumnPair *cP2 = cP;
+        	cP = cP->pPair;
+        	free(cP2);
         } else {
             break;
         }
