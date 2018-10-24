@@ -579,6 +579,10 @@ double poa_getDeleteTotalWeight(Poa *poa) {
 	return weight;
 }
 
+double poa_getTotalErrorWeight(Poa *poa)  {
+	return poa_getDeleteTotalWeight(poa) + poa_getInsertTotalWeight(poa) + poa_getReferenceNodeTotalDisagreementWeight(poa);
+}
+
 void poa_print(Poa *poa, FILE *fH, float indelSignificanceThreshold) {
 	// Print info for each base in reference in turn
 	for(int64_t i=0; i<stList_length(poa->nodes); i++) {
@@ -827,18 +831,33 @@ Poa *poa_realignIterative(stList *reads, char *reference,
 			  	 StateMachine *sM, PairwiseAlignmentParameters *p, uint64_t iterations) {
 	assert(iterations > 0);
 
-	int64_t i=0;
-	while(1) {
-		Poa *poa = poa_realign(reads, reference, sM, p);
-		if(i > 0) {
-			free(reference);
-		}
-		if(++i >= iterations) {
-			return poa;
-		}
+	Poa *poa = poa_realign(reads, reference, sM, p);
+	double totalError = poa_getTotalErrorWeight(poa);
+
+	for(int64_t i=0; ++i < iterations;) {
 		reference = poa_getConsensus(poa);
+
+		// Stop in case consensus string is same as old reference (i.e. greedy convergence)
+		if(stString_eq(reference, poa->refString)) {
+			free(reference);
+			break;
+		}
+
+		Poa *poa2 = poa_realign(reads, reference, sM, p);
+		free(reference);
+		double totalError2 = poa_getTotalErrorWeight(poa2);
+
+		// Stop if total error increases (greedy stopping)
+		if(totalError2 > totalError) {
+			poa_destruct(poa2);
+			break;
+		}
+
 		poa_destruct(poa);
+		poa = poa2;
 	}
+
+	return poa;
 }
 
 /*
@@ -886,19 +905,13 @@ void rleString_destruct(RleString *rleString) {
 
 static char *expandRLEConsensus2(PoaNode *node, stList *rleReads, RepeatSubMatrix *repeatSubMatrix) {
 	// Pick the base
-	int64_t refBaseIndex = symbol_convertCharToSymbol(node->base);
-
-	double maxBaseWeight = 0;
-	int64_t maxBaseIndex = -1;
-	for(int64_t j=0; j<SYMBOL_NUMBER; j++) {
-		if(j != refBaseIndex && node->baseWeights[j] > maxBaseWeight) {
+	double maxBaseWeight = node->baseWeights[0];
+	int64_t maxBaseIndex = 0;
+	for(int64_t j=1; j<SYMBOL_NUMBER; j++) {
+		if(node->baseWeights[j] > maxBaseWeight) {
 			maxBaseWeight = node->baseWeights[j];
 			maxBaseIndex = j;
 		}
-	}
-	double refBaseWeight = node->baseWeights[refBaseIndex];
-	if(refBaseWeight * 1.0 > maxBaseWeight) {
-		maxBaseIndex = refBaseIndex;
 	}
 	char base = symbol_convertSymbolToChar(maxBaseIndex);
 
@@ -907,39 +920,13 @@ static char *expandRLEConsensus2(PoaNode *node, stList *rleReads, RepeatSubMatri
 	int64_t repeatCount = repeatSubMatrix_getMLRepeatCount(repeatSubMatrix, maxBaseIndex, node->observations,
 			rleReads, &logProbability);
 
-	/*double totalRepeatCount = 0;
-	double totalWeight = 0;
-	double *repeatCounts = st_calloc(100, sizeof(double));
-	for(int64_t i=0; i<stList_length(node->observations); i++) {
-		PoaBaseObservation *obs = stList_get(node->observations, i);
-
-		RleString *rleString = stList_get(rleReads, obs->readNo);
-
-		char obsBase = rleString->rleString[obs->offset];
-
-		if(obs->weight/PAIR_ALIGNMENT_PROB_1 > 0.95 && obsBase == base) {
-			repeatCounts[rleString->repeatCounts[obs->offset]] += obs->weight;
-		}
-
-		totalRepeatCount += rleString->repeatCounts[obs->offset] * obs->weight;
-		totalWeight += obs->weight;
-	}
-	double maxWeightRepeatCount = repeatCounts[0];
-	int64_t maxRepeatCount = 0;
-	for(int64_t i=1; i<100; i++) {
-		if(repeatCounts[i] > maxWeightRepeatCount) {
-			maxWeightRepeatCount = repeatCounts[i];
-			maxRepeatCount = i;
-		}
-	}
-	int64_t repeatCount = maxRepeatCount; //round(totalRepeatCount/totalWeight);
-	free(repeatCounts);*/
-
+	// Make repeat string
 	char *str = st_calloc(repeatCount+1, sizeof(char));
 	for(int64_t j=0; j<repeatCount; j++) {
 		str[j] = base;
 	}
 	str[repeatCount] = '\0';
+
 	return str;
 }
 
@@ -978,24 +965,21 @@ RepeatSubMatrix *repeatSubMatrix_parse(char *fileName) {
 
 	for(int64_t i=0; i<SYMBOL_NUMBER_NO_N; i++) {
 		char *header = stFile_getLineFromFile(fh);
-		char base = header[1];
 		Symbol baseIndex = symbol_convertCharToSymbol(header[1]);
 		char *probsStr = stFile_getLineFromFile(fh);
 		stList *tokens = stString_split(probsStr);
 		for(int64_t j=0; j<repeatSubMatrix->maximumRepeatLength; j++) {
 			for(int64_t k=0; k<repeatSubMatrix->maximumRepeatLength; k++) {
 				char *logProbStr = stList_get(tokens, j*repeatSubMatrix->maximumRepeatLength + k);
-
-				double *logProb = repeatSubMatrix_setLogProb(repeatSubMatrix, baseIndex, k, j);
-
-				int l = sscanf(logProbStr, "%lf", logProb);
+				int l = sscanf(logProbStr, "%lf", repeatSubMatrix_setLogProb(repeatSubMatrix, baseIndex, k, j));
 				(void)l;
 				assert(l == 1);
 			}
 		}
-		fprintf(stderr, "Header: %i %c %f %f\n", (int)stList_length(tokens), header[1],
-				repeatSubMatrix_getLogProb(repeatSubMatrix, baseIndex, 0, 0),
-				repeatSubMatrix_getLogProb(repeatSubMatrix, baseIndex, 1, 0));
+		// Cleanup
+		free(header);
+		free(probsStr);
+		stList_destruct(tokens);
 	}
 
 	fclose(fh);
@@ -1016,7 +1000,7 @@ double repeatSubMatrix_getLogProbForGivenRepeatCount(RepeatSubMatrix *repeatSubM
 		RleString *read = stList_get(rleReads, observation->readNo);
 		int64_t observedRepeatCount = read->repeatCounts[observation->offset];
 		assert(underlyingRepeatCount < repeatSubMatrix->maximumRepeatLength);
-		logProb += repeatSubMatrix_getLogProb(repeatSubMatrix, base, observedRepeatCount, underlyingRepeatCount);
+		logProb += repeatSubMatrix_getLogProb(repeatSubMatrix, base, observedRepeatCount, underlyingRepeatCount) * observation->weight;
 	}
 
 	return logProb;
@@ -1024,9 +1008,27 @@ double repeatSubMatrix_getLogProbForGivenRepeatCount(RepeatSubMatrix *repeatSubM
 
 int64_t repeatSubMatrix_getMLRepeatCount(RepeatSubMatrix *repeatSubMatrix, Symbol base, stList *observations,
 		stList *rleReads, double *logProbability) {
-	double mlLogProb = repeatSubMatrix_getLogProbForGivenRepeatCount(repeatSubMatrix, base, observations, rleReads, 0);
-	int64_t mlRepeatLength = 0;
-	for(int64_t i=1; i<repeatSubMatrix->maximumRepeatLength; i++) {
+	assert(stList_length(observations) > 0);
+
+	// Get the range or repeat observations, used to avoid calculating all repeat lengths, heuristically
+	int64_t minRepeatLength=repeatSubMatrix->maximumRepeatLength-1, maxRepeatLength=0; // Mins and maxs inclusive
+	for(int64_t i=0; i<stList_length(observations); i++) {
+		PoaBaseObservation *observation = stList_get(observations, i);
+		RleString *read = stList_get(rleReads, observation->readNo);
+		int64_t observedRepeatCount = read->repeatCounts[observation->offset];
+		assert(observedRepeatCount < repeatSubMatrix->maximumRepeatLength);
+		if(observedRepeatCount < minRepeatLength) {
+			minRepeatLength = observedRepeatCount;
+		}
+		if(observedRepeatCount > maxRepeatLength) {
+			maxRepeatLength = observedRepeatCount;
+		}
+	}
+
+	// Calc the range of repeat observations
+	double mlLogProb = repeatSubMatrix_getLogProbForGivenRepeatCount(repeatSubMatrix, base, observations, rleReads, minRepeatLength);
+	int64_t mlRepeatLength = minRepeatLength;
+	for(int64_t i=minRepeatLength+1; i<maxRepeatLength+1; i++) {
 		double p = repeatSubMatrix_getLogProbForGivenRepeatCount(repeatSubMatrix, base, observations, rleReads, i);
 		if(p > mlLogProb) {
 			mlLogProb = p;

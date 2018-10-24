@@ -596,7 +596,7 @@ static void test_poa_realign_example_rle(CuTest *testCase, char *trueReference, 
 	StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
 
 	Poa *poa = poa_realign(reads, rleReference->rleString, sM, p);
-	Poa *poaRefined = poa_realignIterative(reads, rleReference->rleString, sM, p, 4);
+	Poa *poaRefined = poa_realignIterative(reads, rleReference->rleString, sM, p, 8);
 
 	poa_normalize(poa); // Shift all the indels
 
@@ -664,6 +664,7 @@ static void test_poa_realign_example_rle(CuTest *testCase, char *trueReference, 
 	rleString_destruct(rleTrueReference);
 	rleString_destruct(rleReference);
 	stList_destruct(rleStrings);
+	free(nonRLEConsensusString);
 }
 
 static void test_poa_realign_example(CuTest *testCase, char *trueReference, char *reference, const char **readArray,
@@ -902,27 +903,37 @@ static void test_poa_realign_messy_examples_rle(CuTest *testCase) {
 	test_poa_realign_examples(testCase, messyExamples, messyExampleNo, 1);
 }
 
-static void test_poa_realign_examples_large(CuTest *testCase, bool rle) {
-	int64_t exampleNo = 200;
-	const char *examples[400];
+static void test_poa_realign_examples_large(CuTest *testCase, int64_t exampleNo, const char *path, bool rle) {
+	// Build strings
+	const char **examples = st_calloc(2*exampleNo, sizeof(char *));
 	for(int64_t i=0; i<exampleNo; i++) {
-		examples[2*i] = stString_print("tests/testExamples/200_random_windows_chr1_celegans_guppy/%i.fasta", (int)i);
-		examples[2*i+1] = stString_print("tests/testExamples/200_random_windows_chr1_celegans_guppy/%i.ref.fasta", (int)i);
+		examples[2*i] = stString_print("%s/%i.fasta", path, (int)i);
+		examples[2*i+1] = stString_print("%s/%i.ref.fasta", path, (int)i);
 	}
 
 	test_poa_realign_examples(testCase, examples, exampleNo, rle);
 
+	// Cleanup
 	for(int64_t i=0; i<exampleNo*2; i++) {
 		free((char *)examples[i]);
 	}
+	free(examples);
 }
 
-static void test_poa_realign_examples_large_rle(CuTest *testCase) {
-	test_poa_realign_examples_large(testCase, 1);
+void test_poa_realign_examples_very_large_rle(CuTest *testCase) {
+	test_poa_realign_examples_large(testCase, 2000, "tests/testExamples/2000_random_windows_chr1_celegans_guppy", 1);
 }
 
-static void test_poa_realign_examples_large_no_rle(CuTest *testCase) {
-	test_poa_realign_examples_large(testCase, 0);
+void test_poa_realign_examples_very_large_no_rle(CuTest *testCase) {
+	test_poa_realign_examples_large(testCase, 2000, "tests/testExamples/2000_random_windows_chr1_celegans_guppy", 0);
+}
+
+void test_poa_realign_examples_large_rle(CuTest *testCase) {
+	test_poa_realign_examples_large(testCase, 200, "tests/testExamples/200_random_windows_chr1_celegans_guppy", 1);
+}
+
+void test_poa_realign_examples_large_no_rle(CuTest *testCase) {
+	test_poa_realign_examples_large(testCase, 200, "tests/testExamples/200_random_windows_chr1_celegans_guppy", 0);
 }
 
 static void test_rleString_example(CuTest *testCase, const char *testStr, int64_t rleLength, const char *testStrRLE, const int64_t *repeatCounts) {
@@ -1015,7 +1026,7 @@ static void test_hmm(CuTest *testCase) {
 CuSuite* realignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
 
-    /*SUITE_ADD_TEST(suite, test_poa_getReferenceGraph);
+    SUITE_ADD_TEST(suite, test_poa_getReferenceGraph);
     SUITE_ADD_TEST(suite, test_poa_augment_example);
     SUITE_ADD_TEST(suite, test_poa_realign_tiny_example1);
     SUITE_ADD_TEST(suite, test_poa_realign_example1);
@@ -1030,12 +1041,15 @@ CuSuite* realignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_poa_realign_examples_rle);
 
     SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_no_rle);
-    SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_rle);*/
+    SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_rle);
 
     SUITE_ADD_TEST(suite, test_poa_realign_examples_large_rle);
-    //SUITE_ADD_TEST(suite, test_poa_realign_examples_large_no_rle);
+    SUITE_ADD_TEST(suite, test_poa_realign_examples_large_no_rle);
 
-    //SUITE_ADD_TEST(suite, test_rleString_examples);
+    //SUITE_ADD_TEST(suite, test_poa_realign_examples_very_large_rle);
+    //SUITE_ADD_TEST(suite, test_poa_realign_examples_very_large_no_rle);
+
+    SUITE_ADD_TEST(suite, test_rleString_examples);
 
     return suite;
 }
