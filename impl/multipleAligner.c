@@ -227,6 +227,7 @@ static Column *mergeColumnsP(AlignmentWeight *aW, stSet *columns, stHash *alignm
     //Cleanup the merging weight
     stSortedSet_remove(aWs1, aW->rWeight);
     stSortedSet_remove(aWs2, aW);
+    removeAlignmentFromSortedAlignmentWeights(aW, alignmentWeightsOrderedByWeight);
     alignmentWeight_destruct(aW);
     //Now merge the remaining weights
     while (stSortedSet_size(aWs2) > 0) {
@@ -324,13 +325,13 @@ static ColumnPair *columnPair_construct(int64_t xIndex, int64_t yIndex, double s
 }
 
 static void columnPair_destruct(ColumnPair *cP) {
-	while(cP != NULL) {
+    ColumnPair *pPair = NULL;
+    for (; cP != NULL; cP = pPair) {
+        pPair = cP->pPair;
         cP->refCount--;
         assert(cP->refCount >= 0);
         if(cP->refCount == 0) {
-        	ColumnPair *cP2 = cP;
-        	cP = cP->pPair;
-        	free(cP2);
+        	free(cP);
         } else {
             break;
         }

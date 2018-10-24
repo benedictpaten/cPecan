@@ -114,7 +114,7 @@ bool hasLongIndel(struct PairwiseAlignment *pA, int64_t maxIndelLength) {
 // Split a pairwise alignment into two or more pairwise alignments if
 // it has a long indel.
 stList *splitPairwiseAlignment(const struct PairwiseAlignment *pA, const int64_t maxIndelLength) {
-    stList *ret = stList_construct3(0, free);
+    stList *ret = stList_construct3(0, (void (*)(void *)) destructPairwiseAlignment);
     int64_t i = 0;
     int64_t j = 0;
     int64_t curPos1 = pA->start1;
@@ -127,7 +127,7 @@ stList *splitPairwiseAlignment(const struct PairwiseAlignment *pA, const int64_t
     struct List *curOperationList = constructEmptyList(0, (void (*)(void *)) destructAlignmentOperation);
     // Temporary list of a run of indel operations so that we don't
     // end alignments with indels.
-    struct List *indelOpList = constructEmptyList(0, (void (*)(void *)) destructAlignmentOperation);
+    struct List *indelOpList = constructEmptyList(0, NULL);
     for (i = 0; i < pA->operationList->length; i++) {
         struct AlignmentOperation *op = pA->operationList->list[i];
         switch (op->opType) {
@@ -138,19 +138,29 @@ stList *splitPairwiseAlignment(const struct PairwiseAlignment *pA, const int64_t
                 // value.
                 if (curOperationList->length != 0) {
                     stList_append(ret,
-                            constructPairwiseAlignment(stString_copy(pA->contig1), curStart1, curEnd1, pA->strand1,
-                                    stString_copy(pA->contig2), curStart2, curEnd2, pA->strand2, pA->score,
-                                    curOperationList));
+                                  constructPairwiseAlignment(pA->contig1, curStart1, curEnd1, pA->strand1,
+                                                             pA->contig2, curStart2, curEnd2, pA->strand2, pA->score,
+                                                             curOperationList));
+                } else {
+                    destructList(curOperationList);
                 }
                 curOperationList = constructEmptyList(0, (void (*)(void *)) destructAlignmentOperation);
-                indelOpList = constructEmptyList(0, (void (*)(void *)) destructAlignmentOperation);
+                for (int64_t j = 0; j < indelOpList->length; j++) {
+                    destructAlignmentOperation(indelOpList->list[j]);
+                }
+                destructList(indelOpList);
+                indelOpList = constructEmptyList(0, NULL);
                 curStart1 = curPos1;
                 curStart2 = curPos2;
                 curEnd1 = curStart1;
                 curEnd2 = curStart2;
             } else if (curOperationList->length == 0) {
                 // Indel run at the start of the alignment
-                indelOpList = constructEmptyList(0, (void (*)(void *)) destructAlignmentOperation);
+                for (int64_t j = 0; j < indelOpList->length; j++) {
+                    destructAlignmentOperation(indelOpList->list[j]);
+                }
+                destructList(indelOpList);
+                indelOpList = constructEmptyList(0, NULL);
                 curStart1 = curPos1;
                 curStart2 = curPos2;
                 curEnd1 = curStart1;
@@ -164,7 +174,8 @@ stList *splitPairwiseAlignment(const struct PairwiseAlignment *pA, const int64_t
                 struct AlignmentOperation *indelOp = indelOpList->list[j];
                 listAppend(curOperationList, indelOp);
             }
-            indelOpList = constructEmptyList(0, (void (*)(void *)) destructAlignmentOperation);
+            destructList(indelOpList);
+            indelOpList = constructEmptyList(0, NULL);
 
             curPos1 += pA->strand1 ? op->length : -op->length;
             curPos2 += pA->strand2 ? op->length : -op->length;
@@ -189,9 +200,16 @@ stList *splitPairwiseAlignment(const struct PairwiseAlignment *pA, const int64_t
     if (curOperationList->length != 0) {
         // Append the remaining pairwise alignment
         stList_append(ret,
-                constructPairwiseAlignment(stString_copy(pA->contig1), curStart1, curEnd1, pA->strand1,
-                        stString_copy(pA->contig2), curStart2, curEnd2, pA->strand2, pA->score, curOperationList));
+                      constructPairwiseAlignment(pA->contig1, curStart1, curEnd1, pA->strand1,
+                                                 pA->contig2, curStart2, curEnd2, pA->strand2,
+                                                 pA->score, curOperationList));
+    } else {
+        destructList(curOperationList);
     }
+    for (int64_t i = 0; i < indelOpList->length; i++) {
+        destructAlignmentOperation(indelOpList->list[i]);
+    }
+    destructList(indelOpList);
     // Check all alignments
     for (i = 0; i < stList_length(ret); i++) {
         checkPairwiseAlignment(stList_get(ret, i));
@@ -597,6 +615,7 @@ int main(int argc, char *argv[]) {
 
     stateMachine_destruct(sM);
 
+    pairwiseAlignmentBandingParameters_destruct(pairwiseAlignmentBandingParameters);
     st_logInfo("Finished realigning pairwise alignments, exiting.\n");
 
     //while(1);
