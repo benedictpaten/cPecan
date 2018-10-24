@@ -13,15 +13,13 @@
 CuSuite* pairwiseAlignmentTestSuite(void);
 CuSuite* multipleAlignerTestSuite(void);
 CuSuite* pairwiseAlignmentLongTestSuite(void);
-CuSuite* realignmentTestSuite(void);
 
 int stBaseAlignerRunAllTests(void) {
 	CuString *output = CuStringNew();
 	CuSuite* suite = CuSuiteNew();
-	//CuSuiteAddSuite(suite, pairwiseAlignmentTestSuite());
-	//CuSuiteAddSuite(suite, multipleAlignerTestSuite());
-	//CuSuiteAddSuite(suite, pairwiseAlignmentLongTestSuite());
-	CuSuiteAddSuite(suite, realignmentTestSuite());
+	CuSuiteAddSuite(suite, pairwiseAlignmentTestSuite());
+	CuSuiteAddSuite(suite, multipleAlignerTestSuite());
+	CuSuiteAddSuite(suite, pairwiseAlignmentLongTestSuite());
 	CuSuiteRun(suite);
 	CuSuiteSummary(suite, output);
 	CuSuiteDetails(suite, output);
