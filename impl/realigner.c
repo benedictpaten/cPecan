@@ -828,13 +828,12 @@ char *poa_getConsensus(Poa *poa) {
 }
 
 Poa *poa_realignIterative(stList *reads, char *reference,
-			  	 StateMachine *sM, PairwiseAlignmentParameters *p, uint64_t iterations) {
-	assert(iterations > 0);
-
+			  	 StateMachine *sM, PairwiseAlignmentParameters *p) {
 	Poa *poa = poa_realign(reads, reference, sM, p);
-	double totalError = poa_getTotalErrorWeight(poa);
+	double score = poa_getReferenceNodeTotalMatchWeight(poa) - poa_getTotalErrorWeight(poa);
 
-	for(int64_t i=0; ++i < iterations;) {
+	int64_t i=0;
+	while(1) {
 		reference = poa_getConsensus(poa);
 
 		// Stop in case consensus string is same as old reference (i.e. greedy convergence)
@@ -845,19 +844,107 @@ Poa *poa_realignIterative(stList *reads, char *reference,
 
 		Poa *poa2 = poa_realign(reads, reference, sM, p);
 		free(reference);
-		double totalError2 = poa_getTotalErrorWeight(poa2);
+		double score2 = poa_getReferenceNodeTotalMatchWeight(poa2) - poa_getTotalErrorWeight(poa2);
 
-		// Stop if total error increases (greedy stopping)
-		if(totalError2 > totalError) {
+		// Stop if score decreases (greedy stopping)
+		if(score2 <= score) {
 			poa_destruct(poa2);
 			break;
 		}
 
 		poa_destruct(poa);
 		poa = poa2;
+		score = score2;
 	}
 
 	return poa;
+}
+
+char *addInsert(char *string, char *insertString, int64_t editStart) {
+	int64_t insertLength = strlen(insertString);
+	int64_t stringLength = strlen(string);
+
+	// Allocate new string
+	char *editedString = st_malloc(sizeof(char)*(stringLength + insertLength + 1));
+
+	// Make new reference string
+	memcpy(editedString, string, sizeof(char) * editStart);
+	memcpy(&(editedString[editStart]), insertString, sizeof(char) * insertLength);
+	memcpy(&(editedString[editStart + insertLength]), &(string[editStart]),
+			sizeof(char) * (1 + stringLength - editStart));
+
+	return editedString;
+}
+
+char *removeDelete(char *string, int64_t deleteLength, int64_t editStart) {
+	int64_t stringLength = strlen(string);
+
+	// Allocate new string
+	assert(stringLength >= deleteLength);
+	char *editedString = st_malloc(sizeof(char)*(stringLength - deleteLength + 1));
+
+	// Make new reference string
+	memcpy(editedString, string, sizeof(char)*editStart);
+	memcpy(&(editedString[editStart]), &(string[editStart+deleteLength]),
+			sizeof(char)*(1 + stringLength - editStart - deleteLength));
+
+	return editedString;
+}
+
+Poa *poa_checkMajorIndelEditsGreedily(Poa *poa, stList *reads, StateMachine *sM, PairwiseAlignmentParameters *p) {
+	double score = poa_getReferenceNodeTotalMatchWeight(poa) - poa_getTotalErrorWeight(poa);
+
+	while(1) {
+		int64_t insertStart = 0;
+		PoaInsert *maxInsert = NULL;
+		int64_t deleteStart = 0;
+		PoaDelete *maxDelete = NULL;
+
+		// Get highest value indel
+		for(int64_t i=0; i<stList_length(poa->nodes); i++) {
+			PoaNode *node = stList_get(poa->nodes, i);
+
+			// Get max insert
+			for(int64_t j=0; j<stList_length(node->inserts); j++) {
+				PoaInsert *insert = stList_get(node->inserts, j);
+				if(maxInsert == NULL || insert->weight > maxInsert->weight) {
+					maxInsert = insert;
+					insertStart = i;
+				}
+			}
+
+			// Get max delete
+			for(int64_t j=0; j<stList_length(node->deletes); j++) {
+				PoaDelete *delete = stList_get(node->deletes, j);
+				if(maxDelete == NULL || delete->weight > maxDelete->weight) {
+					maxDelete = delete;
+					deleteStart = i;
+				}
+			}
+		}
+
+		if(maxInsert == NULL || maxDelete == NULL) {
+			return poa;
+		}
+
+		// Create new graph with edit
+		char *editRef = maxInsert->weight >= maxDelete->weight ? addInsert(poa->refString, maxInsert->insert, insertStart) :
+				removeDelete(poa->refString, maxDelete->length, deleteStart);
+		Poa *poa2 = poa_realign(reads, editRef, sM, p);
+		free(editRef);
+		double score2 = poa_getReferenceNodeTotalMatchWeight(poa2) - poa_getTotalErrorWeight(poa2);
+
+		// If new graph has better score, keep it, otherwise return old graph
+		if(score2 <= score) {
+			poa_destruct(poa2);
+			return poa;
+		}
+
+		// We got a better graph, so keep it
+		poa_destruct(poa);
+		poa = poa2;
+		score = score2;
+	}
 }
 
 /*

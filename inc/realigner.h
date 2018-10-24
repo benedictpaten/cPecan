@@ -91,8 +91,9 @@ char *poa_getConsensus(Poa *poa);
  * the starting reference.
  */
 Poa *poa_realignIterative(stList *reads, char *reference,
-			  	 StateMachine *sM, PairwiseAlignmentParameters *p,
-				 uint64_t iterations);
+			  	 StateMachine *sM, PairwiseAlignmentParameters *p);
+
+Poa *poa_checkMajorIndelEditsGreedily(Poa *poa, stList *reads, StateMachine *sM, PairwiseAlignmentParameters *p);
 				 
 void poa_destruct(Poa *poa);
 
@@ -178,5 +179,14 @@ int64_t repeatSubMatrix_getMLRepeatCount(RepeatSubMatrix *repeatSubMatrix, Symbo
  */
 char *expandRLEConsensus(Poa *poa, stList *rlReads, RepeatSubMatrix *repeatSubMatrix);
 
+/*
+ * Make edited string with given insert. Edit start is the index of the position to insert the string.
+ */
+char *addInsert(char *string, char *insertString, int64_t editStart);
+
+/*
+ * Make edited string with given insert. Edit start is the index of the first position to delete from the string.
+ */
+char *removeDelete(char *string, int64_t deleteLength, int64_t editStart);
 
 #endif /* REALIGNER_H_ */

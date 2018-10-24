@@ -435,7 +435,7 @@ static void test_poa_realignIterative(CuTest *testCase) {
 
 		StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
 
-		Poa *poa = poa_realignIterative(reads, reference, sM, p, 2);
+		Poa *poa = poa_realignIterative(reads, reference, sM, p);
 
 		st_logInfo("True-reference:%s\n", trueReference);
 		if (st_getLogLevel() >= info) {
@@ -596,7 +596,11 @@ static void test_poa_realign_example_rle(CuTest *testCase, char *trueReference, 
 	StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
 
 	Poa *poa = poa_realign(reads, rleReference->rleString, sM, p);
-	Poa *poaRefined = poa_realignIterative(reads, rleReference->rleString, sM, p, 8);
+	Poa *poaRefined = poa_realignIterative(reads, rleReference->rleString, sM, p);
+
+	//poaRefined = poa_checkMajorIndelEditsGreedily(poaRefined, reads, sM, p);
+
+	Poa *poaTrue = poa_realign(reads, rleTrueReference->rleString, sM, p);
 
 	poa_normalize(poa); // Shift all the indels
 
@@ -638,6 +642,8 @@ static void test_poa_realign_example_rle(CuTest *testCase, char *trueReference, 
 		poa_printSummaryStats(poa, stderr);
 		st_logInfo("Consensus stats\t");
 		poa_printSummaryStats(poaRefined, stderr);
+		st_logInfo("True-reference stats\t");
+		poa_printSummaryStats(poaTrue, stderr);
 		st_logInfo("Consensus : true-ref identity: %f\n", 2.0*consensusMatches/(rleTrueReference->length + strlen(poaRefined->refString)));
 		st_logInfo("Start-ref : true-ref identity: %f\n", 2.0*referenceMatches/(rleTrueReference->length + rleReference->length));
 		// Non-RLE stats
@@ -659,6 +665,7 @@ static void test_poa_realign_example_rle(CuTest *testCase, char *trueReference, 
 	pairwiseAlignmentBandingParameters_destruct(p);
 	poa_destruct(poa);
 	poa_destruct(poaRefined);
+	poa_destruct(poaTrue);
 	stList_destruct(reads);
 	hmm_destruct(hmm);
 	rleString_destruct(rleTrueReference);
@@ -681,7 +688,7 @@ static void test_poa_realign_example(CuTest *testCase, char *trueReference, char
 	StateMachine *sM = hmm_getStateMachine(hmm); //stateMachine3_construct(threeState);
 
 	Poa *poa = poa_realign(reads, reference, sM, p);
-	Poa *poaRefined = poa_realignIterative(reads, reference, sM, p, 4);
+	Poa *poaRefined = poa_realignIterative(reads, reference, sM, p);
 
 	poa_normalize(poa); // Shift all the indels
 
@@ -958,6 +965,25 @@ static void test_rleString_examples(CuTest *testCase) {
 	test_rleString_example(testCase, "TTTTTCC", 2, "TC", (const int64_t[]){ 5, 2 });
 }
 
+void test_addInsert(CuTest *testCase) {
+	CuAssertStrEquals(testCase, "GATTACA", addInsert("GAACA", "TT", 2));
+	CuAssertStrEquals(testCase, "GATTACA", addInsert("", "GATTACA", 0));
+	CuAssertStrEquals(testCase, "GATTACA", addInsert("ATTACA", "G", 0));
+	CuAssertStrEquals(testCase, "GATTACA", addInsert("GATTAC", "A", 6));
+	CuAssertStrEquals(testCase, "GATTACA", addInsert("GATTACA", "", 6));
+	CuAssertStrEquals(testCase, "GATTACA", addInsert("GATTACA", "", 3));
+}
+
+void test_removeDelete(CuTest *testCase) {
+	CuAssertStrEquals(testCase, "GATTACA", removeDelete("GATTGGACA", 2, 4));
+	CuAssertStrEquals(testCase, "GATTACA", removeDelete("GATTACA", 0, 0));
+	CuAssertStrEquals(testCase, "GATTACA", removeDelete("GATTACATT", 2, 7));
+	CuAssertStrEquals(testCase, "GATTACA", removeDelete("AGATTACA", 1, 0));
+}
+
+
+//char *removeDelete(char *string, int64_t deleteLength, int64_t editStart);
+
 /*
  // Crufty code used to generate an initial model for nanopore alignment
 
@@ -1026,7 +1052,7 @@ static void test_hmm(CuTest *testCase) {
 CuSuite* realignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
 
-    SUITE_ADD_TEST(suite, test_poa_getReferenceGraph);
+    /*SUITE_ADD_TEST(suite, test_poa_getReferenceGraph);
     SUITE_ADD_TEST(suite, test_poa_augment_example);
     SUITE_ADD_TEST(suite, test_poa_realign_tiny_example1);
     SUITE_ADD_TEST(suite, test_poa_realign_example1);
@@ -1041,15 +1067,18 @@ CuSuite* realignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_poa_realign_examples_rle);
 
     SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_no_rle);
-    SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_rle);
+    SUITE_ADD_TEST(suite, test_poa_realign_messy_examples_rle);*/
 
-    SUITE_ADD_TEST(suite, test_poa_realign_examples_large_rle);
-    SUITE_ADD_TEST(suite, test_poa_realign_examples_large_no_rle);
+    //SUITE_ADD_TEST(suite, test_poa_realign_examples_large_rle);
+    //SUITE_ADD_TEST(suite, test_poa_realign_examples_large_no_rle);
 
-    //SUITE_ADD_TEST(suite, test_poa_realign_examples_very_large_rle);
+    SUITE_ADD_TEST(suite, test_poa_realign_examples_very_large_rle);
     //SUITE_ADD_TEST(suite, test_poa_realign_examples_very_large_no_rle);
 
     SUITE_ADD_TEST(suite, test_rleString_examples);
+
+    SUITE_ADD_TEST(suite, test_addInsert);
+    SUITE_ADD_TEST(suite, test_removeDelete);
 
     return suite;
 }
