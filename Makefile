@@ -32,7 +32,7 @@ ${binPath}/cPecanModifyHmm : cPecanModifyHmm.py
 ${binPath}/cPecanAlign : cPecanAlign.c ${libPath}/cPecanLib.a ${cPecanDependencies} 
 	${cxx} ${cflags} -I inc -I${libPath} -o ${binPath}/cPecanAlign cPecanAlign.c ${libPath}/cPecanLib.a ${cPecanLibs}
 
-${binPath}/cPecanLibTests : ${libTests} tests/*.h ${libPath}/cPecanLib.a ${cPecanDependencies}
+${binPath}/cPecanLibTests : ${libTests} ${libPath}/cPecanLib.a ${cPecanDependencies}
 	${cxx} ${cflags} -I inc -I${libPath} -Wno-error -o ${binPath}/cPecanLibTests ${libTests} ${libPath}/cPecanLib.a ${cPecanLibs}
 
 ${libPath}/cPecanLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
