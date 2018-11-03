@@ -1223,6 +1223,60 @@ void pairwiseAlignmentBandingParameters_destruct(PairwiseAlignmentParameters *p)
     free(p);
 }
 
+PairwiseAlignmentParameters *pairwiseAlignmentParameters_jsonParse(char *buf, size_t r) {
+	// Setup parser
+	jsmntok_t *tokens;
+	char *js;
+	int64_t tokenNumber = stJson_setupParser(buf, r, &tokens, &js);
+
+	PairwiseAlignmentParameters *params = pairwiseAlignmentBandingParameters_construct();
+
+	for(int64_t tokenIndex=1; tokenIndex < tokenNumber; tokenIndex++) {
+		jsmntok_t key = tokens[tokenIndex];
+		char *keyString = stJson_token_tostr(js, &key);
+
+		if (strcmp(keyString, "threshold") == 0) {
+			params->threshold = stJson_parseFloat(js, tokens, ++tokenIndex);
+		}
+		else if (strcmp(keyString, "minDiagsBetweenTraceBack") == 0) {
+			params->minDiagsBetweenTraceBack = stJson_parseInt(js, tokens, ++tokenIndex);
+		}
+		else if (strcmp(keyString, "traceBackDiagonals") == 0) {
+			params->traceBackDiagonals = stJson_parseInt(js, tokens, ++tokenIndex);
+		}
+		else if (strcmp(keyString, "diagonalExpansion") == 0) {
+			params->diagonalExpansion = stJson_parseInt(js, tokens, ++tokenIndex);
+		}
+		else if (strcmp(keyString, "constraintDiagonalTrim") == 0) {
+			params->constraintDiagonalTrim = stJson_parseInt(js, tokens, ++tokenIndex);
+		}
+		else if (strcmp(keyString, "anchorMatrixBiggerThanThis") == 0) {
+			params->anchorMatrixBiggerThanThis = stJson_parseInt(js, tokens, ++tokenIndex);
+		}
+		else if (strcmp(keyString, "repeatMaskMatrixBiggerThanThis") == 0) {
+			params->repeatMaskMatrixBiggerThanThis = stJson_parseInt(js, tokens, ++tokenIndex);
+		}
+		else if (strcmp(keyString, "splitMatrixBiggerThanThis") == 0) {
+			params->splitMatrixBiggerThanThis = stJson_parseInt(js, tokens, ++tokenIndex);
+		}
+		else if (strcmp(keyString, "alignAmbiguityCharacters") == 0) {
+			params->alignAmbiguityCharacters = stJson_parseBool(js, tokens, ++tokenIndex);
+		}
+		else if (strcmp(keyString, "gapGamma") == 0) {
+			params->gapGamma = stJson_parseFloat(js, tokens, ++tokenIndex);
+		}
+		else {
+			st_errAbort("ERROR: Unrecognised key in pairwise alignment parameters json: %s\n", keyString);
+		}
+	}
+
+	// Cleanup
+	free(js);
+	free(tokens);
+
+	return params;
+}
+
 static void alignedPairCoordinateCorrectionFn(int64_t offsetX, int64_t offsetY, void *extraArgs) {
     stList *subListOfAlignedPairs = ((void **) extraArgs)[0];
     stList *alignedPairs = ((void **) extraArgs)[1];

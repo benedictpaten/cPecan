@@ -201,6 +201,53 @@ Hmm *hmm_loadFromFile(const char *fileName) {
     return hmm;
 }
 
+Hmm *hmm_jsonParse(char *buf, size_t r) {
+	// Setup parser
+	jsmntok_t *tokens;
+	char *js;
+	int64_t tokenNumber = stJson_setupParser(buf, r, &tokens, &js);
+	if(tokenNumber < 3) {
+		st_errAbort("ERROR: too few tokens to parse in hmm json: %i\n", (int)tokenNumber);
+	}
+
+	// Make empty hmm object, finding out type first
+	char *keyString = stJson_token_tostr(js, &(tokens[1]));
+	if(strcmp(keyString, "type") != 0) {
+		st_errAbort("ERROR: Unrecognised key in polish params json: %s\n", keyString);
+	}
+	Hmm *hmm = hmm_constructEmpty(0, stJson_parseInt(js, tokens, 2));
+
+	// Parse tokens, starting at token 1
+    // (token 0 is entire object)
+	bool gotEmissions = 0, gotTransitions = 0;
+    for (int64_t tokenIndex=3; tokenIndex < tokenNumber; tokenIndex++) {
+        keyString = stJson_token_tostr(js, &(tokens[tokenIndex]));
+        if(strcmp(keyString, "transitions") == 0) {
+        	tokenIndex = stJson_parseFloatArray(hmm->transitions, hmm->stateNumber * hmm->stateNumber, js, tokens, ++tokenIndex);
+        	gotTransitions = 1;
+        }
+        else if(strcmp(keyString, "emissions") == 0) {
+        	tokenIndex = stJson_parseFloatArray(hmm->emissions, hmm->stateNumber * SYMBOL_NUMBER_NO_N * SYMBOL_NUMBER_NO_N, js, tokens, ++tokenIndex);
+        	gotEmissions = 1;
+        }
+        else if(strcmp(keyString, "likelihood") == 0) {
+        	hmm->likelihood = stJson_parseFloat(js, tokens, ++tokenIndex);
+        }
+        else {
+        	st_errAbort("ERROR: Unrecognised key in hmm json: %s\n", keyString);
+        }
+    }
+
+    if(!gotEmissions) {
+    	st_errAbort("ERROR: Did not find emissions specified in json HMM\n");
+    }
+    if(!gotTransitions) {
+        st_errAbort("ERROR: Did not find transitions specified in json HMM\n");
+    }
+
+    return hmm;
+}
+
 ///////////////////////////////////
 ///////////////////////////////////
 //Emissions

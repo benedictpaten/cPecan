@@ -88,6 +88,8 @@ void hmm_setEmissionsExpectation(Hmm *hmm, int64_t state, Symbol x, Symbol y, do
 
 Hmm *hmm_loadFromFile(const char *fileName);
 
+Hmm *hmm_jsonParse(char *buf, size_t r);
+
 void hmm_normalise(Hmm *hmm);
 
 StateMachine *hmm_getStateMachine(Hmm *hmm);
