@@ -245,6 +245,10 @@ Hmm *hmm_jsonParse(char *buf, size_t r) {
         st_errAbort("ERROR: Did not find transitions specified in json HMM\n");
     }
 
+    // Cleanup
+    free(js);
+    free(tokens);
+
     return hmm;
 }
 
