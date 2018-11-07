@@ -1465,3 +1465,129 @@ double scoreByPosteriorProbabilityIgnoringGaps(stList *alignedPairs) {
     return 100.0 * totalScore(alignedPairs) / ((double) stList_length(alignedPairs) * PAIR_ALIGNMENT_PROB_1);
 }
 
+/*
+ * Functions for pairwise alignment creation.
+ */
+
+static int64_t *getCumulativeGapProbs(stList *gapPairs, int64_t seqLength, bool seqXNotSeqY) {
+	int64_t *gapCumulativeProbs = st_calloc(seqLength, sizeof(int64_t));
+
+	// Work out the per-position gap probability
+	for(int64_t i=0; i<stList_length(gapPairs); i++) {
+		stIntTuple *gapPair = stList_get(gapPairs, i);
+		gapCumulativeProbs[stIntTuple_get(gapPair, seqXNotSeqY ? 1 : 2)] += stIntTuple_get(gapPair, 0);
+	}
+
+	// Make cumulative
+	for(int64_t i=1; i<seqLength; i++) {
+		gapCumulativeProbs[i] += gapCumulativeProbs[i-1];
+	}
+
+	return gapCumulativeProbs;
+}
+
+static int64_t getIndelProb(int64_t *gapCumulativeProbs, int64_t start, int64_t length) {
+	assert(start >= 0);
+	assert(length >= 0);
+	return length == 0 ? 0 : (gapCumulativeProbs[start + length - 1] - (start > 0 ? gapCumulativeProbs[start-1] : 0));
+}
+
+stList *getMaximalExpectedAccuracyPairwiseAlignment(stList *alignedPairs,
+		stList *gapXPairs, stList *gapYPairs,
+		int64_t seqXLength, int64_t seqYLength, double *alignmentScore, PairwiseAlignmentParameters *p) {
+
+	int64_t totalPairs = stList_length(alignedPairs); // Total number of aligned pairs
+
+	double *scores = st_calloc(totalPairs+1, sizeof(double)); // MEA alignment score for each aligned pair
+	int64_t *backPointers = st_calloc(totalPairs+1, sizeof(int64_t)); // Trace back pointers
+	bool *isHighScore = st_calloc(totalPairs+1, sizeof(bool)); // Records if the score for a given aligned pair at index i is larger than any
+	// score for an aligned pair at any index less than i
+
+	// Calculate gap array cumulative probs
+	int64_t *gapXCumulativeProbs = getCumulativeGapProbs(gapXPairs, seqXLength, 1);
+	int64_t *gapYCumulativeProbs = getCumulativeGapProbs(gapYPairs, seqYLength, 0);
+
+	// Iterate through the aligned pairs in order of increasing sequence coordinate
+
+	double maxScore = 0; // Max score seen so far
+
+	for(int64_t i=0; i<totalPairs+1; i++) {
+
+		int64_t matchProb, x, y;
+
+		if(i == totalPairs) { // Add final aligned pair at the end of the sequences to trace back the final alignment
+			matchProb = 0; x = seqXLength; y = seqYLength;
+		}
+		else {
+			stIntTuple *aPair = stList_get(alignedPairs, i);
+			matchProb = stIntTuple_get(aPair, 0); x = stIntTuple_get(aPair, 1); y = stIntTuple_get(aPair, 2);
+		}
+
+		// The MEA alignment score of the pair with no preceding alignment pair
+		double score = matchProb +
+				(getIndelProb(gapXCumulativeProbs, 0, x) + getIndelProb(gapYCumulativeProbs, 0, y)) * p->gapGamma;
+		int64_t backPointer = -1;
+
+		// Walk back through previous aligned pairs
+		for(int64_t j=i-1; j>= 0; j--) {
+			stIntTuple *pPair = stList_get(alignedPairs, j);
+			int64_t x2 = stIntTuple_get(pPair, 1), y2 = stIntTuple_get(pPair, 2);
+
+			// If the previous pair, pPair, and aPair can form an alignment
+			if(x2 < x && y2 < y) {
+
+				// Calc score of MEA alignment including pPair
+				int64_t s = matchProb + scores[j] +
+					(getIndelProb(gapXCumulativeProbs, x2+1, x-x2-1) +
+					 getIndelProb(gapYCumulativeProbs, y2+1, y-y2-1)) * p->gapGamma;
+
+				// If score s is highest keep it
+				if(s > score) {
+					score = s;
+					backPointer = j;
+				}
+
+				// If the score of pPair is a high score then can not increase score by exploring further back
+				// pointers
+				if(isHighScore[j]) {
+					break;
+				}
+			}
+		}
+
+		// Store the best alignment for aPair
+		backPointers[i] = backPointer;
+		scores[i] = score;
+
+		// If the score of the alignment ending at aPair is higher than any we've seen to date
+		double s = score + ((x < seqXLength ? getIndelProb(gapXCumulativeProbs, x+1, seqXLength-x-1) : 0) +
+				(y < seqYLength ? getIndelProb(gapYCumulativeProbs, y+1, seqYLength-y-1) : 0)) * p->gapGamma;
+		if(s >= maxScore) {
+			maxScore = s; // Record the max score
+			isHighScore[i] = 1; // Record the fact that the score represents a max seen so far.
+		}
+	}
+
+	// Trace back to build the MEA alignment in reverse
+	stList *filteredAlignment = stList_construct3(0, (void(*)(void *))stIntTuple_destruct);
+	int64_t i = backPointers[totalPairs];
+	while(i >= 0) {
+		stIntTuple *aPair = stList_get(alignedPairs, i);
+		stList_append(filteredAlignment, stIntTuple_construct3(stIntTuple_get(aPair, 0),
+				stIntTuple_get(aPair, 1), stIntTuple_get(aPair, 2)));
+		i = backPointers[i];
+	}
+	stList_reverse(filteredAlignment); // Flip the order
+
+	// Cleanup
+	free(scores);
+	free(backPointers);
+	free(isHighScore);
+	free(gapXCumulativeProbs);
+	free(gapYCumulativeProbs);
+
+	*alignmentScore = maxScore;
+	return filteredAlignment;
+}
+
+

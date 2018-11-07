@@ -71,6 +71,15 @@ void getAlignedPairsWithIndelsUsingAnchors(StateMachine *sM, const char *sX, con
 										   bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
 /*
+ * As filterPairwiseAlignmentToMakePairsOrdered, but does not use the multiple alignment code. Returns
+ * a subset of alignedPairs that form a maximal expected accuracy (MEA) alignment, as described in Schwartz and Pachter.
+ * Alignment score is set to the final score of the alignment.
+ */
+stList *getMaximalExpectedAccuracyPairwiseAlignment(stList *alignedPairs, stList *gapXPairs, stList *gapYPairs,
+													int64_t seqXLength, int64_t seqYLength, double *alignmentScore,
+													PairwiseAlignmentParameters *p);
+
+/*
  * Expectation calculation functions for EM algorithms.
  */
 

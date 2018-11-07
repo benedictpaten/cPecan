@@ -13,7 +13,7 @@
 #include <math.h>
 #include "randomSequences.h"
 
-static void test_diagonal(CuTest *testCase) {
+void test_diagonal(CuTest *testCase) {
     //Construct an example diagonal.
     int64_t xL = 10, yL = 20, xU = 30, yU = 0; //Coordinates of the upper and lower
     //pairs in x,y coordinates
@@ -65,7 +65,7 @@ static bool testDiagonalsEqual(Diagonal d1, Diagonal d2) {
     return b;
 }
 
-static void test_bands(CuTest *testCase) {
+void test_bands(CuTest *testCase) {
     stList *anchorPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
     ///stList_append(anchorPairs, stIntTuple_construct2( 0, 0));
     stList_append(anchorPairs, stIntTuple_construct2(1, 0));
@@ -130,7 +130,7 @@ static void test_bands(CuTest *testCase) {
     stList_destruct(anchorPairs);
 }
 
-static void test_logAdd(CuTest *testCase) {
+void test_logAdd(CuTest *testCase) {
     for (int64_t test = 0; test < 100000; test++) {
         double i = st_random();
         double j = st_random();
@@ -142,7 +142,7 @@ static void test_logAdd(CuTest *testCase) {
     }
 }
 
-static void test_symbol(CuTest *testCase) {
+void test_symbol(CuTest *testCase) {
     Symbol cA[9] = { a, c, g, t, n, t, n, c, g };
     Symbol *cA2 = symbol_convertStringToSymbols("AcGTntNCG", 9);
     for (int64_t i = 0; i < 9; i++) {
@@ -151,7 +151,7 @@ static void test_symbol(CuTest *testCase) {
     free(cA2);
 }
 
-static void test_cell(CuTest *testCase) {
+void test_cell(CuTest *testCase) {
     StateMachine *sM = stateMachine5_construct(fiveState);
     double lowerF[sM->stateNumber], middleF[sM->stateNumber], upperF[sM->stateNumber], currentF[sM->stateNumber];
     double lowerB[sM->stateNumber], middleB[sM->stateNumber], upperB[sM->stateNumber], currentB[sM->stateNumber];
@@ -180,7 +180,7 @@ static void test_cell(CuTest *testCase) {
     CuAssertDblEquals(testCase, totalProbForward, totalProbBackward, 0.00001); //Check the forward and back probabilities are about equal
 }
 
-static void test_dpDiagonal(CuTest *testCase) {
+void test_dpDiagonal(CuTest *testCase) {
     StateMachine *sM = stateMachine5_construct(fiveState);
     Diagonal diagonal = diagonal_construct(3, -1, 1);
     DpDiagonal *dpDiagonal = dpDiagonal_construct(diagonal, sM->stateNumber);
@@ -211,7 +211,7 @@ static void test_dpDiagonal(CuTest *testCase) {
     dpDiagonal_destruct(dpDiagonal2);
 }
 
-static void test_dpMatrix(CuTest *testCase) {
+void test_dpMatrix(CuTest *testCase) {
     int64_t lX = 3, lY = 2;
     DpMatrix *dpMatrix = dpMatrix_construct(lX + lY, 5);
 
@@ -238,7 +238,7 @@ static void test_dpMatrix(CuTest *testCase) {
     dpMatrix_destruct(dpMatrix);
 }
 
-static void test_diagonalDPCalculations(CuTest *testCase) {
+void test_diagonalDPCalculations(CuTest *testCase) {
     //Sets up a complete matrix for the following example and checks the total marginal
     //probability and the posterior probabilities of the matches
 
@@ -378,7 +378,27 @@ static void checkAlignedPairs(CuTest *testCase, stList *blastPairs, int64_t lX, 
     stSortedSet_destruct(pairs);
 }
 
-static void test_getAlignedPairsWithBanding(CuTest *testCase) {
+static void checkAlignedPairsAreOrdered(CuTest *testCase, stList *alignedPairs) {
+	/*
+	 * Checks that the list of aligned pairs are ordered in sequence space so that no aligned pair i
+	 * proceeds another j in the sequence such that i's coordinates in the two sequences both precede j's.
+	 */
+	for(int64_t i=0; i<stList_length(alignedPairs); i++) {
+		stIntTuple *aPair = stList_get(alignedPairs, i);
+		int64_t x = stIntTuple_get(aPair, 1);
+		int64_t y = stIntTuple_get(aPair, 2);
+
+		for(int64_t j=0; j<i; j++) {
+			stIntTuple *pPair = stList_get(alignedPairs, j);
+			int64_t x2 = stIntTuple_get(pPair, 1);
+			int64_t y2 = stIntTuple_get(pPair, 2);
+
+			CuAssertTrue(testCase, x2 < x || y2 < y);
+		}
+	}
+}
+
+void test_getAlignedPairsWithBanding(CuTest *testCase) {
     for (int64_t test = 0; test < 100; test++) {
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(0, 100));
@@ -438,7 +458,7 @@ static void checkBlastPairs(CuTest *testCase, stList *blastPairs, int64_t lX, in
     }
 }
 
-static void test_getBlastPairs(CuTest *testCase) {
+void test_getBlastPairs(CuTest *testCase) {
     /*
      * Test the blast heuristic to get the different pairs.
      */
@@ -463,7 +483,7 @@ static void test_getBlastPairs(CuTest *testCase) {
     }
 }
 
-static void test_filterToRemoveOverlap(CuTest *testCase) {
+void test_filterToRemoveOverlap(CuTest *testCase) {
     for (int64_t i = 0; i < 100; i++) {
         //Make random pairs
         int64_t lX = st_randomInt(0, 100);
@@ -521,7 +541,7 @@ static void test_filterToRemoveOverlap(CuTest *testCase) {
     }
 }
 
-static void test_getBlastPairsWithRecursion(CuTest *testCase) {
+void test_getBlastPairsWithRecursion(CuTest *testCase) {
     /*
      * Test the blast heuristic to get the different pairs.
      */
@@ -544,7 +564,7 @@ static void test_getBlastPairsWithRecursion(CuTest *testCase) {
     }
 }
 
-static void test_getSplitPoints(CuTest *testCase) {
+void test_getSplitPoints(CuTest *testCase) {
     int64_t matrixSize = 2000 * 2000;
 
     stList *anchorPairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
@@ -615,7 +635,7 @@ static void test_getSplitPoints(CuTest *testCase) {
     stList_destruct(anchorPairs);
 }
 
-static void test_getAlignedPairs(CuTest *testCase) {
+void test_getAlignedPairs(CuTest *testCase) {
     for (int64_t test = 0; test < 100; test++) {
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(0, 100));
@@ -642,13 +662,14 @@ static void test_getAlignedPairs(CuTest *testCase) {
     }
 }
 
-static void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
+void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
     for (int64_t test = 0; test < 1000; test++) {
         //Make a pair of sequences
         int64_t coreLength = 100, randomPortionLength = 100;
         char *sX = getRandomSequence(coreLength);
-        char *sY = stString_print("%s%s%s", getRandomSequence(randomPortionLength), sX,
-                getRandomSequence(randomPortionLength)); //x with an extra bit at the end.
+        char *randomPrefix = getRandomSequence(randomPortionLength);
+        char *randomSuffix = getRandomSequence(randomPortionLength);
+        char *sY = stString_print("%s%s%s", randomPrefix, sX, randomSuffix); //x with an extra bit at the end.
 
         st_logInfo("Sequence X to align: %s END\n", sX);
         st_logInfo("Sequence Y to align: %s END\n", sY);
@@ -675,7 +696,10 @@ static void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
         stateMachine_destruct(sM);
         free(sX);
         free(sY);
+        free(randomPrefix);
+        free(randomSuffix);
         stList_destruct(alignedPairs);
+        pairwiseAlignmentBandingParameters_destruct(p);
     }
 }
 
@@ -683,7 +707,90 @@ static void test_getAlignedPairsWithRaggedEnds(CuTest *testCase) {
  * Test indel posterior prob calculating methods
  */
 
-static void test_getAlignedPairsWithIndels(CuTest *testCase) {
+int64_t getGapScore(int64_t *gapProbsX, int64_t *gapProbsY, int64_t xS, int64_t yS, int64_t xE, int64_t yE,
+		PairwiseAlignmentParameters *p) {
+	double s = 0;
+	for(int64_t i=xS+1; i<xE; i++) {
+		s += gapProbsX[i];
+	}
+	for(int64_t i=yS+1; i<yE; i++) {
+		s += gapProbsY[i];
+	}
+	return s * p->gapGamma;
+}
+
+static stList *getMEAlignment(stList *alignedPairs, int64_t seqLengthX, int64_t seqLengthY,
+		stList *gapXPairs, stList *gapYPairs, PairwiseAlignmentParameters *p, double *alignmentScore) {
+	double *scores = st_calloc(stList_length(alignedPairs), sizeof(double));
+	int64_t *backPointers = st_calloc(stList_length(alignedPairs), sizeof(int64_t));
+
+	int64_t *gapProbsX = st_calloc(seqLengthX, sizeof(int64_t));
+	for(int64_t i=0; i<stList_length(gapXPairs); i++) {
+		stIntTuple *gPair = stList_get(gapXPairs, i);
+		gapProbsX[stIntTuple_get(gPair, 1)] += stIntTuple_get(gPair, 0);
+	}
+
+	int64_t *gapProbsY = st_calloc(seqLengthY, sizeof(int64_t));
+	for(int64_t i=0; i<stList_length(gapYPairs); i++) {
+		stIntTuple *gPair = stList_get(gapYPairs, i);
+		gapProbsY[stIntTuple_get(gPair, 2)] += stIntTuple_get(gPair, 0);
+	}
+
+	for(int64_t i=0; i<stList_length(alignedPairs); i++) {
+		stIntTuple *aPair = stList_get(alignedPairs, i);
+		int64_t matchProb = stIntTuple_get(aPair, 0);
+		int64_t x = stIntTuple_get(aPair, 1);
+		int64_t y = stIntTuple_get(aPair, 2);
+		scores[i] = matchProb + getGapScore(gapProbsX, gapProbsY, -1, -1, x, y, p);
+		backPointers[i] = -1;
+
+		for(int64_t j=0; j<stList_length(alignedPairs); j++) {
+			stIntTuple *pPair = stList_get(alignedPairs, j);
+			int64_t x2 = stIntTuple_get(pPair, 1);
+			int64_t y2 = stIntTuple_get(pPair, 2);
+
+			if(x2 < x && y2 < y) {
+				double s = scores[j] + matchProb + getGapScore(gapProbsX, gapProbsY, x2, y2, x, y, p);
+
+				if(s > scores[i]) {
+					scores[i] = s;
+					backPointers[i] = j;
+				}
+			}
+		}
+	}
+
+	double maxScore = getGapScore(gapProbsX, gapProbsY, -1, -1, seqLengthX, seqLengthY, p);
+	int64_t maxScoreIndex = -1;
+	for(int64_t i=0; i<stList_length(alignedPairs); i++) {
+		stIntTuple *aPair = stList_get(alignedPairs, i);
+		int64_t x = stIntTuple_get(aPair, 1);
+		int64_t y = stIntTuple_get(aPair, 2);
+
+		double s = scores[i] + getGapScore(gapProbsX, gapProbsY, x, y, seqLengthX, seqLengthY, p);
+		if(s > maxScore) {
+			maxScore = s;
+			maxScoreIndex = i;
+		}
+	}
+
+	stList *filteredAlignment = stList_construct();
+	while(maxScoreIndex != -1) {
+		stList_append(filteredAlignment, stList_get(alignedPairs, maxScoreIndex));
+		maxScoreIndex = backPointers[maxScoreIndex];
+	}
+	stList_reverse(filteredAlignment);
+
+	free(scores);
+	free(backPointers);
+	free(gapProbsX);
+	free(gapProbsY);
+
+	*alignmentScore = maxScore;
+	return filteredAlignment;
+}
+
+void test_getAlignedPairsWithIndels(CuTest *testCase) {
     for (int64_t test = 0; test < 100; test++) {
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(0, 100));
@@ -711,11 +818,38 @@ static void test_getAlignedPairsWithIndels(CuTest *testCase) {
         // Check the inserts in X
         checkAlignedPairs(testCase, gapYPairs, lX, lY, 0, 1);
 
+        checkAlignedPairsAreOrdered(testCase, alignedPairs);
+        checkAlignedPairsAreOrdered(testCase, gapXPairs);
+        checkAlignedPairsAreOrdered(testCase, gapYPairs);
+
+        // Get the MEA alignment, setting gap gamma to 0 so that our match based MEA algorithm is equivalent
+        double alignmentScore;
+        stList *filteredAlignment = getMaximalExpectedAccuracyPairwiseAlignment(alignedPairs, gapXPairs, gapYPairs, lX, lY, &alignmentScore, p);
+
+        // Get bad algorithm MEA
+        double expectedAlignmentScore;
+        stList *filteredAlignment2 = getMEAlignment(alignedPairs, lX, lY, gapXPairs, gapYPairs, p, &expectedAlignmentScore);
+
+        st_logInfo("Started with : %i pairs, ended with %i aligned pairs, expected %i aligned pairs\n",
+        		(int)stList_length(alignedPairs), (int)stList_length(filteredAlignment), (int)stList_length(filteredAlignment2));
+
+        checkAlignedPairs(testCase, filteredAlignment, lX, lY, 0, 0);
+
+        st_logInfo("Scores: %f %f\n", expectedAlignmentScore/PAIR_ALIGNMENT_PROB_1, alignmentScore/PAIR_ALIGNMENT_PROB_1);
+
+        CuAssertDblEquals(testCase, expectedAlignmentScore/PAIR_ALIGNMENT_PROB_1, alignmentScore/PAIR_ALIGNMENT_PROB_1, 0.0001);
+        CuAssertIntEquals(testCase, stList_length(filteredAlignment2), stList_length(filteredAlignment));
+
         //Cleanup
         stateMachine_destruct(sM);
         free(sX);
         free(sY);
         stList_destruct(alignedPairs);
+        stList_destruct(gapXPairs);
+        stList_destruct(gapYPairs);
+        stList_destruct(filteredAlignment);
+        stList_destruct(filteredAlignment2);
+        pairwiseAlignmentBandingParameters_destruct(p);
     }
 }
 
@@ -723,7 +857,7 @@ static void test_getAlignedPairsWithIndels(CuTest *testCase) {
  * EM training tests.
  */
 
-static void test_hmm(CuTest *testCase, StateMachineType stateMachineType) {
+void test_hmm(CuTest *testCase, StateMachineType stateMachineType) {
     //Expectation object
     Hmm *hmm = hmm_constructEmpty(0.0, stateMachineType);
 
@@ -801,23 +935,23 @@ static void test_hmm(CuTest *testCase, StateMachineType stateMachineType) {
     hmm_destruct(hmm);
 }
 
-static void test_hmm_5State(CuTest *testCase) {
+void test_hmm_5State(CuTest *testCase) {
     test_hmm(testCase, fiveState);
 }
 
-static void test_hmm_5StateAsymmetric(CuTest *testCase) {
+void test_hmm_5StateAsymmetric(CuTest *testCase) {
     test_hmm(testCase, fiveStateAsymmetric);
 }
 
-static void test_hmm_3State(CuTest *testCase) {
+void test_hmm_3State(CuTest *testCase) {
     test_hmm(testCase, threeState);
 }
 
-static void test_hmm_3StateAsymmetric(CuTest *testCase) {
+void test_hmm_3StateAsymmetric(CuTest *testCase) {
     test_hmm(testCase, threeStateAsymmetric);
 }
 
-static void test_em(CuTest *testCase, StateMachineType stateMachineType) {
+void test_em(CuTest *testCase, StateMachineType stateMachineType) {
     for (int64_t test = 0; test < 100; test++) {
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(10, 100));
@@ -867,18 +1001,19 @@ static void test_em(CuTest *testCase, StateMachineType stateMachineType) {
         pairwiseAlignmentBandingParameters_destruct(p);
         free(sX);
         free(sY);
+        stateMachine_destruct(sM);
     }
 }
 
-static void test_em_5State(CuTest *testCase) {
+void test_em_5State(CuTest *testCase) {
     test_em(testCase, fiveState);
 }
 
-static void test_em_3StateAsymmetric(CuTest *testCase) {
+void test_em_3StateAsymmetric(CuTest *testCase) {
     test_em(testCase, threeStateAsymmetric);
 }
 
-static void test_em_3State(CuTest *testCase) {
+void test_em_3State(CuTest *testCase) {
     test_em(testCase, threeState);
 }
 
