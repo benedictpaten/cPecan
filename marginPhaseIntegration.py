@@ -289,7 +289,7 @@ def run_pecan(read, reference_map, alignment_file, args):
         cig_out.write("{}\n".format(full_cigar_string))
 
     # generate command
-    realign_args = "--rescoreByPosteriorProb --splitMatrixBiggerThanThis 100 --diagonalExpansion 20"
+    realign_args = "--rescoreByPosteriorProb --splitMatrixBiggerThanThis 16 --diagonalExpansion 6"
     if args.hmm is not None:
         realign_args += " --loadHmm {}".format(args.hmm)
     cat_cigar_command = "cat %s" % (cigar_loc)
