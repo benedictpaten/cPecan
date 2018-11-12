@@ -1590,4 +1590,70 @@ stList *getMaximalExpectedAccuracyPairwiseAlignment(stList *alignedPairs,
 	return filteredAlignment;
 }
 
+stList *leftShiftAlignment(stList *alignedPairs, char *seqX, char *seqY) {
+	int64_t seqXLength = strlen(seqX), seqYLength = strlen(seqY);
+
+	stList *leftShiftedAlignedPairs = stList_construct3(0, (void (*)(void *))stIntTuple_destruct);
+
+	int64_t x = seqXLength, y = seqYLength;
+	for(int64_t i=stList_length(alignedPairs)-1; i>=0; i--) {
+		stIntTuple *alignedPair = stList_get(alignedPairs, i);
+		int64_t x2 = stIntTuple_get(alignedPair, 1), y2 = stIntTuple_get(alignedPair, 2);
+
+		while((x - x2 > 1 || y - y2 > 1) && toupper(seqX[x-1]) == toupper(seqY[y-1])) { // Insert in seqX or seqY and shift possible
+			stList_append(leftShiftedAlignedPairs, stIntTuple_construct3(stIntTuple_get(alignedPair, 0), x-1, y-1)); // Hacks the score by borrowing from the current aligned pair being considered
+			x--; y--;
+
+			if(x2 == x || y2 == y) { // We've shifted over an existing aligned pair
+				break;
+			}
+		}
+		if(x2 < x && y2 < y) {
+			stList_append(leftShiftedAlignedPairs, stIntTuple_construct3(stIntTuple_get(alignedPair, 0), x2, y2));
+			x = x2;
+			y = y2;
+		}
+	}
+
+	// Deal with boundary at beginning of alignment
+	while((x > 0 & y > 0) && toupper(seqX[x-1]) == toupper(seqY[y-1])) {
+		int64_t score = stList_length(alignedPairs) > 0 ? stIntTuple_get(stList_get(alignedPairs, 0), 0) : 1;
+		stList_append(leftShiftedAlignedPairs, stIntTuple_construct3(score, x-1, y-1));
+		x--; y--;
+	}
+
+	// Reverse, because built backwards
+	stList_reverse(leftShiftedAlignedPairs);
+
+	return leftShiftedAlignedPairs;
+}
+
+/*
+ * Convenience function that aligns two sequences return a left-shift MEA alignment
+ */
+stList *getShiftedMEAAlignment(char *seqX, char *seqY, stList *anchorAlignment, PairwiseAlignmentParameters *p, StateMachine *sM,
+							   bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd, double *alignmentScore) {
+	// Generate the posterior alignment probabilities
+	stList *alignedPairs, *gapXPairs, *gapYPairs;
+	getAlignedPairsWithIndelsUsingAnchors(sM, seqX, seqY, anchorAlignment,
+			p, &alignedPairs, &gapXPairs, &gapYPairs,
+			alignmentHasRaggedLeftEnd, alignmentHasRaggedRightEnd);
+
+	// Get the MEA alignment
+	stList *alignment = getMaximalExpectedAccuracyPairwiseAlignment(alignedPairs, gapXPairs, gapYPairs,
+			strlen(seqX), strlen(seqY),
+			alignmentScore, p);
+
+	// Left shift the alignment
+	stList *leftShiftedAlignment = leftShiftAlignment(alignment, seqX, seqY);
+
+	// Cleanup
+	stList_destruct(gapXPairs);
+	stList_destruct(gapYPairs);
+	stList_destruct(alignedPairs);
+	stList_destruct(alignment);
+
+	return leftShiftedAlignment;
+}
+
 

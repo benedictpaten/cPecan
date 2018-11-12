@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <ctype.h>
 #include "randomSequences.h"
 
 void test_diagonal(CuTest *testCase) {
@@ -790,8 +791,71 @@ static stList *getMEAlignment(stList *alignedPairs, int64_t seqLengthX, int64_t 
 	return filteredAlignment;
 }
 
+void checkAlignedPairsAreTotallyOrdered(CuTest *testCase, stList *alignedPairs, int64_t lX, int64_t lY) {
+	int64_t x = -1, y = -1;
+	for(int64_t i=0; i<stList_length(alignedPairs); i++) {
+		stIntTuple *aPair = stList_get(alignedPairs, i);
+		int64_t x2 = stIntTuple_get(aPair, 1);
+		int64_t y2 = stIntTuple_get(aPair, 2);
+		int64_t score = stIntTuple_get(aPair, 0);
+
+		CuAssertTrue(testCase, x < x2);
+		CuAssertTrue(testCase, y < y2);
+
+		x = x2;
+		y = y2;
+
+		CuAssertTrue(testCase, score >= 0);
+		CuAssertTrue(testCase, score <= PAIR_ALIGNMENT_PROB_1);
+	}
+	CuAssertTrue(testCase, x < lX);
+	CuAssertTrue(testCase, y < lY);
+}
+
+/*void printAlignment(stList *alignedPairs, char *sX, char *sY) {
+	stList *seqX = stList_construct();
+	stList *seqY = stList_construct();
+	int64_t x = -1, y = -1;
+	for(int64_t i=0; i<stList_length(alignedPairs); i++) {
+		stIntTuple *aPair = stList_get(alignedPairs, i);
+		int64_t x2 = stIntTuple_get(aPair, 1);
+		int64_t y2 = stIntTuple_get(aPair, 2);
+		while(x2 - x > 1) {
+			stList_append(seqX, stString_print("%c", sX[++x]));
+			stList_append(seqY, stString_print("-"));
+		}
+		while(y2 - y > 1) {
+			stList_append(seqY, stString_print("%c", sY[++y]));
+			stList_append(seqX, stString_print("-"));
+		}
+		stList_append(seqX, stString_print("%c", sX[x2]));
+		stList_append(seqY, stString_print("%c", sY[y2]));
+		x = x2;
+		y = y2;
+	}
+	fprintf(stderr, "SeaX: %s\n", stString_join2("", seqX));
+	fprintf(stderr, "SeaY: %s\n", stString_join2("", seqY));
+}*/
+
+void checkAlignmentNoFurtherLeftShifts(CuTest *testCase, stList *alignedPairs, char *sX, char *sY) {
+	int64_t x = -1, y = -1;
+	for(int64_t i=0; i<stList_length(alignedPairs); i++) {
+		stIntTuple *aPair = stList_get(alignedPairs, 0);
+		int64_t x2 = stIntTuple_get(aPair, 1);
+		int64_t y2 = stIntTuple_get(aPair, 2);
+		if(x2 - x > 1 && y2 > 0) { // Possible shift
+			CuAssertTrue(testCase, toupper(sY[y2-1]) != toupper(sX[x2-1])); // Check no shift is possible
+		}
+		if(y2 - y > 1 && x2 > 0) { // Possible shift
+			CuAssertTrue(testCase, toupper(sY[y2-1]) != toupper(sX[x2-1])); // Check no shift is possible
+		}
+		x = x2;
+		y = y2;
+	}
+}
+
 void test_getAlignedPairsWithIndels(CuTest *testCase) {
-    for (int64_t test = 0; test < 100; test++) {
+    for (int64_t test = 0; test < 1000; test++) {
         //Make a pair of sequences
         char *sX = getRandomSequence(st_randomInt(0, 100));
         char *sY = evolveSequence(sX); //stString_copy(seqX);
@@ -834,11 +898,24 @@ void test_getAlignedPairsWithIndels(CuTest *testCase) {
         		(int)stList_length(alignedPairs), (int)stList_length(filteredAlignment), (int)stList_length(filteredAlignment2));
 
         checkAlignedPairs(testCase, filteredAlignment, lX, lY, 0, 0);
+        checkAlignedPairsAreTotallyOrdered(testCase, filteredAlignment, lX, lY);
 
         st_logInfo("Scores: %f %f\n", expectedAlignmentScore/PAIR_ALIGNMENT_PROB_1, alignmentScore/PAIR_ALIGNMENT_PROB_1);
 
         CuAssertDblEquals(testCase, expectedAlignmentScore/PAIR_ALIGNMENT_PROB_1, alignmentScore/PAIR_ALIGNMENT_PROB_1, 0.0001);
         CuAssertIntEquals(testCase, stList_length(filteredAlignment2), stList_length(filteredAlignment));
+
+        // Now do left shift alignment
+        stList *shiftedAlignedPairs = leftShiftAlignment(filteredAlignment, sX, sY);
+
+        //printAlignment(filteredAlignment, sX, sY);
+        //fprintf(stderr, "After shift\n");
+        //printAlignment(shiftedAlignedPairs, sX, sY);
+
+        CuAssertTrue(testCase, stList_length(shiftedAlignedPairs) >= stList_length(filteredAlignment));
+        checkAlignedPairs(testCase, shiftedAlignedPairs, lX, lY, 0, 0);
+        checkAlignedPairsAreTotallyOrdered(testCase, shiftedAlignedPairs, lX, lY);
+        checkAlignmentNoFurtherLeftShifts(testCase, shiftedAlignedPairs, sX, sY);
 
         //Cleanup
         stateMachine_destruct(sM);
@@ -849,8 +926,58 @@ void test_getAlignedPairsWithIndels(CuTest *testCase) {
         stList_destruct(gapYPairs);
         stList_destruct(filteredAlignment);
         stList_destruct(filteredAlignment2);
+        stList_destruct(shiftedAlignedPairs);
         pairwiseAlignmentBandingParameters_destruct(p);
     }
+}
+
+void test_leftShiftAlignment(CuTest *testCase) {
+	stList *alignedPairs = stList_construct3(0, (void (*)(void *))stIntTuple_destruct);
+	char *seqX = "GATTTACATC";
+	char *seqY = "GATTACAATCTG";
+
+	// Make following alignment
+	// 01234567-8--9
+	// GATTTACA-T--C
+	// GATT-ACAATCTG
+	// 0123-45678901
+
+	// expect the following output
+	// 01234567---89
+	// GATTTACA---TC
+	// GA-TTACAATCTG
+	// 01-2345678901
+
+	int64_t alignedPairsX[] = { 0, 1, 2, 3, 5, 6, 7, 8, 9 };
+	int64_t alignedPairsY[] = { 0, 1, 2, 3, 4, 5, 6, 8, 11 };
+
+	for(int64_t i=0; i<9; i++) {
+		stList_append(alignedPairs, stIntTuple_construct3(1, alignedPairsX[i], alignedPairsY[i]));
+	}
+
+	// Run left shift
+	stList *leftShiftedAlignment = leftShiftAlignment(alignedPairs, seqX, seqY);
+
+	//for(int64_t i=0; i<stList_length(leftShiftedAlignment); i++) {
+	//	stIntTuple *aPair = stList_get(leftShiftedAlignment, i);
+	//	fprintf(stderr, "FUC %i %i\n", (int)stIntTuple_get(aPair, 1), (int)stIntTuple_get(aPair, 2));
+	//}
+
+	// Test we get what we expect
+	CuAssertIntEquals(testCase, 9, stList_length(leftShiftedAlignment));
+
+	int64_t shiftedAlignedPairsX[] = { 0, 1, 3, 4, 5, 6, 7, 8, 9 };
+	int64_t shiftedAlignedPairsY[] = { 0, 1, 2, 3, 4, 5, 6, 10, 11 };
+
+	for(int64_t i=0; i<9; i++) {
+		stIntTuple *aPair = stList_get(leftShiftedAlignment, i);
+		CuAssertIntEquals(testCase, shiftedAlignedPairsX[i], stIntTuple_get(aPair, 1));
+		CuAssertIntEquals(testCase, shiftedAlignedPairsY[i], stIntTuple_get(aPair, 2));
+	}
+
+	// Cleanup
+	stList_destruct(alignedPairs);
+	stList_destruct(leftShiftedAlignment);
 }
 
 /*
@@ -1043,6 +1170,7 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_em_3State);
     SUITE_ADD_TEST(suite, test_em_3StateAsymmetric);
     SUITE_ADD_TEST(suite, test_em_5State);
+    SUITE_ADD_TEST(suite, test_leftShiftAlignment);
 
     return suite;
 }

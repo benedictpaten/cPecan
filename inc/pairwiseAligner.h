@@ -80,6 +80,17 @@ stList *getMaximalExpectedAccuracyPairwiseAlignment(stList *alignedPairs, stList
 													PairwiseAlignmentParameters *p);
 
 /*
+ * Shifts pairs in an alignment so that inserts are maximally left shifted.
+ */
+stList *leftShiftAlignment(stList *alignedPairs, char *seqX, char *seqY);
+
+/*
+ * Convenience function that aligns two sequences return a left-shift MEA alignment
+ */
+stList *getShiftedMEAAlignment(char *seqX, char *seqY, stList *anchorAlignment, PairwiseAlignmentParameters *p, StateMachine *sM,
+							   bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd, double *alignmentScore);
+
+/*
  * Expectation calculation functions for EM algorithms.
  */
 
