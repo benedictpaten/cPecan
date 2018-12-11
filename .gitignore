@@ -1,0 +1,5 @@
+*.o
+docker
+externalTools/lastz-distrib-1.03.54/src/lastz
+externalTools/lastz-distrib-1.03.54/src/lastz_D
+.idea
