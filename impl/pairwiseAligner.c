@@ -821,6 +821,75 @@ void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const S
     band_destruct(band);
 }
 
+double getForwardProbWithBanding(StateMachine *sM, stList *anchorPairs, const SymbolString sX, const SymbolString sY,
+        PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
+    //Prerequisites
+    assert(p->traceBackDiagonals >= 1);
+    assert(p->diagonalExpansion >= 0);
+    assert(p->diagonalExpansion % 2 == 0);
+    assert(p->minDiagsBetweenTraceBack >= 2);
+    assert(p->traceBackDiagonals + 1 < p->minDiagsBetweenTraceBack);
+
+    int64_t diagonalNumber = sX.length + sY.length;
+    if (diagonalNumber == 0) { //Deal with trivial case
+        return LOG_ONE;
+    }
+
+    //Primitives for the forward matrix recursion
+    Band *band = band_construct(anchorPairs, sX.length, sY.length, p->diagonalExpansion);
+    BandIterator *forwardBandIterator = bandIterator_construct(band);
+    DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
+    dpDiagonal_initialiseValues(dpMatrix_createDiagonal(forwardDpMatrix, bandIterator_getNext(forwardBandIterator)), sM,
+            alignmentHasRaggedLeftEnd ? sM->raggedStartStateProb : sM->startStateProb); //Initialise forward matrix.
+
+    double totalLogProbability = LOG_ZERO;
+
+    int64_t totalPosteriorCalculations = 0;
+    while (1) { //Loop that moves through the matrix forward
+        Diagonal diagonal = bandIterator_getNext(forwardBandIterator);
+
+        //Forward calculation
+        dpDiagonal_zeroValues(dpMatrix_createDiagonal(forwardDpMatrix, diagonal));
+        diagonalCalculationForward(sM, diagonal_getXay(diagonal), forwardDpMatrix, sX, sY);
+
+        bool atEnd = diagonal_getXay(diagonal) == diagonalNumber; //Condition true at the end of the matrix
+        if (atEnd) {
+        	//Backward matrix.
+        	DpMatrix *backwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
+        	dpDiagonal_initialiseValues(dpMatrix_createDiagonal(backwardDpMatrix, diagonal), sM,
+        	                    		alignmentHasRaggedRightEnd ? sM->raggedEndStateProb : sM->endStateProb);
+        	totalLogProbability = diagonalCalculationTotalProbability(sM, diagonalNumber,
+        	                                forwardDpMatrix, backwardDpMatrix, sX, sY);
+        	dpMatrix_destruct(backwardDpMatrix);
+            break;
+        }
+    }
+    //Cleanup
+    dpMatrix_destruct(forwardDpMatrix);
+    bandIterator_destruct(forwardBandIterator);
+    band_destruct(band);
+
+    return totalLogProbability;
+}
+
+/*
+ * Computes for the forward log probability of aligning the two sequences
+ */
+double computeForwardProbability(char *seqX, char *seqY, stList *anchorPairs, PairwiseAlignmentParameters *p, StateMachine *sM,
+								 bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
+
+	SymbolString sX = symbolString_construct(seqX, strlen(seqX));
+	SymbolString sY = symbolString_construct(seqY, strlen(seqY));
+
+	double totalLogProb = getForwardProbWithBanding(sM, anchorPairs, sX, sY,
+							  	  	  	  	  	  	p, alignmentHasRaggedLeftEnd, alignmentHasRaggedRightEnd);
+
+	symbolString_destruct(sX);
+	symbolString_destruct(sY);
+
+	return totalLogProb;
+}
+
 ///////////////////////////////////
 ///////////////////////////////////
 //Blast anchoring functions

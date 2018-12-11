@@ -1144,6 +1144,39 @@ void test_em_3State(CuTest *testCase) {
     test_em(testCase, threeState);
 }
 
+void test_computeForwardProbability(CuTest *testCase) {
+	for (int64_t test = 0; test < 1000; test++) {
+		// Make a pair of sequences
+		char *sX = getRandomSequence(st_randomInt(10, 100));
+		char *sY = evolveSequence(sX); //stString_copy(seqX);
+		st_logInfo("Sequence X to align: %s END\n", sX);
+		st_logInfo("Sequence Y to align: %s END\n", sY);
+
+		// Now do alignment
+		PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+		StateMachine *sM = stateMachine3_construct(threeState);
+
+		// Forward probability
+		stList *anchorPairs = stList_construct();
+		bool raggedLeftEnd = st_random() > 0.5;
+		bool raggedRightEnd = st_random() > 0.5;
+		double logForwardProb = computeForwardProbability(sX, sY, anchorPairs, p, sM, raggedLeftEnd, raggedRightEnd);
+		double logForwardProbIdentity = computeForwardProbability(sX, sX, anchorPairs, p, sM, raggedLeftEnd, raggedRightEnd);
+
+		//st_uglyf("Boo:\n\t%s\n\t%s\t%f\t%f\n\n", sX, sY, logForwardProb, logForwardProbIdentity);
+
+		CuAssertTrue(testCase, logForwardProb <= LOG_ONE);
+		CuAssertTrue(testCase, logForwardProb > LOG_ZERO);
+		CuAssertTrue(testCase, logForwardProb <= logForwardProbIdentity);
+
+		// Cleanup
+		stateMachine_destruct(sM);
+		free(sX);
+		free(sY);
+		pairwiseAlignmentBandingParameters_destruct(p);
+	}
+}
+
 CuSuite* pairwiseAlignmentTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
 
@@ -1171,6 +1204,7 @@ CuSuite* pairwiseAlignmentTestSuite(void) {
     SUITE_ADD_TEST(suite, test_em_3StateAsymmetric);
     SUITE_ADD_TEST(suite, test_em_5State);
     SUITE_ADD_TEST(suite, test_leftShiftAlignment);
+    SUITE_ADD_TEST(suite, test_computeForwardProbability);
 
     return suite;
 }
