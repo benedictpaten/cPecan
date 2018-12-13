@@ -844,7 +844,6 @@ double getForwardProbWithBanding(StateMachine *sM, stList *anchorPairs, const Sy
 
     double totalLogProbability = LOG_ZERO;
 
-    int64_t totalPosteriorCalculations = 0;
     while (1) { //Loop that moves through the matrix forward
         Diagonal diagonal = bandIterator_getNext(forwardBandIterator);
 
@@ -860,11 +859,15 @@ double getForwardProbWithBanding(StateMachine *sM, stList *anchorPairs, const Sy
         	                    		alignmentHasRaggedRightEnd ? sM->raggedEndStateProb : sM->endStateProb);
         	totalLogProbability = diagonalCalculationTotalProbability(sM, diagonalNumber,
         	                                forwardDpMatrix, backwardDpMatrix, sX, sY);
+        	dpMatrix_deleteDiagonal(backwardDpMatrix, diagonalNumber);
         	dpMatrix_destruct(backwardDpMatrix);
             break;
         }
     }
     //Cleanup
+    for (int64_t i=0; i<=diagonalNumber; i++) {
+    	dpMatrix_deleteDiagonal(forwardDpMatrix, i);
+    }
     dpMatrix_destruct(forwardDpMatrix);
     bandIterator_destruct(forwardBandIterator);
     band_destruct(band);
@@ -1544,6 +1547,8 @@ static int64_t *getCumulativeGapProbs(stList *gapPairs, int64_t seqLength, bool 
 	// Work out the per-position gap probability
 	for(int64_t i=0; i<stList_length(gapPairs); i++) {
 		stIntTuple *gapPair = stList_get(gapPairs, i);
+		assert(stIntTuple_get(gapPair, seqXNotSeqY ? 1 : 2) >= 0);
+		assert(stIntTuple_get(gapPair, seqXNotSeqY ? 1 : 2) < seqLength);
 		gapCumulativeProbs[stIntTuple_get(gapPair, seqXNotSeqY ? 1 : 2)] += stIntTuple_get(gapPair, 0);
 	}
 
