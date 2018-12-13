@@ -49,6 +49,12 @@ void pairwiseAlignmentBandingParameters_destruct(PairwiseAlignmentParameters *p)
 PairwiseAlignmentParameters *pairwiseAlignmentParameters_jsonParse(char *buf, size_t r);
 
 /*
+ * Computes for the forward log probability of aligning the two sequences
+ */
+double computeForwardProbability(char *seqX, char *seqY, stList *anchorPairs, PairwiseAlignmentParameters *p, StateMachine *sM,
+								 bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
+
+/*
  * Gets the set of posterior match probabilities under a simple HMM model of alignment for two DNA sequences.
  */
 stList *getAlignedPairs(StateMachine *sM, const char *string1, const char *string2, PairwiseAlignmentParameters *p,
