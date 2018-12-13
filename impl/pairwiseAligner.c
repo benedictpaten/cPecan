@@ -1578,8 +1578,8 @@ stList *getMaximalExpectedAccuracyPairwiseAlignment(stList *alignedPairs,
 	// score for an aligned pair at any index less than i
 
 	// Calculate gap array cumulative probs
-	int64_t *gapXCumulativeProbs = getCumulativeGapProbs(gapXPairs, seqXLength, 1);
-	int64_t *gapYCumulativeProbs = getCumulativeGapProbs(gapYPairs, seqYLength, 0);
+	int64_t *gapYCumulativeProbs = getCumulativeGapProbs(gapYPairs, seqYLength, FALSE);
+	int64_t *gapXCumulativeProbs = getCumulativeGapProbs(gapXPairs, seqXLength, TRUE);
 
 	// Iterate through the aligned pairs in order of increasing sequence coordinate
 
