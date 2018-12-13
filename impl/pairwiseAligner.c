@@ -1475,7 +1475,10 @@ static int64_t *getCumulativeGapProbs(stList *gapPairs, int64_t seqLength, bool 
 	// Work out the per-position gap probability
 	for(int64_t i=0; i<stList_length(gapPairs); i++) {
 		stIntTuple *gapPair = stList_get(gapPairs, i);
-		gapCumulativeProbs[stIntTuple_get(gapPair, seqXNotSeqY ? 1 : 2)] += stIntTuple_get(gapPair, 0);
+		int64_t pos = stIntTuple_get(gapPair, seqXNotSeqY ? 1 : 2);
+		assert(pos >= 0); //TODO sometimes this position is -1
+		assert(pos < seqLength);
+		gapCumulativeProbs[pos] += stIntTuple_get(gapPair, 0);
 	}
 
 	// Make cumulative
@@ -1504,8 +1507,8 @@ stList *getMaximalExpectedAccuracyPairwiseAlignment(stList *alignedPairs,
 	// score for an aligned pair at any index less than i
 
 	// Calculate gap array cumulative probs
-	int64_t *gapXCumulativeProbs = getCumulativeGapProbs(gapXPairs, seqXLength, 1);
-	int64_t *gapYCumulativeProbs = getCumulativeGapProbs(gapYPairs, seqYLength, 0);
+	int64_t *gapYCumulativeProbs = getCumulativeGapProbs(gapYPairs, seqYLength, FALSE);
+	int64_t *gapXCumulativeProbs = getCumulativeGapProbs(gapXPairs, seqXLength, TRUE);
 
 	// Iterate through the aligned pairs in order of increasing sequence coordinate
 
