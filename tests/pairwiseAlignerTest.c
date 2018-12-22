@@ -330,12 +330,13 @@ stList *getRandomAnchorPairs(int64_t lX, int64_t lY) {
     while (1) {
         x += st_randomInt(1, 20);
         y += st_randomInt(1, 20);
+        int64_t expansion = 2 * st_randomInt(0, 5);
         if (x >= lX || y >= lY) {
             break;
         }
         assert(x >= 0 && x < lX);
         assert(y >= 0 && y < lY);
-        stList_append(anchorPairs, stIntTuple_construct2(x, y));
+        stList_append(anchorPairs, stIntTuple_construct3(x, y, expansion));
     }
     return anchorPairs;
 }
@@ -415,6 +416,7 @@ void test_getAlignedPairsWithBanding(CuTest *testCase) {
         p->traceBackDiagonals = st_randomInt(1, 10);
         p->minDiagsBetweenTraceBack = p->traceBackDiagonals + st_randomInt(2, 10);
         p->diagonalExpansion = st_randomInt(0, 10) * 2;
+        p->dynamicAnchorExpnsion = st_random() > 0.5;
         StateMachine *sM = stateMachine5_construct(fiveState);
         stList *anchorPairs = getRandomAnchorPairs(lX, lY);
 

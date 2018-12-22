@@ -125,6 +125,61 @@ static int64_t band_boundCoordinate(int64_t z, int64_t lZ) {
     return z < 0 ? 0 : (z > lZ ? lZ : z);
 }
 
+Band *band_constructDynamic(stList *anchorPairs, int64_t lX, int64_t lY) {
+    //Prerequisities
+    assert(lX >= 0);
+    assert(lY >= 0);
+
+    Band *band = st_malloc(sizeof(Band));
+    band->diagonals = st_malloc(sizeof(Diagonal) * (lX + lY + 1));
+    band->lXalY = lX + lY;
+
+    //Now initialise the diagonals
+    int64_t anchorPairIndex = 0;
+    int64_t xay = 0;
+    int64_t pxay = 0, pxmy = 0;
+    int64_t nxay = 0, nxmy = 0;
+    int64_t xL = 0, yL = 0, xU = 0, yU = 0, expansion = 0;
+
+    while (xay <= band->lXalY) {
+        band->diagonals[xay] = band_setCurrentDiagonal(xay, xL, yL, xU, yU);
+        if (nxay == xay++) {
+            //The previous diagonals become the next
+            pxay = nxay;
+            pxmy = nxmy;
+
+            int64_t x = lX, y = lY;
+            if (anchorPairIndex < stList_length(anchorPairs)) {
+                stIntTuple *anchorPair = stList_get(anchorPairs, anchorPairIndex++);
+                x = stIntTuple_get(anchorPair, 0) + 1; //Plus ones, because matrix coordinates are +1 the sequence ones
+                y = stIntTuple_get(anchorPair, 1) + 1;
+                expansion = stIntTuple_get(anchorPair, 2);
+
+                //Check the anchor pairs
+                assert(x > diagonal_getXCoordinate(pxay, pxmy));
+                assert(y > diagonal_getYCoordinate(pxay, pxmy));
+                assert(x <= lX);
+                assert(y <= lY);
+                assert(x > 0);
+                assert(y > 0);
+                assert(expansion >= 0);
+                assert(expansion % 2 == 0);
+            }
+
+            nxay = x + y;
+            nxmy = x - y;
+
+            //Now call to set the lower and upper x,y coordinates
+            xL = band_boundCoordinate(diagonal_getXCoordinate(pxay, pxmy - expansion), lX);
+            yL = band_boundCoordinate(diagonal_getYCoordinate(nxay, nxmy - expansion), lY);
+            xU = band_boundCoordinate(diagonal_getXCoordinate(nxay, nxmy + expansion), lX);
+            yU = band_boundCoordinate(diagonal_getYCoordinate(pxay, pxmy + expansion), lY);
+        }
+    }
+
+    return band;
+}
+
 Band *band_construct(stList *anchorPairs, int64_t lX, int64_t lY, int64_t expansion) {
     //Prerequisities
     assert(lX >= 0);
@@ -715,7 +770,7 @@ void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const S
     }
 
     //Primitives for the forward matrix recursion
-    Band *band = band_construct(anchorPairs, sX.length, sY.length, p->diagonalExpansion);
+    Band *band = p->dynamicAnchorExpnsion ? band_constructDynamic(anchorPairs, sX.length, sY.length) : band_construct(anchorPairs, sX.length, sY.length, p->diagonalExpansion);
     BandIterator *forwardBandIterator = bandIterator_construct(band);
     DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
     dpDiagonal_initialiseValues(dpMatrix_createDiagonal(forwardDpMatrix, bandIterator_getNext(forwardBandIterator)), sM,
@@ -1288,6 +1343,7 @@ PairwiseAlignmentParameters *pairwiseAlignmentBandingParameters_construct() {
     p->splitMatrixBiggerThanThis = (int64_t) 3000 * 3000;
     p->alignAmbiguityCharacters = 0;
     p->gapGamma = 0.5;
+    p->dynamicAnchorExpnsion = 0;
     return p;
 }
 
