@@ -36,7 +36,7 @@ typedef struct _pairwiseAlignmentBandingParameters {
     int64_t splitMatrixBiggerThanThis; //Any matrix in the anchors bigger than this is split into two.
     bool alignAmbiguityCharacters;
     float gapGamma; //The AMAP gap-gamma parameter which controls the degree to which indel probabilities are factored into the alignment.
-    bool dynamicAnchorExpnsion; // For each alignment anchor specify the expansion of the band individually, instead of using a
+    bool dynamicAnchorExpansion; // For each alignment anchor specify the expansion of the band individually, instead of using a
     // single expansion
 } PairwiseAlignmentParameters;
 

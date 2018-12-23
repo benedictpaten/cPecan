@@ -416,7 +416,7 @@ void test_getAlignedPairsWithBanding(CuTest *testCase) {
         p->traceBackDiagonals = st_randomInt(1, 10);
         p->minDiagsBetweenTraceBack = p->traceBackDiagonals + st_randomInt(2, 10);
         p->diagonalExpansion = st_randomInt(0, 10) * 2;
-        p->dynamicAnchorExpnsion = st_random() > 0.5;
+        p->dynamicAnchorExpansion = st_random() > 0.5;
         StateMachine *sM = stateMachine5_construct(fiveState);
         stList *anchorPairs = getRandomAnchorPairs(lX, lY);
 

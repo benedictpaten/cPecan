@@ -770,7 +770,7 @@ void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const S
     }
 
     //Primitives for the forward matrix recursion
-    Band *band = p->dynamicAnchorExpnsion ? band_constructDynamic(anchorPairs, sX.length, sY.length) : band_construct(anchorPairs, sX.length, sY.length, p->diagonalExpansion);
+    Band *band = p->dynamicAnchorExpansion ? band_constructDynamic(anchorPairs, sX.length, sY.length) : band_construct(anchorPairs, sX.length, sY.length, p->diagonalExpansion);
     BandIterator *forwardBandIterator = bandIterator_construct(band);
     DpMatrix *forwardDpMatrix = dpMatrix_construct(diagonalNumber, sM->stateNumber);
     dpDiagonal_initialiseValues(dpMatrix_createDiagonal(forwardDpMatrix, bandIterator_getNext(forwardBandIterator)), sM,
@@ -1343,7 +1343,7 @@ PairwiseAlignmentParameters *pairwiseAlignmentBandingParameters_construct() {
     p->splitMatrixBiggerThanThis = (int64_t) 3000 * 3000;
     p->alignAmbiguityCharacters = 0;
     p->gapGamma = 0.5;
-    p->dynamicAnchorExpnsion = 0;
+    p->dynamicAnchorExpansion = 0;
     return p;
 }
 
