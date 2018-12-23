@@ -1395,6 +1395,9 @@ PairwiseAlignmentParameters *pairwiseAlignmentParameters_jsonParse(char *buf, si
 		else if (strcmp(keyString, "gapGamma") == 0) {
 			params->gapGamma = stJson_parseFloat(js, tokens, ++tokenIndex);
 		}
+		else if (strcmp(keyString, "dynamicAnchorExpansion") == 0) {
+			params->dynamicAnchorExpansion = stJson_parseBool(js, tokens, ++tokenIndex);
+		}
 		else {
 			st_errAbort("ERROR: Unrecognised key in pairwise alignment parameters json: %s\n", keyString);
 		}
