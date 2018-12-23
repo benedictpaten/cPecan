@@ -1303,7 +1303,9 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(StateMachine *sM
             }
             assert(x >= x1 && x < x2);
             assert(y >= y1 && y < y2);
-            stList_append(subListOfAnchorPoints, stIntTuple_construct2(x - x1, y - y1));
+            stList_append(subListOfAnchorPoints, stIntTuple_length(anchorPair) == 3 ?
+            			  stIntTuple_construct3(x - x1, y - y1, stIntTuple_get(anchorPair, 2))
+						  : stIntTuple_construct2(x - x1, y - y1));
             j++;
         }
 
