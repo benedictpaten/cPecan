@@ -70,7 +70,7 @@ void getAlignedPairsWithIndels(StateMachine *sM, const char *string1, const char
 							   stList **alignedPairs, stList **gapXPairs, stList **gapYPairs,
 							   bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
-stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignment *pA, int64_t trim);
+stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignment *pA, int64_t trim, int64_t diagonalExpansion);
 
 stList *getAlignedPairsUsingAnchors(StateMachine *sM, const char *sX, const char *sY, stList *anchorPairs, PairwiseAlignmentParameters *p, bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd);
 
@@ -249,7 +249,7 @@ void getPosteriorProbsWithBanding(StateMachine *sM, stList *anchorPairs, const S
 
 //Blast pairs
 
-stList *getBlastPairs(const char *sX, const char *sY, int64_t lX, int64_t lY, int64_t trim, bool repeatMask);
+stList *getBlastPairs(const char *sX, const char *sY, int64_t lX, int64_t lY, int64_t trim, int64_t diagonalExpansion, bool repeatMask);
 
 stList *getBlastPairsForPairwiseAlignmentParameters(const char *sX, const char *sY, const int64_t lX, const int64_t lY,
         PairwiseAlignmentParameters *p);

@@ -437,16 +437,17 @@ void test_getAlignedPairsWithBanding(CuTest *testCase) {
     }
 }
 
-static void checkBlastPairs(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY, bool checkNonOverlapping) {
+static void checkBlastPairs(CuTest *testCase, stList *blastPairs, int64_t lX, int64_t lY, int64_t diagonalExpansion, bool checkNonOverlapping) {
     st_logInfo("I got %" PRIi64 " pairs to check\n", stList_length(blastPairs));
     int64_t pX = -1;
     int64_t pY = -1;
     for (int64_t i = 0; i < stList_length(blastPairs); i++) {
         stIntTuple *j = stList_get(blastPairs, i);
-        CuAssertTrue(testCase, stIntTuple_length(j) == 2);
+        CuAssertTrue(testCase, stIntTuple_length(j) == 3);
 
         int64_t x = stIntTuple_get(j, 0);
         int64_t y = stIntTuple_get(j, 1);
+        int64_t expansion = stIntTuple_get(j, 2);
 
         CuAssertTrue(testCase, x >= 0);
         CuAssertTrue(testCase, y >= 0);
@@ -458,6 +459,11 @@ static void checkBlastPairs(CuTest *testCase, stList *blastPairs, int64_t lX, in
         }
         pX = x;
         pY = y;
+
+        CuAssertTrue(testCase, expansion == diagonalExpansion);
+        CuAssertTrue(testCase, expansion >= 0);
+        CuAssertTrue(testCase, expansion % 2 == 0);
+
     }
 }
 
@@ -474,12 +480,13 @@ void test_getBlastPairs(CuTest *testCase) {
         st_logInfo("Sequence Y to align: %s END, seq length %" PRIi64 "\n", seqY, lY);
 
         int64_t trim = st_randomInt(0, 5);
+        int64_t diagonalExpansion = st_randomInt(0, 5)*2;
         bool repeatMask = st_random() > 0.5;
         st_logInfo("Using random trim %" PRIi64 ", recursive %" PRIi64 " \n", trim, repeatMask);
 
-        stList *blastPairs = getBlastPairs(seqX, seqY, lX, lY, trim, repeatMask);
+        stList *blastPairs = getBlastPairs(seqX, seqY, lX, lY, trim, diagonalExpansion, repeatMask);
 
-        checkBlastPairs(testCase, blastPairs, lX, lY, 0);
+        checkBlastPairs(testCase, blastPairs, lX, lY, diagonalExpansion, 0);
         stList_destruct(blastPairs);
         free(seqX);
         free(seqY);
@@ -493,10 +500,11 @@ void test_filterToRemoveOverlap(CuTest *testCase) {
         int64_t lY = st_randomInt(0, 100);
         stList *pairs = stList_construct3(0, (void (*)(void *)) stIntTuple_destruct);
         double acceptProb = st_random();
+        int64_t diagonalExpansion = st_randomInt(0, 5) * 2;
         for (int64_t x = 0; x < lX; x++) {
             for (int64_t y = 0; y < lY; y++) {
                 if (st_random() > acceptProb) {
-                    stList_append(pairs, stIntTuple_construct2(x, y));
+                    stList_append(pairs, stIntTuple_construct3(x, y, diagonalExpansion));
                 }
             }
         }
@@ -504,7 +512,7 @@ void test_filterToRemoveOverlap(CuTest *testCase) {
         stList *nonoverlappingPairs = filterToRemoveOverlap(pairs);
 
         //Check non overlapping
-        checkBlastPairs(testCase, nonoverlappingPairs, lX, lY, 1);
+        checkBlastPairs(testCase, nonoverlappingPairs, lX, lY, diagonalExpansion, 1);
 
         //Now check maximal
         stList *nonoverlappingPairs2 = stList_construct();
@@ -531,7 +539,7 @@ void test_filterToRemoveOverlap(CuTest *testCase) {
         stSortedSet *nonOverlappingPairsSet2 = stList_getSortedSet(nonoverlappingPairs2,
                 (int (*)(const void *, const void *)) stIntTuple_cmpFn);
         st_logDebug("The non-overlapping set sizes are %" PRIi64 " %" PRIi64 "\n",
-                stSortedSet_size(nonOverlappingPairsSet), stSortedSet_size(nonOverlappingPairsSet2));
+                	stSortedSet_size(nonOverlappingPairsSet), stSortedSet_size(nonOverlappingPairsSet2));
         CuAssertTrue(testCase, stSortedSet_equals(nonOverlappingPairsSet, nonOverlappingPairsSet2));
 
         //Cleanup
@@ -560,7 +568,7 @@ void test_getBlastPairsWithRecursion(CuTest *testCase) {
 
         stList *blastPairs = getBlastPairsForPairwiseAlignmentParameters(seqX, seqY, lX, lY, p);
 
-        checkBlastPairs(testCase, blastPairs, lX, lY, 1);
+        checkBlastPairs(testCase, blastPairs, lX, lY, p->diagonalExpansion, 1);
         stList_destruct(blastPairs);
         free(seqX);
         free(seqY);

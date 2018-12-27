@@ -38,7 +38,7 @@ static stHash *readFastaFile(char *filename) {
 
 // copied from cPecanRealign, which is sloppy.
 void *convertToAnchorPair(void *aPair, void *extraArg) {
-    stIntTuple *i = stIntTuple_construct2(stIntTuple_get(aPair, 1), stIntTuple_get(aPair, 2));
+    stIntTuple *i = stIntTuple_construct3(stIntTuple_get(aPair, 1), stIntTuple_get(aPair, 2), 0);
     stIntTuple_destruct(aPair);
     return i;
 }
@@ -50,7 +50,7 @@ struct PairwiseAlignment *convertAlignedPairsToPairwiseAlignment(char *seqName1,
     int64_t pX = -1, pY = -1, mL = 0;
     //Create an end matched pair, which is used to ensure the alignment has the correct end indels.
     struct List *opList = constructEmptyList(0, (void (*)(void *)) destructAlignmentOperation);
-    stList_append(alignedPairs, stIntTuple_construct2(length1, length2));
+    stList_append(alignedPairs, stIntTuple_construct3(length1, length2, 0));
     for (int64_t i = 0; i < stList_length(alignedPairs); i++) {
         stIntTuple *alignedPair = stList_get(alignedPairs, i);
         int64_t x = stIntTuple_get(alignedPair, 0);
