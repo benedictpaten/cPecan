@@ -315,7 +315,7 @@ void writePosteriorProbs(char *posteriorProbsFile, stList *alignedPairs,
     fclose(fH);
 }
 
-stList *scoreAnchorPairs(stList *anchorPairs, stList *alignedPairs) {
+stList *scoreAnchorPairs(stList *anchorPairs, stList *alignedPairs, int64_t diagonalExpansion) {
     /*
      * Selects the aligned pairs contained in anchor pairs.
      */
@@ -325,7 +325,7 @@ stList *scoreAnchorPairs(stList *anchorPairs, stList *alignedPairs) {
 
     for(int64_t i=0; i<stList_length(alignedPairs); i++) {
         stIntTuple *aPair = stList_get(alignedPairs, i);
-        stIntTuple *j = stIntTuple_construct2(stIntTuple_get(aPair, 1), stIntTuple_get(aPair, 2));
+        stIntTuple *j = stIntTuple_construct3(stIntTuple_get(aPair, 1), stIntTuple_get(aPair, 2), diagonalExpansion);
         if(stSortedSet_search(anchorPairsSet, j) != NULL) {
             stList_append(scoredAnchorPairs, stIntTuple_construct3(stIntTuple_get(aPair, 0), stIntTuple_get(aPair, 1), stIntTuple_get(aPair, 2)));
             stSortedSet_remove(anchorPairsSet, j);
@@ -544,7 +544,7 @@ int main(int argc, char *argv[]) {
             }
             //Convert to partial ordered set of pairs
             if (rescoreOriginalAlignment) {
-                stList *rescoredPairs = scoreAnchorPairs(anchorPairs, alignedPairs);
+                stList *rescoredPairs = scoreAnchorPairs(anchorPairs, alignedPairs, pairwiseAlignmentBandingParameters->diagonalExpansion);
                 stList_destruct(alignedPairs);
                 alignedPairs = rescoredPairs;
             } else { //Shouldn't be needed if we only take pairs with > 50% posterior prob
