@@ -239,8 +239,7 @@ char *getSubSequence(char *seq, int64_t start, int64_t end, bool strand) {
     return rSeq;
 }
 
-stHash *sequences = NULL;
-void addToSequencesHash(const char *header, const char *sequence, int64_t length) {
+/*void addToSequencesHash(const char *header, const char *sequence, int64_t length) {
     stList *tokens = stString_split(header);
     char *firstToken = stList_get(tokens, 0);
     if (stHash_search(sequences, (char *) firstToken) != NULL) {
@@ -266,7 +265,7 @@ void addToSequencesHash(const char *header, const char *sequence, int64_t length
         stHash_insert(sequences, stString_copy(firstToken), stString_copy(sequence));
     }
     stList_destruct(tokens);
-}
+}*/
 
 void *convertToAnchorPair(void *aPair, void *extraArg) {
     stIntTuple *i = stIntTuple_construct3(stIntTuple_get(aPair, 1), stIntTuple_get(aPair, 2), 0);
@@ -494,11 +493,11 @@ int main(int argc, char *argv[]) {
     }
 
     //Read in input sequences
-    sequences = stHash_construct3(stHash_stringKey, stHash_stringEqualKey, free, free);
+    stHash *sequences = stHash_construct3(stHash_stringKey, stHash_stringEqualKey, free, free);
     assert(optind < argc);
     while (optind < argc) {
         FILE *seqFileHandle = fopen(argv[optind++], "r");
-        fastaReadToFunction(seqFileHandle, addToSequencesHash);
+        fastaReadToFunction(seqFileHandle, sequences, fastaRead_readToMapFunction);
         fclose(seqFileHandle);
     }
 
